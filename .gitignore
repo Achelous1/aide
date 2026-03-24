@@ -93,9 +93,6 @@ typings/
 # Electron-Forge
 out/
 
-# pnpm
-pnpm-lock.yaml
-
 # Test
 test-results/
 playwright-report/
