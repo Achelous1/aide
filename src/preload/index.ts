@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../main/ipc/channels';
-import type { AideAPI, TerminalSpawnOptions } from '../types/ipc';
+import type { AideAPI, AgentStatus, TerminalSpawnOptions } from '../types/ipc';
 
 const aideAPI: AideAPI = {
   terminal: {
@@ -27,6 +27,31 @@ const aideAPI: AideAPI = {
       ipcRenderer.on(IPC_CHANNELS.TERMINAL_DATA, listener);
       return () => {
         ipcRenderer.removeListener(IPC_CHANNELS.TERMINAL_DATA, listener);
+      };
+    },
+  },
+
+  workspace: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_LIST),
+    create: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_CREATE, path),
+    open: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_OPEN, path),
+    remove: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_REMOVE, id),
+    recent: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RECENT),
+  },
+
+  agent: {
+    detect: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_DETECT),
+    onStatus: (callback: (sessionId: string, status: AgentStatus) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        sessionId: string,
+        status: AgentStatus
+      ) => {
+        callback(sessionId, status);
+      };
+      ipcRenderer.on(IPC_CHANNELS.AGENT_STATUS, listener);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.AGENT_STATUS, listener);
       };
     },
   },

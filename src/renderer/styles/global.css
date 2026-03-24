@@ -2,6 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --background: #131519;
+  --surface: #1A1C23;
+  --surface-elevated: #24262E;
+  --surface-sidebar: #181A21;
+  --border: #2E3140;
+  --terminal-bg: #0F1117;
+  --terminal-text: #CDD1E0;
+  --text-primary: #E8E9ED;
+  --text-secondary: #8B8D98;
+  --text-tertiary: #5C5E6A;
+  --accent: #10B981;
+  --accent-warning: #F59E0B;
+  --accent-info: #06B6D4;
+  --agent-claude: #D97706;
+  --agent-gemini: #3B82F6;
+  --agent-codex: #10B981;
+  --tab-active-bg: #131519;
+  --tab-inactive-bg: #1A1C23;
+}
+
+.light {
+  --background: #F5F5F0;
+  --surface: #FAFAF7;
+  --surface-elevated: #EBEBE6;
+  --surface-sidebar: #EFEFEA;
+  --border: #E0E3E8;
+  --terminal-bg: #FAFAF7;
+  --terminal-text: #374151;
+  --text-primary: #0D0D0D;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --accent: #059669;
+  --accent-warning: #D97706;
+  --accent-info: #0891B2;
+  --agent-claude: #D97706;
+  --agent-gemini: #3B82F6;
+  --agent-codex: #10B981;
+  --tab-active-bg: #F5F5F0;
+  --tab-inactive-bg: #E8E8E3;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;
@@ -10,6 +52,7 @@ html, body, #root {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, sans-serif;
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+  background: var(--background);
+  color: var(--text-primary);
 }

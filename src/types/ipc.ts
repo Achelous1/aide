@@ -37,6 +37,24 @@ export interface AgentConfig {
   installed: boolean;
 }
 
+export interface WorkspaceInfo {
+  id: string;
+  name: string;
+  path: string;
+  color: string;
+  lastOpened: number;
+}
+
+export type AgentStatus = 'idle' | 'processing' | 'awaiting-input';
+
+export interface TerminalTab {
+  id: string;
+  type: 'agent' | 'shell';
+  agentId?: string;
+  sessionId: string;
+  title: string;
+}
+
 /** IPC API exposed to renderer via contextBridge */
 export interface AideAPI {
   terminal: {
@@ -45,5 +63,16 @@ export interface AideAPI {
     resize(sessionId: string, cols: number, rows: number): Promise<void>;
     kill(sessionId: string): Promise<void>;
     onData(callback: (sessionId: string, data: string) => void): () => void;
+  };
+  workspace: {
+    list(): Promise<WorkspaceInfo[]>;
+    create(path: string): Promise<WorkspaceInfo>;
+    open(path: string): Promise<void>;
+    remove(id: string): Promise<void>;
+    recent(): Promise<WorkspaceInfo[]>;
+  };
+  agent: {
+    detect(): Promise<AgentConfig[]>;
+    onStatus(callback: (sessionId: string, status: AgentStatus) => void): () => void;
   };
 }
