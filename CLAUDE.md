@@ -65,6 +65,34 @@ plugins/              # Generated plugins stored here
 - CSP meta tag in `index.html` restricts script/style sources
 - node-pty must be unpacked from asar (`forge.config.ts` packagerConfig)
 
+## Coding Guidelines
+
+> These bias toward caution over speed. Use judgment for trivial tasks.
+
+### 1. Think Before Coding
+- State assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+
+### 2. Simplicity First
+- Minimum code that solves the problem. Nothing speculative.
+- No abstractions for single-use code.
+- No "flexibility" that wasn't requested.
+- If you write 200 lines and it could be 50, rewrite it.
+
+### 3. Surgical Changes
+- Touch only what you must. Don't "improve" adjacent code.
+- Match existing style, even if you'd do it differently.
+- Remove imports/variables YOUR changes made unused. Leave pre-existing dead code alone.
+
+### 4. Goal-Driven Execution
+- Transform tasks into verifiable goals before starting.
+- For multi-step tasks, state a brief plan with verify steps:
+  ```
+  1. [Step] → verify: [check]
+  2. [Step] → verify: [check]
+  ```
+
 ## Platform Notes
 
 - macOS: bash/zsh default shell, .dmg/.zip packaging
