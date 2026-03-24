@@ -7,6 +7,7 @@ export default defineConfig({
       external: [
         'electron',
         'node-pty',
+        'electron-store',
       ],
     },
   },

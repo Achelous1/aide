@@ -1,8 +1,7 @@
 import { dialog, BrowserWindow, type IpcMain } from 'electron';
 import fs from 'fs';
 import nodePath from 'path';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const Store = require('electron-store');
+import Store from 'electron-store';
 import { IPC_CHANNELS } from './channels';
 import type { WorkspaceInfo } from '../../types/ipc';
 

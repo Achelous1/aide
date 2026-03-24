@@ -46,35 +46,50 @@ interface WelcomePageProps {
 
 export function WelcomePage({ recentProjects }: WelcomePageProps) {
   async function handleOpenRepository() {
-    const path = await window.aide.workspace.openDialog();
-    if (!path) return;
-    const workspace = await window.aide.workspace.create(path);
-    useWorkspaceStore.getState().addWorkspace(workspace);
-    useWorkspaceStore.getState().setActive(workspace.id);
+    try {
+      const path = await window.aide.workspace.openDialog();
+      if (!path) return;
+      const workspace = await window.aide.workspace.create(path);
+      useWorkspaceStore.getState().addWorkspace(workspace);
+      useWorkspaceStore.getState().setActive(workspace.id);
+    } catch (err) {
+      console.error('Failed to open repository:', err);
+    }
   }
 
   async function handleNewProject() {
-    const path = await window.aide.workspace.openDialog();
-    if (!path) return;
-    const workspace = await window.aide.workspace.create(path);
-    useWorkspaceStore.getState().addWorkspace(workspace);
-    useWorkspaceStore.getState().setActive(workspace.id);
+    try {
+      const path = await window.aide.workspace.openDialog();
+      if (!path) return;
+      const workspace = await window.aide.workspace.create(path);
+      useWorkspaceStore.getState().addWorkspace(workspace);
+      useWorkspaceStore.getState().setActive(workspace.id);
+    } catch (err) {
+      console.error('Failed to create project:', err);
+    }
   }
 
   async function handleOpenRecent(path: string) {
-    await window.aide.workspace.open(path);
-    const workspaces = useWorkspaceStore.getState().workspaces;
-    const workspace = workspaces.find((w) => w.path === path);
-    if (workspace) {
-      useWorkspaceStore.getState().setActive(workspace.id);
+    try {
+      await window.aide.workspace.open(path);
+      const workspaces = useWorkspaceStore.getState().workspaces;
+      const workspace = workspaces.find((w) => w.path === path);
+      if (workspace) {
+        useWorkspaceStore.getState().setActive(workspace.id);
+      }
+    } catch (err) {
+      console.error('Failed to open recent project:', err);
     }
   }
 
   return (
     <div className="flex flex-col h-full bg-[var(--background)]">
       {/* TopBar */}
-      <header className="h-10 flex items-center justify-center border-b border-[var(--border)] flex-shrink-0">
-        <span className="text-sm font-bold text-[var(--text-secondary)]">&gt; aide</span>
+      <header
+        className="h-10 relative flex items-center justify-center border-b border-[var(--border)] flex-shrink-0"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <span className="text-sm font-bold text-[var(--text-secondary)] pointer-events-none">&gt; aide</span>
       </header>
 
       {/* Body */}
