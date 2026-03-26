@@ -5,8 +5,7 @@ import chokidar from 'chokidar';
 import { IPC_CHANNELS } from './channels';
 import type { FileTreeNode } from '../../types/ipc';
 
-const SKIP_DIRS = new Set(['node_modules', '.git', '.vite', '.omc', 'dist']);
-const MAX_DEPTH = 5;
+const MAX_DEPTH = 10;
 
 function readTree(dirPath: string, depth = 0): FileTreeNode[] {
   if (depth >= MAX_DEPTH) return [];
@@ -20,8 +19,6 @@ function readTree(dirPath: string, depth = 0): FileTreeNode[] {
 
   const nodes: FileTreeNode[] = [];
   for (const entry of entries) {
-    if (entry.isDirectory() && SKIP_DIRS.has(entry.name)) continue;
-
     const fullPath = path.join(dirPath, entry.name);
     if (entry.isDirectory()) {
       nodes.push({
@@ -68,10 +65,7 @@ export function registerFsHandlers(ipcMain: IpcMain, cwd: string): void {
   chokidar
     .watch(cwd, {
       ignoreInitial: true,
-      ignored: (p: string) => {
-        const parts = p.split(path.sep);
-        return parts.some((part) => SKIP_DIRS.has(part));
-      },
+      depth: 3,
     })
     .on('all', () => {
       if (debounceTimer) clearTimeout(debounceTimer);

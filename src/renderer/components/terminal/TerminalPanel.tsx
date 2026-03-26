@@ -11,6 +11,12 @@ export function TerminalPanel({ sessionId }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const sessionIdRef = useRef<string>(sessionId);
+
+  // Keep sessionId ref in sync
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   // Initialize xterm once
   useEffect(() => {
@@ -57,7 +63,13 @@ export function TerminalPanel({ sessionId }: TerminalPanelProps) {
     fitAddonRef.current = fitAddon;
 
     const resizeObserver = new ResizeObserver(() => {
-      fitAddonRef.current?.fit();
+      if (fitAddonRef.current && terminalRef.current) {
+        fitAddonRef.current.fit();
+        const sid = sessionIdRef.current;
+        if (sid) {
+          window.aide.terminal.resize(sid, terminalRef.current.cols, terminalRef.current.rows);
+        }
+      }
     });
     resizeObserver.observe(containerRef.current);
 

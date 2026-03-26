@@ -195,14 +195,16 @@ Welcome Page의 Workspace Navbar와 동일한 구조.
 | Element | Spec | 동작 |
 |---------|------|------|
 | Header | `EXPLORER` (10px, uppercase, tertiary) | 섹션 제목 |
-| Folder | `▼`/`▶` + 폴더명 (13px) | 클릭 시 하위 트리 펼침/접힘 |
-| File | 파일명 (13px, secondary) | 클릭 시 시스템 기본 에디터로 열기 |
+| Folder | `▶`/`▼` + 폴더명 (13px) | 클릭 시 하위 트리 펼침/접힘 토글 |
+| File | 파일명 (13px, secondary) | 클릭 시 console.log(path) (에디터 연동 향후) |
 
 **기능**:
-- 트리 뷰 형태의 디렉토리 구조 표시
-- chokidar 기반 파일 변경 실시간 반영
-- Git 상태 인라인 표시 (색상 코딩)
-- 우클릭 컨텍스트 메뉴: 새 파일/폴더, 이름 변경, 삭제, 터미널에서 열기
+- 재귀 트리 뷰 (최대 깊이 10)
+- 모든 디렉토리 표시 (자동 제외 없음)
+- 정렬: 디렉토리 우선, 알파벳 순
+- chokidar 기반 파일 변경 감시 (500ms 디바운스) → `fs:changed` 이벤트 → 자동 새로고침
+- IPC: `readTree(cwd)`, `readFile(path)`, `writeFile(path, content)`, `delete(path)`, `onChanged(callback)`
+- 워크스페이스 경로를 `cwd` prop으로 전달받음
 
 ### 3.7 TabBar (36px)
 
@@ -239,26 +241,44 @@ Welcome Page의 Workspace Navbar와 동일한 구조.
 
 | Element | Spec | 동작 |
 |---------|------|------|
-| Background | `terminal-bg` 토큰 색상 | xterm.js 캔버스 배경 |
+| Background | `#0F1117` (terminal-bg 토큰) | xterm.js 캔버스 배경 |
 | Font | JetBrains Mono 13px | 터미널 텍스트 |
 | Prompt | 에이전트별 프롬프트 표시 | 에이전트 CLI 네이티브 프롬프트 |
 | Output | 터미널 출력 스트림 | IPC를 통한 pty 출력 실시간 표시 |
-| Cursor | 블록 커서 (깜빡임) | xterm.js 기본 커서 |
+| Cursor | 블록 커서 (깜빡임, `#CDD1E0`) | xterm.js cursorStyle: 'block' |
 
 **기능**:
 - xterm.js + FitAddon으로 터미널 영역 자동 리사이즈
 - ResizeObserver로 컨테이너 크기 변경 감지 → `pty.resize(cols, rows)` IPC 호출
 - 키보드 입력 → `terminal.write(sessionId, data)` IPC로 pty에 전달
 - pty 출력 → `terminal.onData(sessionId, data)` 콜백으로 xterm에 쓰기
+- **256색 ANSI 컬러**: pty 환경변수 `TERM=xterm-256color`, `COLORTERM=truecolor`, `FORCE_COLOR=1`
+- **멀티탭 보존**: 각 탭마다 독립 TerminalPanel 인스턴스, 비활성 탭은 `display: none`으로 숨김 (출력 보존)
+- **탭 닫기**: `window.aide.terminal.kill(sessionId)` → pty 종료 + 탭 제거 + 다음 탭 자동 전환
 
 ### 3.9 StatusBar (24px)
 
 | Element | Spec | 동작 |
 |---------|------|------|
-| Git Branch | `git: feature/init` (11px) | 현재 브랜치 표시. 클릭 시 브랜치 전환 드롭다운 (향후) |
+| Git Branch | 실시간 브랜치명 (11px) | simple-git으로 30초 폴링, 변경 파일 수 표시 |
 | Plugin Count | `[0] plugins active` (11px) | 활성 플러그인 수. 클릭 시 플러그인 패널 (향후) |
 | Spacer | fill | — |
 | Agent Name | `claude-opus-4-6` (11px) | 현재 탭의 에이전트/모델명 표시 |
+
+### 3.10 Agent Auto-Detection
+
+앱 시작 시 시스템에 설치된 CLI 에이전트를 자동 감지.
+
+| Agent | Detection | 동작 |
+|-------|-----------|------|
+| Claude Code | `which claude` / `where claude` | 설치 시 활성, 미설치 시 비활성 |
+| Gemini CLI | `which gemini` / `where gemini` | 설치 시 활성, 미설치 시 비활성 |
+| Codex CLI | `which codex` / `where codex` | 설치 시 활성, 미설치 시 비활성 |
+| Shell | 항상 사용 가능 | 기본 셸 (bash/zsh/powershell) |
+
+- AgentDropdown 마운트 시 `window.aide.agent.detect()` 호출
+- 미설치 에이전트: `opacity-40` + "Not installed" 힌트 + 클릭 차단
+- 결과는 `agent-store.setInstalledAgents()`에 저장
 
 ---
 
