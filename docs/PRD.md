@@ -242,8 +242,8 @@ $ npm test
 - [x] 파일 트리 브라우저 (chokidar 감시, 재귀 트리)
 - [x] Git 기본 기능 (simple-git: status, commit, push, pull, branch, log)
 - [ ] GitHub PR/Issue 조회
-- [ ] 다크/라이트 테마 토글 UI (CSS 변수 토큰은 완료, 전환 버튼 미구현)
-- [ ] Navbar expanded 토글 버튼 연결
+- [x] 다크/라이트 테마 토글 (StatusBar 버튼, .light 클래스 전환)
+- [x] Navbar expanded 토글 (collapsed 48px ↔ expanded 220px, «/» 버튼)
 
 ### Out of Scope (Post-MVP)
 - 커뮤니티 플러그인 허브 (아래 Post-MVP 로드맵 참조)
