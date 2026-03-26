@@ -46,10 +46,12 @@ export function WorkspaceNav() {
 
   const handleAddWorkspace = async () => {
     if (!window.aide?.workspace) return;
-    // In a real impl we'd open a directory picker; for now call create with empty string
     try {
-      const ws = await window.aide.workspace.create('');
+      const selectedPath = await window.aide.workspace.openDialog();
+      if (!selectedPath) return;
+      const ws = await window.aide.workspace.create(selectedPath);
       addWorkspace(ws);
+      setActive(ws.id);
     } catch {
       // ignore
     }
