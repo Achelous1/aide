@@ -228,20 +228,22 @@ $ npm test
 ## MVP Scope 정의
 
 ### In Scope (MVP)
-- [ ] Welcome Page (히어로, Open Repository, New Project, 최근 프로젝트 5개)
-- [ ] Workspace 관리 (멀티 프로젝트, Navbar collapsed/expanded 토글)
-- [ ] Electron 앱 기본 셸 (프로젝트 구조, 빌드 파이프라인)
-- [ ] 터미널 에뮬레이터 (xterm.js 기반, 멀티 탭)
-- [ ] 에이전트 선택 드롭다운 (탭 `+` 버튼 → claude/gemini/codex/shell)
-- [ ] 에이전트 상태 표시 시스템 (idle/processing/awaiting input)
-- [ ] 멀티 LLM 연동 (Claude Code, Gemini CLI, Codex CLI)
+- [x] Welcome Page (히어로, Open Repository, New Project, 최근 프로젝트 5개)
+- [x] Workspace 관리 (멀티 프로젝트, Navbar collapsed, electron-store 영속화)
+- [x] Electron 앱 기본 셸 (프로젝트 구조, 빌드 파이프라인)
+- [x] 터미널 에뮬레이터 (xterm.js 기반, 멀티 탭, ANSI 256색, 탭 보존)
+- [x] 에이전트 선택 드롭다운 (탭 `+` 버튼 → claude/gemini/codex/shell)
+- [x] 에이전트 상태 표시 시스템 (idle/processing/awaiting input, pty 파싱)
+- [x] 에이전트 자동 감지 (which/where, 미설치 비활성화)
+- [ ] 멀티 LLM 연동 — 에이전트별 최적화 (현재: 기본 pty spawn만 구현)
 - [ ] 플러그인 생성 파이프라인 (자연어 → 스펙 → 코드 → tool/skill)
 - [ ] 플러그인 샌드박스 런타임
 - [ ] 플러그인 관리 (목록, 활성화/비활성화, 삭제)
-- [ ] 파일 트리 브라우저
-- [ ] Git 기본 기능 (status, commit, push, pull, branch)
+- [x] 파일 트리 브라우저 (chokidar 감시, 재귀 트리)
+- [x] Git 기본 기능 (simple-git: status, commit, push, pull, branch, log)
 - [ ] GitHub PR/Issue 조회
-- [ ] 다크/라이트 테마 지원
+- [ ] 다크/라이트 테마 토글 UI (CSS 변수 토큰은 완료, 전환 버튼 미구현)
+- [ ] Navbar expanded 토글 버튼 연결
 
 ### Out of Scope (Post-MVP)
 - 커뮤니티 플러그인 허브 (아래 Post-MVP 로드맵 참조)
