@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useAgentStore } from '../../stores/agent-store';
 import type { AgentStatus } from '../../../types/ipc';
@@ -26,6 +27,14 @@ function StatusBadge({ status }: { status: AgentStatus }) {
 export function WorkspaceNav() {
   const { workspaces, activeWorkspaceId, setActive, addWorkspace } = useWorkspaceStore();
   const { sessionStatuses } = useAgentStore();
+
+  useEffect(() => {
+    if (!window.aide?.agent?.onStatus) return;
+    const unsubscribe = window.aide.agent.onStatus((sessionId, status) => {
+      useAgentStore.getState().setStatus(sessionId, status);
+    });
+    return unsubscribe;
+  }, []);
 
   // Derive a representative status per workspace (first session found)
   const getWorkspaceStatus = (workspaceId: string): AgentStatus | null => {

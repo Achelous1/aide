@@ -1,8 +1,45 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../main/ipc/channels';
-import type { AideAPI, AgentStatus, TerminalSpawnOptions } from '../types/ipc';
+import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions } from '../types/ipc';
 
 const aideAPI: AideAPI = {
+  fs: {
+    readTree: (dirPath: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.FS_READ_TREE, dirPath),
+
+    readFile: (filePath: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.FS_READ_FILE, filePath),
+
+    writeFile: (filePath: string, content: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.FS_WRITE_FILE, filePath, content),
+
+    delete: (filePath: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.FS_DELETE, filePath),
+
+    onChanged: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on(IPC_CHANNELS.FS_CHANGED, listener);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.FS_CHANGED, listener);
+      };
+    },
+  },
+
+  git: {
+    status: (cwd: string): Promise<GitStatus> =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_STATUS, cwd),
+    commit: (cwd: string, message: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_COMMIT, cwd, message),
+    push: (cwd: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_PUSH, cwd),
+    pull: (cwd: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_PULL, cwd),
+    branch: (cwd: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_BRANCH, cwd),
+    log: (cwd: string, limit?: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_LOG, cwd, limit),
+  },
+
   terminal: {
     spawn: (options?: TerminalSpawnOptions) =>
       ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_SPAWN, options),

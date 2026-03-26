@@ -8,6 +8,7 @@ export default defineConfig({
         'electron',
         'node-pty',
         'electron-store',
+        'simple-git',
       ],
     },
   },

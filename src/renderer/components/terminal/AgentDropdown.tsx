@@ -49,8 +49,13 @@ const AGENT_OPTIONS: AgentOption[] = [
 
 export function AgentDropdown() {
   const { addTab, setActiveTab, toggleDropdown, updateTabSession } = useTerminalStore();
-  const { installedAgents } = useAgentStore();
+  const { installedAgents, setInstalledAgents } = useAgentStore();
   const ref = useRef<HTMLDivElement>(null);
+
+  // Detect installed agents on mount
+  useEffect(() => {
+    window.aide.agent.detect().then(setInstalledAgents).catch(() => {});
+  }, [setInstalledAgents]);
 
   // Close on outside click
   useEffect(() => {

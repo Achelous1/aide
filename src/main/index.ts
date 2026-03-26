@@ -2,6 +2,9 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { registerIpcHandlers } from './ipc/handlers';
 import { registerWorkspaceHandlers } from './ipc/workspace-handlers';
+import { registerFsHandlers } from './ipc/fs-handlers';
+import { registerAgentHandlers } from './ipc/agent-handlers';
+import { registerGitHandlers } from './ipc/git-handlers';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -42,6 +45,9 @@ const createWindow = (): void => {
 app.on('ready', () => {
   registerIpcHandlers();
   registerWorkspaceHandlers(ipcMain);
+  registerFsHandlers(ipcMain, process.cwd());
+  registerAgentHandlers(ipcMain);
+  registerGitHandlers(ipcMain);
   createWindow();
 });
 

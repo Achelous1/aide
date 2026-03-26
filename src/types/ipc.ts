@@ -47,6 +47,16 @@ export interface WorkspaceInfo {
 
 export type AgentStatus = 'idle' | 'processing' | 'awaiting-input';
 
+export interface GitStatus {
+  branch: string;
+  modified: string[];
+  added: string[];
+  deleted: string[];
+  untracked: string[];
+  ahead: number;
+  behind: number;
+}
+
 export interface TerminalTab {
   id: string;
   type: 'agent' | 'shell';
@@ -57,6 +67,21 @@ export interface TerminalTab {
 
 /** IPC API exposed to renderer via contextBridge */
 export interface AideAPI {
+  fs: {
+    readTree(dirPath: string): Promise<FileTreeNode[]>;
+    readFile(filePath: string): Promise<string>;
+    writeFile(filePath: string, content: string): Promise<void>;
+    delete(filePath: string): Promise<void>;
+    onChanged(callback: () => void): () => void;
+  };
+  git: {
+    status(cwd: string): Promise<GitStatus>;
+    commit(cwd: string, message: string): Promise<unknown>;
+    push(cwd: string): Promise<unknown>;
+    pull(cwd: string): Promise<unknown>;
+    branch(cwd: string): Promise<unknown>;
+    log(cwd: string, limit?: number): Promise<unknown>;
+  };
   terminal: {
     spawn(options?: TerminalSpawnOptions): Promise<string>;
     write(sessionId: string, data: string): Promise<void>;

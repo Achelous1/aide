@@ -2,6 +2,8 @@ import { type IpcMain, BrowserWindow } from 'electron';
 import * as pty from 'node-pty';
 import os from 'os';
 import { IPC_CHANNELS } from './channels';
+import { AgentStatusDetector } from '../agent/status-detector';
+import type { AgentStatus } from '../../types/ipc';
 
 interface PtySession {
   pty: pty.IPty;
@@ -10,6 +12,15 @@ interface PtySession {
 
 const sessions = new Map<string, PtySession>();
 let sessionCounter = 0;
+
+const statusDetector = new AgentStatusDetector(
+  (sessionId: string, status: AgentStatus) => {
+    const session = sessions.get(sessionId);
+    if (session) {
+      broadcastToRenderer(session.webContentsId, IPC_CHANNELS.AGENT_STATUS, sessionId, status);
+    }
+  }
+);
 
 function getDefaultShell(): string {
   if (process.platform === 'win32') {
@@ -57,10 +68,12 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
           sessionId,
           data
         );
+        statusDetector.feed(sessionId, data);
       });
 
       ptyProcess.onExit(() => {
         sessions.delete(sessionId);
+        statusDetector.remove(sessionId);
       });
 
       return sessionId;
@@ -92,6 +105,7 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
     if (session) {
       session.pty.kill();
       sessions.delete(sessionId);
+      statusDetector.remove(sessionId);
     }
   });
 }

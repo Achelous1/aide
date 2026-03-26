@@ -15,6 +15,7 @@ export const IPC_CHANNELS = {
   FS_READ_FILE: 'fs:read-file',
   FS_WRITE_FILE: 'fs:write-file',
   FS_DELETE: 'fs:delete',
+  FS_CHANGED: 'fs:changed',
 
   // Git
   GIT_STATUS: 'git:status',
