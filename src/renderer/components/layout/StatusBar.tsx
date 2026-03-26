@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../../stores/workspace-store';
+import { useThemeStore } from '../../stores/theme-store';
 import type { GitStatus } from '../../../types/ipc';
 
 export function StatusBar() {
@@ -42,12 +43,23 @@ export function StatusBar() {
       ? gitStatus.modified.length + gitStatus.added.length + gitStatus.deleted.length + gitStatus.untracked.length
       : 0;
 
+  const theme = useThemeStore((s) => s.theme);
+  const toggleTheme = useThemeStore((s) => s.toggleTheme);
+
   return (
     <div
       className="flex items-center w-full shrink-0 px-3 gap-4 bg-aide-accent text-black text-[11px] font-mono"
       style={{ height: '24px' }}
     >
       <span>git: {branch}{changeCount > 0 ? ` (${changeCount})` : ''}</span>
+      <span className="flex-1" />
+      <button
+        onClick={toggleTheme}
+        className="hover:opacity-70 transition-opacity"
+        title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+      >
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
     </div>
   );
 }

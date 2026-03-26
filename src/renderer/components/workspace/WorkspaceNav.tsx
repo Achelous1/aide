@@ -25,7 +25,7 @@ function StatusBadge({ status }: { status: AgentStatus }) {
 }
 
 export function WorkspaceNav() {
-  const { workspaces, activeWorkspaceId, setActive, addWorkspace } = useWorkspaceStore();
+  const { workspaces, activeWorkspaceId, navExpanded, setActive, toggleNav, addWorkspace } = useWorkspaceStore();
   const { sessionStatuses } = useAgentStore();
 
   useEffect(() => {
@@ -55,11 +55,82 @@ export function WorkspaceNav() {
     }
   };
 
+  if (navExpanded) {
+    return (
+      <div
+        className="flex flex-col bg-aide-surface-sidebar border-r border-aide-border shrink-0 overflow-y-auto"
+        style={{ width: '220px' }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-3 py-2 shrink-0">
+          <span className="text-[10px] uppercase tracking-widest text-aide-text-tertiary font-mono">Workspaces</span>
+          <button
+            onClick={toggleNav}
+            title="Collapse sidebar"
+            className="text-aide-text-tertiary hover:text-aide-text-primary text-xs"
+          >
+            «
+          </button>
+        </div>
+
+        {/* Workspace list */}
+        <div className="flex flex-col gap-0.5 px-1">
+          {workspaces.map((ws) => {
+            const isActive = ws.id === activeWorkspaceId;
+            const status = getWorkspaceStatus(ws.id);
+            return (
+              <button
+                key={ws.id}
+                onClick={() => setActive(ws.id)}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors ${
+                  isActive ? 'bg-aide-surface-elevated' : 'hover:bg-aide-surface-elevated'
+                }`}
+              >
+                <span
+                  className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                  style={{ backgroundColor: ws.color }}
+                >
+                  {ws.name[0]?.toUpperCase() ?? '?'}
+                </span>
+                <span className="text-xs font-mono text-aide-text-primary truncate flex-1">{ws.name}</span>
+                {status && (
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${
+                    status === 'idle' ? 'bg-[#3B82F6]' : 'bg-[#F59E0B]'
+                  }`} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Add button */}
+        <div className="px-2 mt-2">
+          <button
+            onClick={handleAddWorkspace}
+            className="flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs font-mono text-aide-text-secondary hover:bg-aide-surface-elevated transition-colors"
+          >
+            <span>+</span>
+            <span>New Workspace</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex flex-col items-center py-2 gap-2 bg-aide-surface-sidebar border-r border-aide-border shrink-0"
       style={{ width: '48px' }}
     >
+      {/* Expand toggle */}
+      <button
+        onClick={toggleNav}
+        title="Expand sidebar"
+        className="flex items-center justify-center w-7 h-5 rounded text-aide-text-tertiary hover:text-aide-text-primary text-xs mb-1"
+      >
+        »
+      </button>
+
       {workspaces.map((ws) => {
         const isActive = ws.id === activeWorkspaceId;
         const status = getWorkspaceStatus(ws.id);
@@ -73,7 +144,6 @@ export function WorkspaceNav() {
                 ? 'bg-aide-surface-elevated text-aide-text-primary'
                 : 'text-aide-text-secondary hover:bg-aide-surface-elevated hover:text-aide-text-primary'
             }`}
-            style={{ backgroundColor: isActive ? undefined : undefined }}
           >
             <span
               className="w-7 h-7 rounded-[6px] flex items-center justify-center text-black text-[11px] font-bold"
