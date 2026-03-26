@@ -38,8 +38,6 @@ export function App() {
     return <WelcomePage recentProjects={recentProjects} />;
   }
 
-  const activeTab = tabs.find((t) => t.id === activeTabId);
-
   return (
     <div className="flex flex-col h-screen bg-aide-background text-aide-text-primary overflow-hidden">
       <TitleBar />
@@ -65,8 +63,16 @@ export function App() {
         {/* Main area: TabBar + Terminal */}
         <div className="flex flex-col flex-1 overflow-hidden">
           <TabBar />
-          <div className="flex-1 overflow-hidden">
-            {activeTab && <TerminalPanel sessionId={activeTab.sessionId} />}
+          <div className="flex-1 overflow-hidden relative">
+            {tabs.map((tab) => (
+              <div
+                key={tab.id}
+                className="absolute inset-0"
+                style={{ display: tab.id === activeTabId ? 'block' : 'none' }}
+              >
+                {tab.sessionId && <TerminalPanel sessionId={tab.sessionId} />}
+              </div>
+            ))}
           </div>
         </div>
       </div>

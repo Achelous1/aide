@@ -18,22 +18,33 @@ export function TerminalPanel({ sessionId }: TerminalPanelProps) {
 
     const terminal = new Terminal({
       theme: {
-        background: '#1a1b26',
-        foreground: '#c0caf5',
-        cursor: '#c0caf5',
-        selectionBackground: '#3b4261',
-        black: '#15161e',
+        background: '#0F1117',
+        foreground: '#CDD1E0',
+        cursor: '#CDD1E0',
+        cursorAccent: '#0F1117',
+        selectionBackground: '#2E3140',
+        selectionForeground: '#E8E9ED',
+        black: '#1A1C23',
         red: '#f7768e',
         green: '#9ece6a',
         yellow: '#e0af68',
         blue: '#7aa2f7',
         magenta: '#bb9af7',
         cyan: '#7dcfff',
-        white: '#a9b1d6',
+        white: '#CDD1E0',
+        brightBlack: '#5C5E6A',
+        brightRed: '#ff9e9e',
+        brightGreen: '#b9f27c',
+        brightYellow: '#f0c674',
+        brightBlue: '#8cb4ff',
+        brightMagenta: '#d4aaff',
+        brightCyan: '#a4e4ff',
+        brightWhite: '#E8E9ED',
       },
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      fontSize: 14,
+      fontFamily: "'JetBrains Mono', 'IBM Plex Mono', Menlo, Monaco, monospace",
+      fontSize: 13,
       cursorBlink: true,
+      allowTransparency: false,
     });
 
     const fitAddon = new FitAddon();
@@ -62,7 +73,6 @@ export function TerminalPanel({ sessionId }: TerminalPanelProps) {
     if (!sessionId || !terminalRef.current) return;
 
     const terminal = terminalRef.current;
-    terminal.clear();
 
     // Send user input to this session's pty
     const inputDisposable = terminal.onData((data) => {
