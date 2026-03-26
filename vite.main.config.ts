@@ -11,6 +11,7 @@ export default defineConfig({
         'simple-git',
         'chokidar',
         'fsevents',
+        '@octokit/rest',
       ],
     },
   },

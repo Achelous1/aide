@@ -27,9 +27,15 @@ export const IPC_CHANNELS = {
 
   // Plugin
   PLUGIN_LIST: 'plugin:list',
-  PLUGIN_ENABLE: 'plugin:enable',
-  PLUGIN_DISABLE: 'plugin:disable',
-  PLUGIN_REMOVE: 'plugin:remove',
+  PLUGIN_GENERATE_SPEC: 'plugin:generate-spec',
+  PLUGIN_ACTIVATE: 'plugin:activate',
+  PLUGIN_DEACTIVATE: 'plugin:deactivate',
+  PLUGIN_DELETE: 'plugin:delete',
+
+  // GitHub
+  GITHUB_LIST_PRS: 'github:list-prs',
+  GITHUB_LIST_ISSUES: 'github:list-issues',
+  GITHUB_GET_PR: 'github:get-pr',
 
   // Agent
   AGENT_LIST_INSTALLED: 'agent:list-installed',

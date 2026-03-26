@@ -36,7 +36,7 @@ export function StatusBar() {
     };
   }, [cwd]);
 
-  const branch = gitStatus?.branch ?? 'main';
+  const branch = gitStatus?.branch ?? '—';
   const changeCount =
     gitStatus
       ? gitStatus.modified.length + gitStatus.added.length + gitStatus.deleted.length + gitStatus.untracked.length

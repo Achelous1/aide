@@ -68,6 +68,7 @@ AIDE의 메인 인터페이스. 모든 상호작용의 시작점.
 - 멀티 탭: 여러 에이전트/셸 세션을 탭으로 동시 운영 및 전환
   - 각 탭은 독립 pty 세션 보유, 탭 전환 시 출력 보존 (display:none 패턴)
   - 워크스페이스 진입 시 기본 Shell 탭 자동 생성
+  - 워크스페이스별 탭 상태 보존: 워크스페이스 전환 시 현재 탭 목록과 활성 탭을 저장하고, 돌아올 때 복원
 - xterm.js 256색 ANSI 컬러 지원 (TERM=xterm-256color, COLORTERM=truecolor)
 - JetBrains Mono 폰트, 블록 커서 (깜빡임)
 
@@ -231,7 +232,7 @@ $ npm test
 - [x] Welcome Page (히어로, Open Repository, New Project, 최근 프로젝트 5개)
 - [x] Workspace 관리 (멀티 프로젝트, Navbar collapsed, electron-store 영속화)
 - [x] Electron 앱 기본 셸 (프로젝트 구조, 빌드 파이프라인)
-- [x] 터미널 에뮬레이터 (xterm.js 기반, 멀티 탭, ANSI 256색, 탭 보존)
+- [x] 터미널 에뮬레이터 (xterm.js 기반, 멀티 탭, ANSI 256색, 탭 보존, 워크스페이스별 탭 상태 보존)
 - [x] 에이전트 선택 드롭다운 (탭 `+` 버튼 → claude/gemini/codex/shell)
 - [x] 에이전트 상태 표시 시스템 (idle/processing/awaiting input, pty 파싱)
 - [x] 에이전트 자동 감지 (which/where, 미설치 비활성화)
@@ -242,8 +243,8 @@ $ npm test
 - [x] 파일 트리 브라우저 (chokidar 감시, 재귀 트리)
 - [x] Git 기본 기능 (simple-git: status, commit, push, pull, branch, log)
 - [ ] GitHub PR/Issue 조회
-- [ ] 다크/라이트 테마 토글 UI (CSS 변수 토큰은 완료, 전환 버튼 미구현)
-- [ ] Navbar expanded 토글 버튼 연결
+- [x] 다크/라이트 테마 토글 (StatusBar 버튼, .light 클래스 전환)
+- [x] Navbar expanded 토글 (collapsed 48px ↔ expanded 220px, «/» 버튼)
 
 ### Out of Scope (Post-MVP)
 - 커뮤니티 플러그인 허브 (아래 Post-MVP 로드맵 참조)

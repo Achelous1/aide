@@ -15,10 +15,12 @@ export interface FileTreeNode {
 
 /** Plugin info for UI display */
 export interface PluginInfo {
+  id: string;
   name: string;
   version: string;
   description: string;
   enabled: boolean;
+  active: boolean;
   tools: PluginTool[];
 }
 
@@ -65,6 +67,40 @@ export interface TerminalTab {
   title: string;
 }
 
+/** GitHub PR summary */
+export interface GithubPR {
+  number: number;
+  title: string;
+  state: string;
+  author: string;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+  draft: boolean;
+}
+
+/** GitHub Issue summary */
+export interface GithubIssue {
+  number: number;
+  title: string;
+  state: string;
+  author: string;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+  labels: string[];
+}
+
+/** Plugin specification */
+export interface PluginSpec {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  permissions: string[];
+  entryPoint: string;
+}
+
 /** IPC API exposed to renderer via contextBridge */
 export interface AideAPI {
   fs: {
@@ -101,5 +137,17 @@ export interface AideAPI {
   agent: {
     detect(): Promise<AgentConfig[]>;
     onStatus(callback: (sessionId: string, status: AgentStatus) => void): () => void;
+  };
+  plugin: {
+    list(): Promise<PluginInfo[]>;
+    generateSpec(name: string, description: string): Promise<PluginSpec>;
+    activate(id: string): Promise<void>;
+    deactivate(id: string): Promise<void>;
+    delete(name: string): Promise<void>;
+  };
+  github: {
+    listPRs(owner: string, repo: string, token?: string): Promise<GithubPR[]>;
+    listIssues(owner: string, repo: string, token?: string): Promise<GithubIssue[]>;
+    getPR(owner: string, repo: string, prNumber: number, token?: string): Promise<GithubPR & { body: string; additions: number; deletions: number; changedFiles: number }>;
   };
 }

@@ -16,6 +16,7 @@ export function App() {
   const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
   const tabs = useTerminalStore((s) => s.tabs);
   const activeTabId = useTerminalStore((s) => s.activeTabId);
+  const workspaceTabs = useTerminalStore((s) => s.workspaceTabs);
   const createDefaultTab = useTerminalStore((s) => s.createDefaultTab);
   const updateTabSession = useTerminalStore((s) => s.updateTabSession);
 
@@ -27,7 +28,8 @@ export function App() {
   useEffect(() => {
     if (!activeWorkspaceId || tabs.length > 0) return;
     const tabId = createDefaultTab();
-    window.aide.terminal.spawn().then((sessionId) => {
+    const ws = workspaces.find((w) => w.id === activeWorkspaceId);
+    window.aide.terminal.spawn({ cwd: ws?.path }).then((sessionId) => {
       updateTabSession(tabId, sessionId);
     }).catch(() => {
       // ignore spawn errors
@@ -36,6 +38,27 @@ export function App() {
 
   if (!activeWorkspaceId) {
     return <WelcomePage recentProjects={recentProjects} />;
+  }
+
+  // Collect all terminals: active workspace tabs + all cached workspace tabs
+  // This keeps xterm instances alive across workspace switches
+  const allTerminals: Array<{ tab: { id: string; sessionId: string }; wsId: string; isActiveWs: boolean }> = [];
+
+  // Current workspace tabs
+  for (const tab of tabs) {
+    if (tab.sessionId) {
+      allTerminals.push({ tab, wsId: activeWorkspaceId, isActiveWs: true });
+    }
+  }
+
+  // Cached workspace tabs (inactive workspaces)
+  for (const [wsId, saved] of Object.entries(workspaceTabs)) {
+    if (wsId === activeWorkspaceId) continue;
+    for (const tab of saved.tabs) {
+      if (tab.sessionId) {
+        allTerminals.push({ tab, wsId, isActiveWs: false });
+      }
+    }
   }
 
   return (
@@ -64,15 +87,18 @@ export function App() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <TabBar />
           <div className="flex-1 overflow-hidden relative">
-            {tabs.map((tab) => (
-              <div
-                key={tab.id}
-                className="absolute inset-0"
-                style={{ display: tab.id === activeTabId ? 'block' : 'none' }}
-              >
-                {tab.sessionId && <TerminalPanel sessionId={tab.sessionId} visible={tab.id === activeTabId} />}
-              </div>
-            ))}
+            {allTerminals.map(({ tab, isActiveWs }) => {
+              const isVisible = isActiveWs && tab.id === activeTabId;
+              return (
+                <div
+                  key={tab.id}
+                  className="absolute inset-0"
+                  style={{ display: isVisible ? 'block' : 'none' }}
+                >
+                  <TerminalPanel sessionId={tab.sessionId} visible={isVisible} />
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

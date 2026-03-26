@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { WorkspaceInfo } from '../../types/ipc';
+import { useTerminalStore } from './terminal-store';
 
 interface WorkspaceState {
   workspaces: WorkspaceInfo[];
@@ -14,7 +15,7 @@ interface WorkspaceState {
   loadWorkspaces: () => Promise<void>;
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
+export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,
   recentProjects: [],
@@ -23,7 +24,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     set((state) => ({ workspaces: [...state.workspaces, workspace] })),
   removeWorkspace: (id) =>
     set((state) => ({ workspaces: state.workspaces.filter((w) => w.id !== id) })),
-  setActive: (id) => set({ activeWorkspaceId: id }),
+  setActive: (id) => {
+    const prevId = get().activeWorkspaceId;
+    if (id && id !== prevId) {
+      useTerminalStore.getState().switchWorkspace(prevId, id);
+    }
+    set({ activeWorkspaceId: id });
+  },
   toggleNav: () => set((state) => ({ navExpanded: !state.navExpanded })),
   loadRecent: (projects) => set({ recentProjects: projects.slice(0, 5) }),
   loadWorkspaces: async () => {

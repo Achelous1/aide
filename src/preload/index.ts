@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../main/ipc/channels';
-import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions } from '../types/ipc';
+import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions, PluginSpec } from '../types/ipc';
 
 const aideAPI: AideAPI = {
   fs: {
@@ -93,6 +93,24 @@ const aideAPI: AideAPI = {
         ipcRenderer.removeListener(IPC_CHANNELS.AGENT_STATUS, listener);
       };
     },
+  },
+
+  plugin: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_LIST),
+    generateSpec: (name: string, description: string): Promise<PluginSpec> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GENERATE_SPEC, name, description),
+    activate: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_ACTIVATE, id),
+    deactivate: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_DEACTIVATE, id),
+    delete: (name: string) => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_DELETE, name),
+  },
+
+  github: {
+    listPRs: (owner: string, repo: string, token?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_LIST_PRS, owner, repo, token),
+    listIssues: (owner: string, repo: string, token?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_LIST_ISSUES, owner, repo, token),
+    getPR: (owner: string, repo: string, prNumber: number, token?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_GET_PR, owner, repo, prNumber, token),
   },
 };
 

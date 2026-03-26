@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTerminalStore } from '../../stores/terminal-store';
 import { useAgentStore } from '../../stores/agent-store';
+import { useWorkspaceStore } from '../../stores/workspace-store';
 
 interface AgentOption {
   id: string;
@@ -50,6 +51,8 @@ const AGENT_OPTIONS: AgentOption[] = [
 export function AgentDropdown() {
   const { addTab, setActiveTab, toggleDropdown, updateTabSession } = useTerminalStore();
   const { installedAgents, setInstalledAgents } = useAgentStore();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
   const ref = useRef<HTMLDivElement>(null);
 
   // Detect installed agents on mount
@@ -87,8 +90,9 @@ export function AgentDropdown() {
     setActiveTab(tabId);
 
     try {
+      const ws = workspaces.find((w) => w.id === activeWorkspaceId);
       const sessionId = await window.aide.terminal.spawn(
-        option.command ? { shell: option.command } : undefined
+        option.command ? { shell: option.command, cwd: ws?.path } : { cwd: ws?.path }
       );
       updateTabSession(tabId, sessionId);
     } catch {
