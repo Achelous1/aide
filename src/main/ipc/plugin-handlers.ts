@@ -4,6 +4,7 @@ import * as path from 'path';
 import { IPC_CHANNELS } from './channels';
 import { generatePluginSpec } from '../plugin/spec-generator';
 import type { PluginSpec } from '../plugin/spec-generator';
+import { generatePluginCode } from '../plugin/code-generator';
 import { PluginRegistry } from '../plugin/registry';
 
 const PLUGINS_DIR = path.join(app.getPath('userData'), 'plugins');
@@ -41,14 +42,26 @@ function loadRegistryFromDisk(): void {
 export function registerPluginHandlers(ipcMain: IpcMain): void {
   loadRegistryFromDisk();
 
+  // Spec-only: generate and return spec without writing to disk
   ipcMain.handle(IPC_CHANNELS.PLUGIN_GENERATE_SPEC, async (_event, name: string, description: string) => {
+    return generatePluginSpec(name, description);
+  });
+
+  // Full pipeline: natural language → spec → code → register (with cleanup on failure)
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_GENERATE, async (_event, name: string, description: string) => {
     ensurePluginsDir();
     const spec = generatePluginSpec(name, description);
     const pluginDir = path.join(PLUGINS_DIR, spec.name);
-    fs.mkdirSync(pluginDir, { recursive: true });
-    fs.writeFileSync(path.join(pluginDir, 'plugin.spec.json'), JSON.stringify(spec, null, 2));
-    fs.writeFileSync(path.join(pluginDir, 'index.js'), `// Plugin: ${spec.name}\n// ${spec.description}\nmodule.exports = {};\n`);
-    registry.register(spec, pluginDir);
+    try {
+      generatePluginCode(spec, pluginDir);
+      registry.register(spec, pluginDir);
+    } catch (err) {
+      // Cleanup orphaned files on pipeline failure
+      if (fs.existsSync(pluginDir)) {
+        fs.rmSync(pluginDir, { recursive: true });
+      }
+      throw err;
+    }
     return spec;
   });
 
@@ -69,6 +82,10 @@ export function registerPluginHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle(IPC_CHANNELS.PLUGIN_DELETE, async (_event, pluginName: string) => {
     const pluginDir = path.join(PLUGINS_DIR, pluginName);
+    // Prevent path traversal — pluginDir must be inside PLUGINS_DIR
+    if (!pluginDir.startsWith(PLUGINS_DIR + path.sep)) {
+      throw new Error('Invalid plugin name');
+    }
     // Find and unregister from registry
     const plugins = registry.list();
     const match = plugins.find((p) => p.name === pluginName);

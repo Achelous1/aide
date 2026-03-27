@@ -47,4 +47,22 @@ export function registerGitHandlers(ipcMain: IpcMain): void {
     const git = simpleGit(cwd);
     return git.log({ maxCount: limit });
   });
+
+  ipcMain.handle(IPC_CHANNELS.GIT_REMOTE_URL, async (_event, cwd: string): Promise<{ owner: string; repo: string } | null> => {
+    try {
+      const git = simpleGit(cwd);
+      const remotes = await git.getRemotes(true);
+      const origin = remotes.find((r) => r.name === 'origin');
+      if (!origin?.refs?.fetch) return null;
+      const url = origin.refs.fetch;
+      // Parse GitHub URL: https://github.com/owner/repo.git or git@github.com:owner/repo.git
+      const httpsMatch = url.match(/github\.com\/([^/]+)\/([^/.]+)/);
+      if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
+      const sshMatch = url.match(/github\.com:([^/]+)\/([^/.]+)/);
+      if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
+      return null;
+    } catch {
+      return null;
+    }
+  });
 }

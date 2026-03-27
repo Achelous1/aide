@@ -46,22 +46,11 @@ export function TabBar() {
             />
             <span>{tab.title}</span>
             {/* Close button on hover */}
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={async (e) => {
-                e.stopPropagation();
-                if (tab.sessionId) {
-                  try {
-                    await window.aide.terminal.kill(tab.sessionId);
-                  } catch {
-                    // ignore kill errors
-                  }
-                }
-                removeTab(tab.id);
-              }}
-              onKeyDown={async (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
+            {tabs.length > 1 && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={async (e) => {
                   e.stopPropagation();
                   if (tab.sessionId) {
                     try {
@@ -71,12 +60,25 @@ export function TabBar() {
                     }
                   }
                   removeTab(tab.id);
-                }
-              }}
-              className="ml-1 opacity-0 group-hover:opacity-100 text-aide-text-tertiary hover:text-aide-text-primary transition-opacity leading-none"
-            >
-              ×
-            </span>
+                }}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    if (tab.sessionId) {
+                      try {
+                        await window.aide.terminal.kill(tab.sessionId);
+                      } catch {
+                        // ignore kill errors
+                      }
+                    }
+                    removeTab(tab.id);
+                  }
+                }}
+                className="ml-1 opacity-0 group-hover:opacity-100 text-[10px] text-aide-text-tertiary hover:text-aide-text-primary transition-opacity leading-none"
+              >
+                ×
+              </span>
+            )}
           </button>
         );
       })}

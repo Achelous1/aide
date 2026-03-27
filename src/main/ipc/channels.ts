@@ -24,10 +24,12 @@ export const IPC_CHANNELS = {
   GIT_PULL: 'git:pull',
   GIT_BRANCH: 'git:branch',
   GIT_LOG: 'git:log',
+  GIT_REMOTE_URL: 'git:remote-url',
 
   // Plugin
   PLUGIN_LIST: 'plugin:list',
   PLUGIN_GENERATE_SPEC: 'plugin:generate-spec',
+  PLUGIN_GENERATE: 'plugin:generate',
   PLUGIN_ACTIVATE: 'plugin:activate',
   PLUGIN_DEACTIVATE: 'plugin:deactivate',
   PLUGIN_DELETE: 'plugin:delete',

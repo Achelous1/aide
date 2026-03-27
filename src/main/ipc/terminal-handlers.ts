@@ -3,6 +3,7 @@ import * as pty from 'node-pty';
 import os from 'os';
 import { IPC_CHANNELS } from './channels';
 import { AgentStatusDetector } from '../agent/status-detector';
+import { getAgentSpawnConfig, COMMON_ENV, type AgentType } from '../agent/agent-config';
 import type { AgentStatus } from '../../types/ipc';
 
 interface PtySession {
@@ -42,22 +43,34 @@ function broadcastToRenderer(webContentsId: number, channel: string, ...args: un
 export function registerTerminalHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(
     IPC_CHANNELS.TERMINAL_SPAWN,
-    (event, options?: { shell?: string; cwd?: string }) => {
-      const shell = options?.shell || getDefaultShell();
+    (event, options?: { shell?: string; cwd?: string; agentType?: AgentType }) => {
+      const defaultShell = getDefaultShell();
       const cwd = options?.cwd || os.homedir();
       const sessionId = `term-${++sessionCounter}`;
 
-      const ptyProcess = pty.spawn(shell, [], {
+      const agentConfig = getAgentSpawnConfig(options?.agentType ?? 'shell', defaultShell);
+      const shell = options?.agentType ? agentConfig.command : (options?.shell || defaultShell);
+
+      // Build env from explicit allowlist — never spread full process.env
+      // to prevent leaking secrets (AWS keys, tokens, etc.) to child processes
+      const safeBaseEnv: Record<string, string> = {};
+      const allowedKeys = [
+        'PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'LC_ALL', 'LC_CTYPE',
+        'SHELL', 'TERM', 'TMPDIR', 'XDG_RUNTIME_DIR',
+      ];
+      for (const key of allowedKeys) {
+        if (process.env[key]) safeBaseEnv[key] = process.env[key] as string;
+      }
+
+      const ptyProcess = pty.spawn(shell, agentConfig.args, {
         name: 'xterm-256color',
         cols: 80,
         rows: 24,
         cwd,
         env: {
-          ...process.env as Record<string, string>,
-          TERM: 'xterm-256color',
-          COLORTERM: 'truecolor',
-          FORCE_COLOR: '1',
-          TERM_PROGRAM: 'AIDE',
+          ...safeBaseEnv,
+          ...COMMON_ENV,
+          ...agentConfig.extraEnv,
         },
       });
 

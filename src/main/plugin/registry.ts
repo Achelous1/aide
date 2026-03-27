@@ -1,20 +1,30 @@
-import type { PluginSpec } from './spec-generator';
+import * as fs from 'fs';
+import * as path from 'path';
+import type { PluginSpec, PluginTool } from './spec-generator';
 import { PluginSandbox } from './sandbox';
 
 interface RegisteredPlugin {
   spec: PluginSpec;
   sandbox: PluginSandbox | null;
   active: boolean;
+  pluginDir: string;
+}
+
+interface RegisteredTool {
+  pluginId: string;
+  tool: PluginTool;
 }
 
 export class PluginRegistry {
   private plugins: Map<string, RegisteredPlugin> = new Map();
+  private tools: Map<string, RegisteredTool> = new Map();
 
   register(spec: PluginSpec, pluginDir: string): void {
     this.plugins.set(spec.id, {
       spec,
       sandbox: new PluginSandbox(pluginDir, spec),
       active: false,
+      pluginDir,
     });
   }
 
@@ -24,6 +34,7 @@ export class PluginRegistry {
     if (plugin.active && plugin.sandbox) {
       plugin.sandbox.stop();
     }
+    this._deregisterTools(id);
     this.plugins.delete(id);
     return true;
   }
@@ -33,6 +44,7 @@ export class PluginRegistry {
     if (!plugin || !plugin.sandbox) return null;
     const exports = plugin.sandbox.run(workspacePath);
     plugin.active = true;
+    this._loadTools(plugin);
     return exports;
   }
 
@@ -43,6 +55,7 @@ export class PluginRegistry {
       plugin.sandbox.stop();
     }
     plugin.active = false;
+    this._deregisterTools(id);
     return true;
   }
 
@@ -55,5 +68,49 @@ export class PluginRegistry {
 
   get(id: string): RegisteredPlugin | undefined {
     return this.plugins.get(id);
+  }
+
+  getRegisteredTools(): PluginTool[] {
+    return Array.from(this.tools.values()).map((t) => t.tool);
+  }
+
+  private _loadTools(plugin: RegisteredPlugin): void {
+    const toolManifestPath = path.join(plugin.pluginDir, 'tool.json');
+    if (!fs.existsSync(toolManifestPath)) {
+      // Fall back to spec tools
+      for (const tool of plugin.spec.tools) {
+        this.tools.set(`${plugin.spec.id}:${tool.name}`, {
+          pluginId: plugin.spec.id,
+          tool,
+        });
+      }
+      return;
+    }
+    try {
+      const manifest = JSON.parse(fs.readFileSync(toolManifestPath, 'utf-8'));
+      const toolList: PluginTool[] = Array.isArray(manifest.tools) ? manifest.tools : [];
+      for (const tool of toolList) {
+        this.tools.set(`${plugin.spec.id}:${tool.name}`, {
+          pluginId: plugin.spec.id,
+          tool,
+        });
+      }
+    } catch {
+      // If tool.json is malformed, fall back to spec tools
+      for (const tool of plugin.spec.tools) {
+        this.tools.set(`${plugin.spec.id}:${tool.name}`, {
+          pluginId: plugin.spec.id,
+          tool,
+        });
+      }
+    }
+  }
+
+  private _deregisterTools(pluginId: string): void {
+    for (const key of this.tools.keys()) {
+      if (key.startsWith(`${pluginId}:`)) {
+        this.tools.delete(key);
+      }
+    }
   }
 }

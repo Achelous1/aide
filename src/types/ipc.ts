@@ -2,6 +2,7 @@
 export interface TerminalSpawnOptions {
   shell?: string;
   cwd?: string;
+  agentType?: 'claude' | 'gemini' | 'codex' | 'shell';
 }
 
 /** File tree node */
@@ -117,6 +118,7 @@ export interface AideAPI {
     pull(cwd: string): Promise<unknown>;
     branch(cwd: string): Promise<unknown>;
     log(cwd: string, limit?: number): Promise<unknown>;
+    remoteUrl(cwd: string): Promise<{ owner: string; repo: string } | null>;
   };
   terminal: {
     spawn(options?: TerminalSpawnOptions): Promise<string>;
@@ -141,13 +143,14 @@ export interface AideAPI {
   plugin: {
     list(): Promise<PluginInfo[]>;
     generateSpec(name: string, description: string): Promise<PluginSpec>;
+    generate(name: string, description: string): Promise<PluginSpec>;
     activate(id: string): Promise<void>;
     deactivate(id: string): Promise<void>;
     delete(name: string): Promise<void>;
   };
   github: {
-    listPRs(owner: string, repo: string, token?: string): Promise<GithubPR[]>;
-    listIssues(owner: string, repo: string, token?: string): Promise<GithubIssue[]>;
-    getPR(owner: string, repo: string, prNumber: number, token?: string): Promise<GithubPR & { body: string; additions: number; deletions: number; changedFiles: number }>;
+    listPRs(owner: string, repo: string): Promise<GithubPR[]>;
+    listIssues(owner: string, repo: string): Promise<GithubIssue[]>;
+    getPR(owner: string, repo: string, prNumber: number): Promise<GithubPR & { body: string; additions: number; deletions: number; changedFiles: number }>;
   };
 }

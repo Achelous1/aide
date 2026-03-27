@@ -38,6 +38,8 @@ const aideAPI: AideAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.GIT_BRANCH, cwd),
     log: (cwd: string, limit?: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_LOG, cwd, limit),
+    remoteUrl: (cwd: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_REMOTE_URL, cwd),
   },
 
   terminal: {
@@ -99,18 +101,20 @@ const aideAPI: AideAPI = {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_LIST),
     generateSpec: (name: string, description: string): Promise<PluginSpec> =>
       ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GENERATE_SPEC, name, description),
+    generate: (name: string, description: string): Promise<PluginSpec> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GENERATE, name, description),
     activate: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_ACTIVATE, id),
     deactivate: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_DEACTIVATE, id),
     delete: (name: string) => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_DELETE, name),
   },
 
   github: {
-    listPRs: (owner: string, repo: string, token?: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_LIST_PRS, owner, repo, token),
-    listIssues: (owner: string, repo: string, token?: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_LIST_ISSUES, owner, repo, token),
-    getPR: (owner: string, repo: string, prNumber: number, token?: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_GET_PR, owner, repo, prNumber, token),
+    listPRs: (owner: string, repo: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_LIST_PRS, owner, repo),
+    listIssues: (owner: string, repo: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_LIST_ISSUES, owner, repo),
+    getPR: (owner: string, repo: string, prNumber: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_GET_PR, owner, repo, prNumber),
   },
 };
 
