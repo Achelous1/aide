@@ -7,11 +7,8 @@ export default defineConfig({
       external: [
         'electron',
         'node-pty',
-        'electron-store',
-        'simple-git',
-        'chokidar',
         'fsevents',
-        '@octokit/rest',
+        'electron-squirrel-startup',
       ],
     },
   },

@@ -1,9 +1,24 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
+import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+
+const nativeModules = ['node-pty'];
+
+function copyNativeModules(buildPath: string) {
+  for (const mod of nativeModules) {
+    const src = path.resolve(__dirname, 'node_modules', mod);
+    const dest = path.join(buildPath, 'node_modules', mod);
+    if (fs.existsSync(src)) {
+      fs.cpSync(src, dest, { recursive: true });
+    }
+  }
+}
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -11,6 +26,12 @@ const config: ForgeConfig = {
       unpack: '**/node_modules/node-pty/**/*',
     },
     name: 'AIDE',
+    afterCopy: [
+      (buildPath, _electronVersion, _platform, _arch, callback) => {
+        copyNativeModules(buildPath);
+        callback();
+      },
+    ],
   },
   rebuildConfig: {},
   makers: [
@@ -18,6 +39,7 @@ const config: ForgeConfig = {
     new MakerZIP({}, ['darwin']),
   ],
   plugins: [
+    new AutoUnpackNativesPlugin({}),
     new VitePlugin({
       build: [
         {

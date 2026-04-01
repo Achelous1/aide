@@ -120,6 +120,15 @@ Checking `node.children.length >= 3` only prevents direct siblings but allows ne
 ### Auto-spawn: Let PaneView own its lifecycle
 Moving auto-spawn from `App.tsx useEffect` to `PaneView` eliminates timing issues where layout-store state wasn't ready when App's effect fired. The component that renders the terminal should be responsible for ensuring it has content.
 
+### Packaging: Only externalize native modules in Vite
+Vite's `external` list means "don't bundle, resolve at runtime." But electron-forge's Vite plugin does NOT copy `node_modules` into the asar — only `.vite/build/` output goes in. So any pure JS package marked external (e.g., `electron-store`, `chokidar`) will be missing at runtime. **Only native modules (`node-pty`, `fsevents`) and `electron` should be external.** Pure JS deps get bundled by Vite automatically. Native modules need `afterCopy` hook in `forge.config.ts` to copy them into the build path.
+
+### Packaging: Packaged apps don't inherit shell PATH
+Electron apps launched from Finder (not terminal) get a minimal `PATH` (`/usr/bin:/bin`). CLI tools like `claude`, `zsh` in `/usr/local/bin` or `/opt/homebrew/bin` won't be found. **`fix-env.ts` runs the login shell to load the full environment before any pty spawn.** This only runs when `app.isPackaged` is true.
+
+### Packaging: macOS fsevents EBADF on /dev/fd/
+In packaged apps, the `fsevents` native module reports `/dev/fd/N` paths. When chokidar tries to `lstat` them, the FD is already closed → `EBADF`. The `ignored` option doesn't help because the error occurs before filtering. **A process-level `uncaughtException` handler suppresses this specific error** (see `src/main/index.ts`).
+
 ## Platform Notes
 
 - macOS: bash/zsh default shell, .dmg/.zip packaging

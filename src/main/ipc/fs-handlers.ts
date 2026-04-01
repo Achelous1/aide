@@ -66,6 +66,7 @@ export function registerFsHandlers(ipcMain: IpcMain, cwd: string): void {
     .watch(cwd, {
       ignoreInitial: true,
       depth: 3,
+      ignored: /\/dev\/fd\//,
     })
     .on('all', () => {
       if (debounceTimer) clearTimeout(debounceTimer);

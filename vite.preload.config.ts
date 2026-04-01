@@ -6,7 +6,6 @@ export default defineConfig({
     rollupOptions: {
       external: [
         'electron',
-        'electron-store',
       ],
       output: {
         entryFileNames: 'preload.js',
