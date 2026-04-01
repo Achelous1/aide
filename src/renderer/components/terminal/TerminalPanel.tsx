@@ -71,46 +71,55 @@ export function TerminalPanel({ sessionId, visible = true }: TerminalPanelProps)
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  // Initialize xterm once
+  // Initialize xterm once (deferred by one frame so container has layout dimensions)
   useEffect(() => {
     if (!containerRef.current) return;
+    let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
 
-    const terminal = new Terminal({
-      theme: useThemeStore.getState().theme === 'dark' ? DARK_THEME : LIGHT_THEME,
-      fontFamily: "'JetBrains Mono', 'IBM Plex Mono', Menlo, Monaco, monospace",
-      fontSize: 13,
-      cursorBlink: true,
-      cursorStyle: 'block',
-      allowTransparency: false,
+    const raf = requestAnimationFrame(() => {
+      if (cancelled || !containerRef.current) return;
+
+      const terminal = new Terminal({
+        theme: useThemeStore.getState().theme === 'dark' ? DARK_THEME : LIGHT_THEME,
+        fontFamily: "'JetBrains Mono', 'IBM Plex Mono', Menlo, Monaco, monospace",
+        fontSize: 13,
+        cursorBlink: true,
+        cursorStyle: 'block',
+        allowTransparency: false,
+      });
+
+      const fitAddon = new FitAddon();
+      terminal.loadAddon(fitAddon);
+      terminal.open(containerRef.current);
+      fitAddon.fit();
+
+      terminalRef.current = terminal;
+      fitAddonRef.current = fitAddon;
+
+      resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry || !fitAddonRef.current || !terminalRef.current) return;
+        const { width, height } = entry.contentRect;
+        if (width === 0 || height === 0) return;
+        fitAddonRef.current.fit();
+        const sid = sessionIdRef.current;
+        if (sid) {
+          window.aide.terminal.resize(sid, terminalRef.current.cols, terminalRef.current.rows);
+        }
+      });
+      resizeObserver.observe(containerRef.current);
     });
-
-    const fitAddon = new FitAddon();
-    terminal.loadAddon(fitAddon);
-    terminal.open(containerRef.current);
-    fitAddon.fit();
-
-    terminalRef.current = terminal;
-    fitAddonRef.current = fitAddon;
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry || !fitAddonRef.current || !terminalRef.current) return;
-      const { width, height } = entry.contentRect;
-      // Skip when hidden (display: none → size is 0)
-      if (width === 0 || height === 0) return;
-      fitAddonRef.current.fit();
-      const sid = sessionIdRef.current;
-      if (sid) {
-        window.aide.terminal.resize(sid, terminalRef.current.cols, terminalRef.current.rows);
-      }
-    });
-    resizeObserver.observe(containerRef.current);
 
     return () => {
-      resizeObserver.disconnect();
-      terminal.dispose();
-      terminalRef.current = null;
-      fitAddonRef.current = null;
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      resizeObserver?.disconnect();
+      if (terminalRef.current) {
+        terminalRef.current.dispose();
+        terminalRef.current = null;
+        fitAddonRef.current = null;
+      }
     };
   }, []);
 

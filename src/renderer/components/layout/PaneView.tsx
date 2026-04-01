@@ -111,8 +111,6 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
 
   const isFocused = focusedPaneId === pane.id;
   const activeTab = pane.tabs.find((t) => t.id === pane.activeTabId) ?? pane.tabs[0];
-  const allPanes = useLayoutStore((s) => s.getAllPanes());
-  const totalTabs = allPanes.reduce((sum, p) => sum + p.tabs.length, 0);
 
   const handleCloseTab = useCallback(async (tab: TerminalTab, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -155,7 +153,7 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
               tab={tab}
               paneId={pane.id}
               isActive={tab.id === pane.activeTabId}
-              canClose={totalTabs > 1}
+              canClose={pane.tabs.length > 1}
               onActivate={() => setActiveTab(pane.id, tab.id)}
               onClose={(e) => handleCloseTab(tab, e)}
               onContextMenu={(e) => handleContextMenu(e, tab.id)}

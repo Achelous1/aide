@@ -4,12 +4,21 @@ import { useLayoutStore } from '../../stores/layout-store';
 import type { LayoutNode } from '../../../types/ipc';
 import { isSplitLayout } from '../../../types/ipc';
 
+function countPanes(node: LayoutNode): number {
+  if (isSplitLayout(node)) {
+    return node.children.reduce((sum, child) => sum + countPanes(child), 0);
+  }
+  return 1;
+}
+
 interface SplitContainerProps {
   node: LayoutNode;
 }
 
 export function SplitContainer({ node }: SplitContainerProps) {
-  const paneCount = useLayoutStore((s) => s.getAllPanes().length);
+  // Derive pane count from the layout tree (stable primitive selector)
+  const layout = useLayoutStore((s) => s.layout);
+  const paneCount = countPanes(layout);
 
   if (!isSplitLayout(node)) {
     return <PaneView pane={node} showHeader={paneCount > 1} />;
