@@ -100,6 +100,7 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
   const setActiveTab = useLayoutStore((s) => s.setActiveTab);
   const removeTabFromPane = useLayoutStore((s) => s.removeTabFromPane);
   const splitPane = useLayoutStore((s) => s.splitPane);
+  const closePaneAndMergeTabs = useLayoutStore((s) => s.closePaneAndMergeTabs);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
 
@@ -182,7 +183,14 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
               style={{ backgroundColor: AGENT_COLORS[activeTab.agentId ?? 'shell'] ?? AGENT_COLORS.shell }}
             />
           )}
-          <span className="text-[11px] font-mono text-aide-text-secondary truncate">{activeTab.title}</span>
+          <span className="text-[11px] font-mono text-aide-text-secondary truncate flex-1">{activeTab.title}</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); closePaneAndMergeTabs(pane.id); }}
+            className="text-[12px] text-aide-text-tertiary hover:text-aide-text-primary transition-colors leading-none"
+            title="Close pane (merge tabs to sibling)"
+          >
+            ✕
+          </button>
         </div>
       )}
 

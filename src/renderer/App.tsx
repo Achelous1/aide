@@ -93,6 +93,18 @@ export function App() {
         return;
       }
 
+      // ⌘⇧W / Ctrl+Shift+W: close focused pane, merge tabs to sibling
+      if ((e.key === 'w' || e.key === 'W') && e.shiftKey) {
+        const panes = useLayoutStore.getState().getAllPanes();
+        if (panes.length <= 1) return;
+        const pane = useLayoutStore.getState().getFocusedPane();
+        if (!pane) return;
+        e.preventDefault();
+        e.stopPropagation();
+        useLayoutStore.getState().closePaneAndMergeTabs(pane.id);
+        return;
+      }
+
       // ⌘W / Ctrl+W: close current tab from focused pane
       if (e.key === 'w' || e.key === 'W') {
         const pane = useLayoutStore.getState().getFocusedPane();

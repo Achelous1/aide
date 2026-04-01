@@ -101,6 +101,7 @@ interface LayoutState {
   // Pane operations
   splitPane: (paneId: string, direction: 'horizontal' | 'vertical') => void;
   closePane: (paneId: string) => void;
+  closePaneAndMergeTabs: (paneId: string) => void;
   setFocusedPane: (paneId: string) => void;
 
   // Tab operations
@@ -197,6 +198,44 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       const newFocused = remainingPanes[0]?.id ?? null;
 
       return { layout: newLayout, focusedPaneId: newFocused };
+    });
+  },
+
+  closePaneAndMergeTabs: (paneId) => {
+    set((state) => {
+      const allPanes = collectPanes(state.layout);
+      if (allPanes.length <= 1) return state;
+
+      const layout = cloneNode(state.layout);
+      const closingPane = findPane(layout, paneId);
+      if (!closingPane) return state;
+
+      // Find sibling pane to receive tabs
+      const parentInfo = findParentSplit(layout, paneId);
+      if (!parentInfo) return state;
+
+      const { parent, index } = parentInfo;
+      // Pick sibling: prefer left/above (index-1), fallback to right/below (index+1)
+      const siblingIndex = index > 0 ? index - 1 : index + 1;
+      const siblingNode = parent.children[siblingIndex];
+      if (!siblingNode) return state;
+
+      // Find the first pane in the sibling subtree to receive tabs
+      const siblingPanes = collectPanes(siblingNode);
+      const targetPane = siblingPanes[0];
+      if (!targetPane) return state;
+
+      // Merge tabs from closing pane into target
+      for (const tab of closingPane.tabs) {
+        targetPane.tabs.push(tab);
+      }
+      if (closingPane.tabs.length > 0) {
+        targetPane.activeTabId = closingPane.tabs[0].id;
+      }
+
+      // Remove the closing pane from tree
+      const newLayout = removeChild(layout, paneId);
+      return { layout: newLayout, focusedPaneId: targetPane.id };
     });
   },
 
