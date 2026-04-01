@@ -24,35 +24,7 @@ export function App() {
     loadWorkspaces();
   }, [loadWorkspaces]);
 
-  // Auto-create a default shell tab when workspace is first loaded
-  useEffect(() => {
-    if (!activeWorkspaceId) return;
-    // Check layout-store panes for existing tabs (not terminal-store)
-    const panes = useLayoutStore.getState().getAllPanes();
-    const hasTabs = panes.some((p) => p.tabs.length > 0);
-    if (hasTabs) return;
-
-    const ws = workspaces.find((w) => w.id === activeWorkspaceId);
-    window.aide.terminal.spawn({ cwd: ws?.path }).then((sessionId) => {
-      const tab = {
-        id: crypto.randomUUID(),
-        type: 'shell' as const,
-        sessionId,
-        title: '$ shell',
-      };
-      // Add to both stores
-      useTerminalStore.getState().addTab(tab);
-      useTerminalStore.getState().setActiveTab(tab.id);
-      const pane = useLayoutStore.getState().getFocusedPane();
-      if (pane) {
-        useLayoutStore.getState().addTabToPane(pane.id, tab);
-      } else {
-        useLayoutStore.getState().resetLayout([tab]);
-      }
-    }).catch(() => {
-      // ignore spawn errors
-    });
-  }, [activeWorkspaceId]);
+  // PaneView auto-spawns a shell when empty — no App-level auto-create needed
 
   // Global keyboard shortcuts
   useEffect(() => {

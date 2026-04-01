@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -6,6 +6,8 @@ import { TerminalPanel } from '../terminal/TerminalPanel';
 import { AgentDropdown } from '../terminal/AgentDropdown';
 import { PluginView } from '../plugin/PluginView';
 import { useLayoutStore } from '../../stores/layout-store';
+import { useTerminalStore } from '../../stores/terminal-store';
+import { useWorkspaceStore } from '../../stores/workspace-store';
 import type { Pane, TerminalTab } from '../../../types/ipc';
 
 const AGENT_COLORS: Record<string, string> = {
@@ -101,8 +103,33 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
   const removeTabFromPane = useLayoutStore((s) => s.removeTabFromPane);
   const splitPane = useLayoutStore((s) => s.splitPane);
   const closePaneAndMergeTabs = useLayoutStore((s) => s.closePaneAndMergeTabs);
+  const addTabToPane = useLayoutStore((s) => s.addTabToPane);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
+  const autoSpawnedRef = useRef(false);
+
+  // Auto-spawn a shell when pane has no tabs
+  useEffect(() => {
+    if (pane.tabs.length > 0 || autoSpawnedRef.current) return;
+    autoSpawnedRef.current = true;
+
+    const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+    if (!wsId) return;
+    const ws = useWorkspaceStore.getState().workspaces.find((w) => w.id === wsId);
+
+    window.aide.terminal.spawn({ cwd: ws?.path }).then((sessionId) => {
+      const tab: TerminalTab = {
+        id: crypto.randomUUID(),
+        type: 'shell',
+        sessionId,
+        title: '$ shell',
+      };
+      useTerminalStore.getState().addTab(tab);
+      addTabToPane(pane.id, tab);
+    }).catch(() => {
+      autoSpawnedRef.current = false;
+    });
+  }, [pane.tabs.length, pane.id, addTabToPane]);
 
   // Droppable zone for cross-pane drops
   const { setNodeRef: setDropRef, isOver } = useDroppable({
