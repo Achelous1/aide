@@ -1,13 +1,12 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useDroppable, useDndMonitor } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { TerminalPanel } from '../terminal/TerminalPanel';
 import { AgentDropdown } from '../terminal/AgentDropdown';
 import { PluginView } from '../plugin/PluginView';
+import { EmptyState } from './EmptyState';
 import { useLayoutStore } from '../../stores/layout-store';
-import { useTerminalStore } from '../../stores/terminal-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
 import type { Pane, TerminalTab } from '../../../types/ipc';
 
 const AGENT_COLORS: Record<string, string> = {
@@ -103,36 +102,9 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
   const removeTabFromPane = useLayoutStore((s) => s.removeTabFromPane);
   const splitPane = useLayoutStore((s) => s.splitPane);
   const closePaneAndMergeTabs = useLayoutStore((s) => s.closePaneAndMergeTabs);
-  const addTabToPane = useLayoutStore((s) => s.addTabToPane);
+
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
-  const autoSpawnedRef = useRef(false);
-
-  // Auto-spawn a shell when pane has no tabs
-  useEffect(() => {
-    console.log('[PaneView] auto-spawn check', { paneId: pane.id, tabCount: pane.tabs.length, autoSpawned: autoSpawnedRef.current });
-    if (pane.tabs.length > 0 || autoSpawnedRef.current) return;
-    autoSpawnedRef.current = true;
-
-    const wsId = useWorkspaceStore.getState().activeWorkspaceId;
-    if (!wsId) { console.log('[PaneView] no activeWorkspaceId, skip spawn'); return; }
-    const ws = useWorkspaceStore.getState().workspaces.find((w) => w.id === wsId);
-    console.log('[PaneView] spawning shell', { wsId, cwd: ws?.path });
-
-    window.aide.terminal.spawn({ cwd: ws?.path }).then((sessionId) => {
-      console.log('[PaneView] spawn success', { sessionId });
-      const tab: TerminalTab = {
-        id: crypto.randomUUID(),
-        type: 'shell',
-        sessionId,
-        title: '$ shell',
-      };
-      useTerminalStore.getState().addTab(tab);
-      addTabToPane(pane.id, tab);
-    }).catch(() => {
-      autoSpawnedRef.current = false;
-    });
-  }, [pane.tabs.length, pane.id, addTabToPane]);
 
   // Edge detection for drag-to-split
   type DropEdge = 'left' | 'right' | 'top' | 'bottom' | 'center' | null;
@@ -216,7 +188,7 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
               tab={tab}
               paneId={pane.id}
               isActive={tab.id === pane.activeTabId}
-              canClose={pane.tabs.length > 1 || showHeader}
+              canClose={true}
               onActivate={() => setActiveTab(pane.id, tab.id)}
               onClose={(e) => handleCloseTab(tab, e)}
               onContextMenu={(e) => handleContextMenu(e, tab.id)}
@@ -278,21 +250,25 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
             </span>
           </div>
         )}
-        {pane.tabs.map((tab) => {
-          const isVisible = tab.id === pane.activeTabId;
-          if (tab.type === 'plugin') {
+        {pane.tabs.length === 0 ? (
+          <EmptyState paneId={pane.id} />
+        ) : (
+          pane.tabs.map((tab) => {
+            const isVisible = tab.id === pane.activeTabId;
+            if (tab.type === 'plugin') {
+              return (
+                <div key={tab.id} className="absolute inset-0" style={{ display: isVisible ? 'block' : 'none' }}>
+                  <PluginView pluginId={tab.pluginId ?? tab.id} pluginName={tab.title} />
+                </div>
+              );
+            }
             return (
               <div key={tab.id} className="absolute inset-0" style={{ display: isVisible ? 'block' : 'none' }}>
-                <PluginView pluginId={tab.pluginId ?? tab.id} pluginName={tab.title} />
+                {tab.sessionId && <TerminalPanel sessionId={tab.sessionId} visible={isVisible && isFocused} />}
               </div>
             );
-          }
-          return (
-            <div key={tab.id} className="absolute inset-0" style={{ display: isVisible ? 'block' : 'none' }}>
-              {tab.sessionId && <TerminalPanel sessionId={tab.sessionId} visible={isVisible && isFocused} />}
-            </div>
-          );
-        })}
+          })
+        )}
       </div>
 
       {/* Context Menu */}

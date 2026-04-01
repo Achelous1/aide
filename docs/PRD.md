@@ -266,7 +266,7 @@ $ npm test
 
 ### In Scope (MVP)
 - [x] Welcome Page (히어로, Open Repository, New Project, 최근 프로젝트 5개)
-- [ ] Empty State (모든 탭 닫힘 시 로고 + 에이전트 선택 카드 표시)
+- [x] Empty State (모든 탭 닫힘 시 로고 + 에이전트 선택 카드 표시)
 - [x] Workspace 관리 (멀티 프로젝트, Navbar collapsed, electron-store 영속화)
 - [x] Electron 앱 기본 셸 (프로젝트 구조, 빌드 파이프라인)
 - [x] 터미널 에뮬레이터 (xterm.js 기반, 멀티 탭, ANSI 256색, 탭 보존, 워크스페이스별 탭 상태 보존)
