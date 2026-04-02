@@ -144,6 +144,14 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
     return registry.getRegisteredTools();
   });
 
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_GET_HTML, async (_event, pluginId: string) => {
+    const plugin = registry.get(pluginId);
+    if (!plugin) return null;
+    const htmlPath = path.join(plugin.pluginDir, 'index.html');
+    if (!fs.existsSync(htmlPath)) return null;
+    return fs.readFileSync(htmlPath, 'utf-8');
+  });
+
   ipcMain.handle(IPC_CHANNELS.PLUGIN_DELETE, async (_event, pluginName: string) => {
     const effectiveCwd = getEffectiveCwd(cwd);
     // Search local first, then global

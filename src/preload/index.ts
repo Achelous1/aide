@@ -108,6 +108,7 @@ const aideAPI: AideAPI = {
     delete: (name: string) => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_DELETE, name),
     invoke: (pluginId: string, toolName: string, args: Record<string, unknown>) =>
       ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_INVOKE, pluginId, toolName, args),
+    getHtml: (id: string): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GET_HTML, id),
   },
 
   mcp: {

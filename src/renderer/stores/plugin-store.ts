@@ -1,5 +1,7 @@
 import { create } from 'zustand';
-import type { PluginInfo } from '../../types/ipc';
+import type { PluginInfo, TerminalTab } from '../../types/ipc';
+import { useLayoutStore } from './layout-store';
+import { useTerminalStore } from './terminal-store';
 
 interface PluginState {
   plugins: PluginInfo[];
@@ -36,6 +38,26 @@ export const usePluginStore = create<PluginState>((set, get) => ({
       await window.aide.plugin.activate(id);
       const plugins = await window.aide.plugin.list();
       set({ plugins });
+      // Check for existing plugin tab — avoid duplicates
+      const layout = useLayoutStore.getState();
+      const allPanes = layout.getAllPanes();
+      const alreadyOpen = allPanes.some(p => p.tabs.some(t => t.type === 'plugin' && t.pluginId === id));
+      if (!alreadyOpen) {
+        const plugin = get().plugins.find(p => p.id === id);
+        if (plugin) {
+          const tab: TerminalTab = {
+            id: crypto.randomUUID(),
+            type: 'plugin',
+            pluginId: id,
+            title: plugin.name,
+          };
+          useTerminalStore.getState().addTab(tab);
+          const pane = layout.getFocusedPane();
+          if (pane) {
+            layout.addTabToPane(pane.id, tab);
+          }
+        }
+      }
     } catch (e) {
       set({ error: e instanceof Error ? e.message : 'Failed to activate plugin' });
     }
@@ -46,6 +68,16 @@ export const usePluginStore = create<PluginState>((set, get) => ({
       await window.aide.plugin.deactivate(id);
       const plugins = await window.aide.plugin.list();
       set({ plugins });
+      // Remove plugin tab from all panes
+      const layout = useLayoutStore.getState();
+      const allPanes = layout.getAllPanes();
+      for (const pane of allPanes) {
+        const pluginTab = pane.tabs.find(t => t.type === 'plugin' && t.pluginId === id);
+        if (pluginTab) {
+          layout.removeTabFromPane(pane.id, pluginTab.id);
+          useTerminalStore.getState().removeTab(pluginTab.id);
+        }
+      }
     } catch (e) {
       set({ error: e instanceof Error ? e.message : 'Failed to deactivate plugin' });
     }

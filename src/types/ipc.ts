@@ -65,7 +65,7 @@ export interface TerminalTab {
   type: 'agent' | 'shell' | 'plugin';
   agentId?: string;
   pluginId?: string;
-  sessionId: string;
+  sessionId?: string;
   title: string;
 }
 
@@ -202,6 +202,7 @@ export interface AideAPI {
     deactivate(id: string): Promise<void>;
     delete(name: string): Promise<void>;
     invoke(pluginId: string, toolName: string, args: Record<string, unknown>): Promise<unknown>;
+    getHtml: (id: string) => Promise<string | null>;
   };
   mcp: {
     status(): Promise<McpStatus>;

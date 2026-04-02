@@ -34,6 +34,7 @@ export const IPC_CHANNELS = {
   PLUGIN_DEACTIVATE: 'plugin:deactivate',
   PLUGIN_DELETE: 'plugin:delete',
   PLUGIN_INVOKE: 'plugin:invoke',
+  PLUGIN_GET_HTML: 'plugin:get-html',
 
   // MCP
   MCP_STATUS: 'mcp:status',
