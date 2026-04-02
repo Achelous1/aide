@@ -1,5 +1,6 @@
 import { IpcMain, app } from 'electron';
 import * as fs from 'fs';
+import { userInfo } from 'os';
 import * as path from 'path';
 import { IPC_CHANNELS } from './channels';
 import { generatePluginSpec } from '../plugin/spec-generator';
@@ -12,7 +13,7 @@ const registry = new PluginRegistry();
 function getHome(): string {
   const env = process.env.HOME;
   if (env && env !== '/') return env;
-  try { return require('os').userInfo().homedir; } catch { /* ignore */ }
+  try { return userInfo().homedir; } catch { /* ignore */ }
   return app.getPath('home');
 }
 

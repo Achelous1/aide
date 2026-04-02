@@ -1,5 +1,6 @@
 import { app } from 'electron';
 import { execSync } from 'child_process';
+import { userInfo } from 'os';
 
 /**
  * Packaged Electron apps on macOS launched from Finder don't inherit
@@ -38,7 +39,7 @@ export function fixPackagedEnv(): void {
   // os.userInfo().homedir uses getpwuid() which is always reliable.
   if (!process.env.HOME || process.env.HOME === '/') {
     try {
-      process.env.HOME = require('os').userInfo().homedir;
+      process.env.HOME = userInfo().homedir;
     } catch { /* ignore */ }
   }
 }

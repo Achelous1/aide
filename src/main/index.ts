@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as fs from 'fs';
+import { userInfo } from 'os';
 import path from 'path';
 import { fixPackagedEnv } from './fix-env';
 import { registerIpcHandlers } from './ipc/handlers';
@@ -66,7 +67,7 @@ const createWindow = (): void => {
 app.on('ready', () => {
   // Ensure global plugin directory exists on startup
   try {
-    const home = (process.env.HOME && process.env.HOME !== '/') ? process.env.HOME : require('os').userInfo().homedir;
+    const home = (process.env.HOME && process.env.HOME !== '/') ? process.env.HOME : userInfo().homedir;
     const globalPluginsDir = path.join(home, '.aide', 'plugins');
     if (!fs.existsSync(globalPluginsDir)) {
       fs.mkdirSync(globalPluginsDir, { recursive: true });
@@ -88,7 +89,7 @@ app.on('ready', () => {
   createWindow();
   // MCP setup runs after window creation — failures must not prevent the app from opening
   try {
-    const mcpHome = (process.env.HOME && process.env.HOME !== '/') ? process.env.HOME : require('os').userInfo().homedir;
+    const mcpHome = (process.env.HOME && process.env.HOME !== '/') ? process.env.HOME : userInfo().homedir;
     writeMcpConfig(mcpHome);
   } catch (err) {
     console.error('[AIDE] MCP setup failed (non-fatal):', err);
