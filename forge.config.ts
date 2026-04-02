@@ -20,6 +20,23 @@ function copyNativeModules(buildPath: string) {
   }
 }
 
+function patchInfoPlist(buildPath: string) {
+  // NSApplicationSupportsSecureRestorableState prevents macOS from triggering
+  // NSPersistentUI window restoration with null class names, which silently kills
+  // unsigned apps launched via Finder/open. buildPath = Contents/Resources/app;
+  // Info.plist is 2 levels up at Contents/Info.plist.
+  const plistPath = path.join(buildPath, '..', '..', 'Info.plist');
+  if (!fs.existsSync(plistPath)) return;
+  let content = fs.readFileSync(plistPath, 'utf-8');
+  if (!content.includes('NSApplicationSupportsSecureRestorableState')) {
+    content = content.replace(
+      '</dict>\n</plist>',
+      '\t<key>NSApplicationSupportsSecureRestorableState</key>\n\t<true/>\n</dict>\n</plist>'
+    );
+    fs.writeFileSync(plistPath, content);
+  }
+}
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
@@ -29,6 +46,7 @@ const config: ForgeConfig = {
     afterCopy: [
       (buildPath, _electronVersion, _platform, _arch, callback) => {
         copyNativeModules(buildPath);
+        patchInfoPlist(buildPath);
         callback();
       },
     ],
@@ -63,11 +81,13 @@ const config: ForgeConfig = {
     new FusesPlugin({
       version: FuseVersion.V1,
       [FuseV1Options.RunAsNode]: false,
-      [FuseV1Options.EnableCookieEncryption]: true,
+      [FuseV1Options.EnableCookieEncryption]: false,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
-      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
-      [FuseV1Options.OnlyLoadAppFromAsar]: true,
+      // Disabled until app is code-signed: these abort silently when
+      // the asar hash doesn't match or modules load outside the asar.
+      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: false,
+      [FuseV1Options.OnlyLoadAppFromAsar]: false,
     }),
   ],
 };

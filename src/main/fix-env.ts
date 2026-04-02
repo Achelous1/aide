@@ -11,7 +11,7 @@ export function fixPackagedEnv(): void {
 
   try {
     const shell = process.env.SHELL || '/bin/zsh';
-    const output = execSync(`${shell} -ilc 'env'`, {
+    const output = execSync(`${shell} -lc 'env'`, {
       encoding: 'utf-8',
       timeout: 5000,
     });
