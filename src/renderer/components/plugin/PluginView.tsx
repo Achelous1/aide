@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 interface PluginViewProps {
   pluginId: string;
@@ -8,6 +8,7 @@ interface PluginViewProps {
 export function PluginView({ pluginId, pluginName }: PluginViewProps) {
   const [html, setHtml] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,6 +26,22 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
     return () => { cancelled = true; };
   }, [pluginId]);
 
+  // Send theme to iframe when it loads or theme changes
+  const sendTheme = useCallback(() => {
+    const isDark = !document.documentElement.classList.contains('light');
+    iframeRef.current?.contentWindow?.postMessage(
+      { theme: isDark ? 'dark' : 'light' },
+      '*'
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!html) return;
+    const observer = new MutationObserver(sendTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, [html, sendTheme]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full w-full bg-aide-surface-sidebar text-aide-text-secondary">
@@ -36,10 +53,12 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
   if (html) {
     return (
       <iframe
+        ref={iframeRef}
         srcDoc={html}
         sandbox="allow-scripts"
         className="w-full h-full border-0"
         title={pluginName}
+        onLoad={sendTheme}
       />
     );
   }

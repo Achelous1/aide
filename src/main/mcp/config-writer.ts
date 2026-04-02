@@ -234,11 +234,14 @@ function createPlugin(params) {
   fs.writeFileSync(path.join(pluginDir, "src", "index.js"), params.code);
   const indexHtml = '<!DOCTYPE html>' +
     '<html><head><meta charset="utf-8"><style>' +
-    'body{margin:0;font-family:monospace;font-size:12px;background:var(--background,#131519);color:var(--text-primary,#E8E9ED)}' +
-    '</style></head><body>' +
-    '<div id=\\"root\\" style=\\"padding:12px;\\">' +
-    '<p style=\\"color:var(--text-secondary,#8B8D98)\\">Plugin: ' + safeName + '</p>' +
-    '<p style=\\"color:var(--text-tertiary,#5C5E6A);font-size:10px;\\">' + (params.description || '') + '</p>' +
+    ':root{--background:#131519;--surface:#1A1C23;--surface-elevated:#24262E;--border:#2E3140;--text-primary:#E8E9ED;--text-secondary:#8B8D98;--text-tertiary:#5C5E6A;--accent:#10B981;--accent-warning:#F59E0B;--accent-info:#06B6D4}' +
+    '.light{--background:#F5F5F0;--surface:#FAFAF7;--surface-elevated:#EBEBE6;--border:#E0E3E8;--text-primary:#0D0D0D;--text-secondary:#6B7280;--text-tertiary:#9CA3AF;--accent:#059669}' +
+    '@media(prefers-color-scheme:light){:root:not(.dark){--background:#F5F5F0;--surface:#FAFAF7;--surface-elevated:#EBEBE6;--border:#E0E3E8;--text-primary:#0D0D0D;--text-secondary:#6B7280;--text-tertiary:#9CA3AF;--accent:#059669}}' +
+    'body{margin:0;font-family:monospace;font-size:12px;background:var(--background);color:var(--text-primary)}' +
+    '</style><script>window.addEventListener("message",function(e){if(e.data&&e.data.theme){document.documentElement.className=e.data.theme}});</script></head><body>' +
+    '<div id="root" style="padding:12px;">' +
+    '<p style="color:var(--text-secondary)">Plugin: ' + safeName + '</p>' +
+    '<p style="color:var(--text-tertiary);font-size:10px;">' + (params.description || '') + '</p>' +
     '</div></body></html>';
   fs.writeFileSync(path.join(pluginDir, "index.html"), indexHtml);
   try { vm.compileFunction(params.code, [], { filename: "index.js" }); } catch (err) {
