@@ -49,10 +49,14 @@ function loadDirIntoRegistry(dir: string): void {
 }
 
 function ensurePluginsDirs(cwd: string): void {
-  const globalDir = getGlobalPluginsDir();
-  const localDir = getLocalPluginsDir(cwd);
-  if (!fs.existsSync(globalDir)) fs.mkdirSync(globalDir, { recursive: true });
-  if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
+  try {
+    const globalDir = getGlobalPluginsDir();
+    if (!fs.existsSync(globalDir)) fs.mkdirSync(globalDir, { recursive: true });
+  } catch { /* non-fatal */ }
+  try {
+    const localDir = getLocalPluginsDir(cwd);
+    if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
+  } catch { /* non-fatal */ }
 }
 
 function loadRegistryFromDisk(cwd: string): void {

@@ -81,11 +81,7 @@ app.on('ready', () => {
   registerAgentHandlers(ipcMain);
   registerGitHandlers(ipcMain);
   registerGithubHandlers(ipcMain);
-  try {
-    registerPluginHandlers(ipcMain, process.cwd());
-  } catch (err) {
-    console.error('[AIDE] Plugin handlers setup failed (non-fatal):', err);
-  }
+  registerPluginHandlers(ipcMain, process.cwd());
   createWindow();
   // MCP setup runs after window creation — failures must not prevent the app from opening
   try {
