@@ -42,12 +42,19 @@ export class PluginSandbox {
       },
     };
 
+    const hasFsPermission =
+      this.spec.permissions.includes('fs:read') || this.spec.permissions.includes('fs:write');
+
+    const sandboxRequire = (id: string): unknown => {
+      if (id === 'path') return path;
+      if (id === 'fs' && hasFsPermission) return scopedFs;
+      throw new Error(`require('${id}') is not allowed in plugin sandbox`);
+    };
+
     const sandbox = {
       module: { exports: {} as Record<string, unknown> },
       exports: {} as Record<string, unknown>,
-      require: () => {
-        throw new Error('require() is not allowed in plugin sandbox');
-      },
+      require: sandboxRequire,
       console: {
         log: (...args: unknown[]) => console.log(`[plugin:${this.spec.name}]`, ...args),
         error: (...args: unknown[]) => console.error(`[plugin:${this.spec.name}]`, ...args),
