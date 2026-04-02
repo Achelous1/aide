@@ -41,6 +41,17 @@ function broadcastToRenderer(webContentsId: number, channel: string, ...args: un
   }
 }
 
+export function killAllSessions(): void {
+  for (const [, session] of sessions) {
+    try {
+      session.pty.kill();
+    } catch {
+      // Ignore errors — process may already be dead
+    }
+  }
+  sessions.clear();
+}
+
 export function registerTerminalHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(
     IPC_CHANNELS.TERMINAL_SPAWN,

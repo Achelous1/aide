@@ -10,6 +10,7 @@ import { registerAgentHandlers } from './ipc/agent-handlers';
 import { registerGitHandlers } from './ipc/git-handlers';
 import { registerGithubHandlers } from './ipc/github-handlers';
 import { registerPluginHandlers } from './ipc/plugin-handlers';
+import { killAllSessions } from './ipc/terminal-handlers';
 import { writeMcpConfig } from './mcp/config-writer';
 
 fixPackagedEnv();
@@ -90,6 +91,10 @@ app.on('ready', () => {
   } catch (err) {
     console.error('[AIDE] MCP setup failed (non-fatal):', err);
   }
+});
+
+app.on('before-quit', () => {
+  killAllSessions();
 });
 
 app.on('window-all-closed', () => {
