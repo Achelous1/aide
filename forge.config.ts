@@ -43,6 +43,7 @@ const config: ForgeConfig = {
       unpack: '**/node_modules/node-pty/**/*',
     },
     name: 'AIDE',
+    icon: path.resolve(__dirname, 'resources', 'icon'),
     afterCopy: [
       (buildPath, _electronVersion, _platform, _arch, callback) => {
         copyNativeModules(buildPath);
