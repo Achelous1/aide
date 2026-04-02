@@ -126,6 +126,12 @@ Vite's `external` list means "don't bundle, resolve at runtime." But electron-fo
 ### Packaging: Packaged apps don't inherit shell PATH
 Electron apps launched from Finder (not terminal) get a minimal `PATH` (`/usr/bin:/bin`). CLI tools like `claude`, `zsh` in `/usr/local/bin` or `/opt/homebrew/bin` won't be found. **`fix-env.ts` runs the login shell to load the full environment before any pty spawn.** This only runs when `app.isPackaged` is true.
 
+### Packaging: Finder sets HOME=/ — guard all home directory access
+macOS Finder launches packaged apps with `HOME=/` (not the user's home). `app.getPath('home')`, `os.homedir()`, and `process.env.HOME` all return `/` in this context. **Never use `app.getPath('home')` directly.** Use the `getHome()` helper pattern that rejects `/` and falls back to `os.userInfo().homedir` (which uses `getpwuid()`). `fix-env.ts` also overrides HOME from the login shell, but if it fails, the safety net catches it. All `app.on('ready')` code that touches `~/.aide/` must be wrapped in try-catch so failures don't prevent window creation.
+
+### Packaging: Disable Electron Fuses for unsigned builds
+`EnableEmbeddedAsarIntegrityValidation`, `OnlyLoadAppFromAsar`, and `EnableCookieEncryption` in `forge.config.ts` Fuses must be `false` until the app is code-signed. These silently abort the process when the asar hash doesn't match or native modules load outside the asar bundle.
+
 ### Packaging: macOS fsevents EBADF on /dev/fd/
 In packaged apps, the `fsevents` native module reports `/dev/fd/N` paths. When chokidar tries to `lstat` them, the FD is already closed → `EBADF`. The `ignored` option doesn't help because the error occurs before filtering. **A process-level `uncaughtException` handler suppresses this specific error** (see `src/main/index.ts`).
 
