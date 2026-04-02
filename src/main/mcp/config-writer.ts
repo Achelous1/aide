@@ -134,7 +134,7 @@ const vm = require("vm");
 const crypto = require("crypto");
 
 const GLOBAL_PLUGINS_DIR = process.env.AIDE_GLOBAL_PLUGINS_DIR || "";
-const PLUGINS_DIR = process.env.AIDE_PLUGINS_DIR || "";
+const PLUGINS_DIR = process.env.AIDE_PLUGINS_DIR || path.join(process.cwd(), ".aide", "plugins");
 const WORKSPACE = process.env.AIDE_WORKSPACE || process.cwd();
 
 function send(msg) {
