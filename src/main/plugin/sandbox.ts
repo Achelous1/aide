@@ -22,23 +22,76 @@ export class PluginSandbox {
     const code = fs.readFileSync(entryPath, 'utf-8');
 
     // Scoped filesystem API - only allows access within workspace and plugin dir
+    const assertInWorkspace = (resolved: string): void => {
+      if (!resolved.startsWith(workspacePath + path.sep) && resolved !== workspacePath) {
+        throw new Error('Access denied: path outside workspace');
+      }
+    };
+    const assertRead = (): void => {
+      if (!this.spec.permissions.includes('fs:read')) {
+        throw new Error('Permission denied: fs:read not granted');
+      }
+    };
+    const assertWrite = (): void => {
+      if (!this.spec.permissions.includes('fs:write')) {
+        throw new Error('Permission denied: fs:write not granted');
+      }
+    };
+
     const scopedFs = {
+      // Legacy methods (backward compat)
       read: (filePath: string): string => {
         const resolved = path.resolve(workspacePath, filePath);
-        if (!resolved.startsWith(workspacePath + path.sep) && resolved !== workspacePath) {
-          throw new Error('Access denied: path outside workspace');
-        }
+        assertInWorkspace(resolved);
         return fs.readFileSync(resolved, 'utf-8');
       },
       write: (filePath: string, content: string): void => {
-        if (!this.spec.permissions.includes('fs:write')) {
-          throw new Error('Permission denied: fs:write not granted');
-        }
+        assertWrite();
         const resolved = path.resolve(workspacePath, filePath);
-        if (!resolved.startsWith(workspacePath + path.sep) && resolved !== workspacePath) {
-          throw new Error('Access denied: path outside workspace');
-        }
+        assertInWorkspace(resolved);
         fs.writeFileSync(resolved, content);
+      },
+      // Standard fs methods
+      existsSync: (filePath: string): boolean => {
+        const resolved = path.resolve(workspacePath, filePath);
+        assertInWorkspace(resolved);
+        return fs.existsSync(resolved);
+      },
+      readFileSync: (filePath: string, encoding?: BufferEncoding): string | Buffer => {
+        assertRead();
+        const resolved = path.resolve(workspacePath, filePath);
+        assertInWorkspace(resolved);
+        return encoding ? fs.readFileSync(resolved, encoding) : fs.readFileSync(resolved);
+      },
+      writeFileSync: (filePath: string, content: string | Buffer): void => {
+        assertWrite();
+        const resolved = path.resolve(workspacePath, filePath);
+        assertInWorkspace(resolved);
+        fs.writeFileSync(resolved, content);
+      },
+      mkdirSync: (dirPath: string, options?: fs.MakeDirectoryOptions): void => {
+        assertWrite();
+        const resolved = path.resolve(workspacePath, dirPath);
+        assertInWorkspace(resolved);
+        fs.mkdirSync(resolved, options);
+      },
+      readdirSync: (dirPath: string, options?: Parameters<typeof fs.readdirSync>[1]): string[] | Buffer[] | fs.Dirent[] => {
+        assertRead();
+        const resolved = path.resolve(workspacePath, dirPath);
+        assertInWorkspace(resolved);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (fs.readdirSync as any)(resolved, options);
+      },
+      statSync: (filePath: string): fs.Stats => {
+        const resolved = path.resolve(workspacePath, filePath);
+        assertInWorkspace(resolved);
+        return fs.statSync(resolved);
+      },
+      unlinkSync: (filePath: string): void => {
+        assertWrite();
+        const resolved = path.resolve(workspacePath, filePath);
+        assertInWorkspace(resolved);
+        fs.unlinkSync(resolved);
       },
     };
 
@@ -55,6 +108,7 @@ export class PluginSandbox {
       module: { exports: {} as Record<string, unknown> },
       exports: {} as Record<string, unknown>,
       require: sandboxRequire,
+      Buffer,
       console: {
         log: (...args: unknown[]) => console.log(`[plugin:${this.spec.name}]`, ...args),
         error: (...args: unknown[]) => console.error(`[plugin:${this.spec.name}]`, ...args),
