@@ -76,8 +76,13 @@ app.on('ready', () => {
   registerGitHandlers(ipcMain);
   registerGithubHandlers(ipcMain);
   registerPluginHandlers(ipcMain, process.cwd());
-  writeMcpConfig(app.getPath('home'));
   createWindow();
+  // MCP setup runs after window creation — failures must not prevent the app from opening
+  try {
+    writeMcpConfig(app.getPath('home'));
+  } catch (err) {
+    console.error('[AIDE] MCP setup failed (non-fatal):', err);
+  }
 });
 
 app.on('window-all-closed', () => {
