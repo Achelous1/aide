@@ -123,9 +123,39 @@ export function App() {
         return;
       }
 
-      // ⌘1-9 / Ctrl+1-9: switch to tab by number in focused pane
+      // ⌘1/2/3: spawn agent (Claude/Gemini/Codex) in focused pane
+      const AGENT_SHORTCUTS: Record<string, { command: string; id: string; label: string }> = {
+        '1': { command: 'claude', id: 'claude', label: 'claude' },
+        '2': { command: 'gemini', id: 'gemini', label: 'gemini' },
+        '3': { command: 'codex', id: 'codex', label: 'codex' },
+      };
+      const agentShortcut = AGENT_SHORTCUTS[e.key];
+      if (agentShortcut) {
+        e.preventDefault();
+        e.stopPropagation();
+        const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+        if (!wsId) return;
+        const ws = useWorkspaceStore.getState().workspaces.find((w) => w.id === wsId);
+        window.aide.terminal.spawn({ shell: agentShortcut.command, cwd: ws?.path }).then((sessionId) => {
+          const tab = {
+            id: crypto.randomUUID(),
+            type: 'agent' as const,
+            agentId: agentShortcut.id,
+            sessionId,
+            title: agentShortcut.label,
+          };
+          useTerminalStore.getState().addTab(tab);
+          const pane = useLayoutStore.getState().getFocusedPane();
+          if (pane) {
+            useLayoutStore.getState().addTabToPane(pane.id, tab);
+          }
+        }).catch(() => {});
+        return;
+      }
+
+      // ⌘4-9 / Ctrl+4-9: switch to tab by number in focused pane
       const digit = parseInt(e.key, 10);
-      if (digit >= 1 && digit <= 9) {
+      if (digit >= 4 && digit <= 9) {
         const pane = useLayoutStore.getState().getFocusedPane();
         if (pane) {
           const target = pane.tabs[digit - 1];

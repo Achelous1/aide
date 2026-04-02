@@ -4,45 +4,45 @@ import { useAgentStore } from '../../stores/agent-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useLayoutStore } from '../../stores/layout-store';
 
-interface AgentCard {
+interface AgentButton {
   id: string;
   label: string;
-  hint: string;
-  color: string;
+  icon: string;
+  shortcutKey: string;
   type: 'agent' | 'shell';
   command?: string;
 }
 
-const AGENT_CARDS: AgentCard[] = [
+const AGENT_BUTTONS: AgentButton[] = [
   {
     id: 'claude',
-    label: 'claude',
-    hint: 'Claude Code',
-    color: 'var(--agent-claude)',
+    label: 'Open Claude',
+    icon: '\u25CC',
+    shortcutKey: '1',
     type: 'agent',
     command: 'claude',
   },
   {
     id: 'gemini',
-    label: 'gemini',
-    hint: 'Gemini CLI',
-    color: 'var(--agent-gemini)',
+    label: 'Open Gemini',
+    icon: '\u25CE',
+    shortcutKey: '2',
     type: 'agent',
     command: 'gemini',
   },
   {
     id: 'codex',
-    label: 'codex',
-    hint: 'Codex CLI',
-    color: 'var(--agent-codex)',
+    label: 'Open Codex',
+    icon: '\u25CD',
+    shortcutKey: '3',
     type: 'agent',
     command: 'codex',
   },
   {
     id: 'shell',
-    label: '$ shell',
-    hint: '$ shell',
-    color: 'var(--text-tertiary)',
+    label: 'Open Terminal',
+    icon: '\u25A2',
+    shortcutKey: 'T',
     type: 'shell',
   },
 ];
@@ -66,21 +66,21 @@ export function EmptyState({ paneId }: EmptyStateProps) {
     return installedAgents.some((a) => a.id === agentId);
   };
 
-  const handleSelect = async (card: AgentCard) => {
-    if (!isInstalled(card.id)) return;
+  const handleSelect = async (btn: AgentButton) => {
+    if (!isInstalled(btn.id)) return;
 
     try {
       const ws = workspaces.find((w) => w.id === activeWorkspaceId);
       const sessionId = await window.aide.terminal.spawn(
-        card.command ? { shell: card.command, cwd: ws?.path } : { cwd: ws?.path }
+        btn.command ? { shell: btn.command, cwd: ws?.path } : { cwd: ws?.path }
       );
 
       const tab = {
         id: crypto.randomUUID(),
-        type: card.type,
-        agentId: card.type === 'agent' ? card.id : undefined,
+        type: btn.type,
+        agentId: btn.type === 'agent' ? btn.id : undefined,
         sessionId,
-        title: card.label,
+        title: btn.type === 'agent' ? btn.id : '$ shell',
       };
 
       addTab(tab);
@@ -106,39 +106,75 @@ export function EmptyState({ paneId }: EmptyStateProps) {
         Select an agent to start a new session
       </p>
 
-      {/* Agent cards */}
-      <div className="flex flex-row gap-4">
-        {AGENT_CARDS.map((card) => {
-          const installed = isInstalled(card.id);
+      {/* Agent buttons */}
+      <div
+        className="flex flex-col gap-2 rounded-xl"
+        style={{
+          width: '440px',
+          padding: '8px',
+          backgroundColor: 'var(--background)',
+        }}
+      >
+        {AGENT_BUTTONS.map((btn, idx) => {
+          const installed = isInstalled(btn.id);
+          const isFirst = idx === 0;
           return (
             <button
-              key={card.id}
-              onClick={() => handleSelect(card)}
+              key={btn.id}
+              onClick={() => handleSelect(btn)}
               disabled={!installed}
-              className={`flex flex-col gap-2 p-4 rounded-lg border border-aide-border transition-colors ${
-                installed
-                  ? 'bg-aide-surface-elevated hover:bg-aide-surface cursor-pointer'
-                  : 'bg-aide-surface-elevated cursor-not-allowed'
-              }`}
+              className="flex items-center justify-between rounded-[10px] transition-colors"
               style={{
-                width: '180px',
-                height: '120px',
-                borderTop: `3px solid ${card.color}`,
+                height: '44px',
+                padding: '0 12px',
+                backgroundColor: isFirst ? 'var(--surface-elevated)' : 'var(--background)',
                 opacity: installed ? 1 : 0.4,
+                cursor: installed ? 'pointer' : 'not-allowed',
               }}
             >
-              <div className="flex items-center gap-2">
+              {/* Left: icon + label */}
+              <div className="flex items-center" style={{ gap: '10px' }}>
                 <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: card.color }}
-                />
-                <span className="text-[13px] font-mono font-bold text-aide-text-primary">
-                  {card.label}
+                  className="font-mono font-bold text-[15px]"
+                  style={{ color: isFirst ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}
+                >
+                  {btn.icon}
+                </span>
+                <span
+                  className="font-mono font-medium text-[13px]"
+                  style={{ color: isFirst ? 'var(--text-primary)' : 'var(--text-tertiary)' }}
+                >
+                  {btn.label}
                 </span>
               </div>
-              <span className="text-[11px] font-mono text-aide-text-secondary text-left">
-                {installed ? card.hint : 'Not installed'}
-              </span>
+
+              {/* Right: shortcut chips */}
+              <div className="flex items-center" style={{ gap: '6px' }}>
+                <span
+                  className="inline-flex items-center justify-center font-mono font-semibold text-[11px] rounded-full leading-none"
+                  style={{
+                    minWidth: '22px',
+                    height: '22px',
+                    padding: '0 6px',
+                    backgroundColor: isFirst ? 'var(--surface)' : 'var(--surface-elevated)',
+                    color: isFirst ? 'var(--text-secondary)' : 'var(--text-tertiary)',
+                  }}
+                >
+                  {'\u2318'}
+                </span>
+                <span
+                  className="inline-flex items-center justify-center font-mono font-semibold text-[11px] rounded-full leading-none"
+                  style={{
+                    minWidth: '22px',
+                    height: '22px',
+                    padding: '0 6px',
+                    backgroundColor: isFirst ? 'var(--surface)' : 'var(--surface-elevated)',
+                    color: isFirst ? 'var(--text-secondary)' : 'var(--text-tertiary)',
+                  }}
+                >
+                  {btn.shortcutKey}
+                </span>
+              </div>
             </button>
           );
         })}
