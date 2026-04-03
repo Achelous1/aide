@@ -271,11 +271,35 @@ function createPlugin(params) {
   return spec;
 }
 
+function editPlugin(params) {
+  const resolved = resolvePluginDir(params.name);
+  if (!resolved) throw new Error("Plugin not found: " + params.name);
+  const pluginDir = resolved.dir;
+  const specPath = path.join(pluginDir, "plugin.spec.json");
+  const spec = JSON.parse(fs.readFileSync(specPath, "utf-8"));
+  if (params.description) spec.description = params.description;
+  if (params.permissions) spec.permissions = params.permissions;
+  if (params.tools) {
+    spec.tools = params.tools;
+    fs.writeFileSync(path.join(pluginDir, "tool.json"), JSON.stringify({ pluginId: spec.id, pluginName: spec.name, version: spec.version, tools: params.tools }, null, 2));
+  }
+  fs.writeFileSync(specPath, JSON.stringify(spec, null, 2));
+  if (params.code) {
+    try { vm.compileFunction(params.code, [], { filename: "index.js" }); } catch (err) {
+      throw new Error("Plugin code compilation failed: " + err.message);
+    }
+    fs.writeFileSync(path.join(pluginDir, "src", "index.js"), params.code);
+  }
+  if (params.html) fs.writeFileSync(path.join(pluginDir, "index.html"), params.html);
+  return spec;
+}
+
 function getBuiltinTools() {
   const builtins = [
     { name: "aide_create_plugin", description: "Create a new AIDE plugin from code. The code must be a CommonJS module exporting { name, version, tools, invoke(toolName, args) }.\\n\\nSandbox Environment:\\n- require('path') → always available\\n- require('fs') → scoped to workspace directory (requires fs:read or fs:write permission). Available methods: existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, unlinkSync. All paths resolved relative to workspace root.\\n- require('fs') needs plugin permissions: fs:read for read operations, fs:write for write operations\\n- Buffer global available\\n- console.log/error/warn available\\n- aide.fs → same scoped fs object. Methods: read(path), write(path,content), existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, unlinkSync\\n- aide.files.reveal(path) / aide.files.select(path) / aide.files.refresh() → control the FILES tab (no-op in MCP context, functional in Electron UI)\\n- aide.plugins.emit(event, data) → broadcast event to other plugins (no-op in MCP context)\\n- No network access, no child_process, no other Node.js modules\\n- An index.html is auto-generated for iframe rendering. Pass the optional 'html' parameter to aide_create_plugin to provide a custom UI in one step.\\n\\nHTML UI (iframe) Event API:\\nWhen the plugin has a custom index.html rendered in an iframe, it can receive FILES tab events via:\\n  window.aide.on('file:clicked', function(data) { /* data.filePath */ })\\n  window.aide.on('file:right-clicked', function(data) { /* data.filePath */ })\\nThese fire whenever a user clicks/right-clicks a file in the FILES tab while eventBindings are configured in .aide/settings.json.\\n\\nIMPORTANT — AIDE Design System Rules:\\nIf the plugin produces UI output (HTML/CSS), it MUST use these CSS custom properties (not hardcoded colors):\\n\\nDark theme (default):\\n  --background: #131519, --surface: #1A1C23, --surface-elevated: #24262E\\n  --border: #2E3140, --text-primary: #E8E9ED, --text-secondary: #8B8D98\\n  --text-tertiary: #5C5E6A, --accent: #10B981 (emerald green)\\n  --accent-warning: #F59E0B, --accent-info: #06B6D4\\n  --agent-claude: #D97706 (amber), --agent-gemini: #3B82F6 (blue), --agent-codex: #10B981 (green)\\n\\nLight theme (.light class on root):\\n  --background: #F5F5F0, --surface: #FAFAF7, --surface-elevated: #EBEBE6\\n  --border: #E0E3E8, --text-primary: #0D0D0D, --text-secondary: #6B7280\\n  --text-tertiary: #9CA3AF, --accent: #059669\\n\\nStyle rules:\\n- Use CSS var() references: color: var(--text-primary), background: var(--surface)\\n- Font: monospace (system mono stack), sizes 10px-12px for UI text\\n- Borders: 1px solid var(--border), border-radius 4-6px\\n- Buttons: bg var(--accent) with black text, disabled opacity 0.4\\n- Spacing: 4px/8px/12px increments (Tailwind-compatible)\\n- Never use hardcoded hex colors — always reference CSS variables", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plugin name (lowercase, hyphens)" }, description: { type: "string", description: "What the plugin does" }, code: { type: "string", description: "Complete plugin source code (CommonJS module)" }, permissions: { type: "array", items: { type: "string" }, description: "Required permissions: fs:read, fs:write, network, process" }, tools: { type: "array", description: "Tool definitions the plugin exposes", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, parameters: { type: "object" } } } }, html: { type: "string", description: "Optional custom index.html for the plugin iframe UI. If omitted, a default UI is auto-generated. Use window.aide.on('file:clicked', cb) inside for file event integration." }, scope: { type: "string", enum: ["global", "local"], description: "Where to install: global (~/.aide/plugins) or local ({workspace}/.aide/plugins). Default: local" } }, required: ["name", "description", "code"] } },
     { name: "aide_list_plugins", description: "List all installed AIDE plugins with their tools.", inputSchema: { type: "object", properties: {} } },
     { name: "aide_invoke_tool", description: "Invoke a tool from an installed AIDE plugin.", inputSchema: { type: "object", properties: { plugin_name: { type: "string" }, tool_name: { type: "string" }, args: { type: "object" } }, required: ["plugin_name", "tool_name"] } },
+    { name: "aide_edit_plugin", description: "Edit an existing AIDE plugin in-place. Only provided fields are updated — omitted fields are left unchanged. Useful for patching code or UI without deleting and recreating the plugin.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plugin name to edit" }, code: { type: "string", description: "New index.js source (CommonJS module). Replaces existing code." }, html: { type: "string", description: "New index.html content. Replaces existing UI." }, description: { type: "string", description: "Updated plugin description." }, permissions: { type: "array", items: { type: "string" }, description: "Updated permissions list." }, tools: { type: "array", description: "Updated tool definitions.", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, parameters: { type: "object" } } } } }, required: ["name"] } },
     { name: "aide_delete_plugin", description: "Delete an installed AIDE plugin.", inputSchema: { type: "object", properties: { plugin_name: { type: "string" }, scope: { type: "string", enum: ["global", "local"], description: "Which scope to delete from. Default: local" } }, required: ["plugin_name"] } }
   ];
   const plugins = listPluginSpecs();
@@ -298,6 +322,7 @@ function handleRequest(method, id, params) {
       if (tn === "aide_create_plugin") { sendResult(id, { content: [{ type: "text", text: JSON.stringify(createPlugin(ta), null, 2) }] }); }
       else if (tn === "aide_list_plugins") { sendResult(id, { content: [{ type: "text", text: JSON.stringify(listPluginSpecs(), null, 2) }] }); }
       else if (tn === "aide_invoke_tool") { sendResult(id, { content: [{ type: "text", text: JSON.stringify(invokePluginTool(ta.plugin_name, ta.tool_name, ta.args || {})) }] }); }
+      else if (tn === "aide_edit_plugin") { sendResult(id, { content: [{ type: "text", text: JSON.stringify(editPlugin(ta), null, 2) }] }); }
       else if (tn === "aide_delete_plugin") {
         const scope = ta.scope || "local";
         const baseDir = scope === "global" ? GLOBAL_PLUGINS_DIR : PLUGINS_DIR;
