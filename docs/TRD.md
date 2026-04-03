@@ -204,6 +204,43 @@ interface ToolRegistry {
 
 에이전트가 tool을 호출하면 AIDE가 중간에서 해당 플러그인의 샌드박스 함수를 실행하고 결과를 반환한다.
 
+#### 2.5 Plugin Scope & Workspace Isolation
+
+플러그인은 두 가지 스코프로 관리된다.
+
+| 스코프 | 저장 위치 | 가시성 |
+|--------|-----------|--------|
+| `local` | `{workspace}/.aide/plugins/` | 해당 워크스페이스에서만 표시 |
+| `global` | `~/.aide/plugins/` | 모든 워크스페이스에서 표시 |
+
+**워크스페이스 전환 시 플러그인 갱신 흐름**:
+
+```
+사용자: 사이드바에서 워크스페이스 B 클릭
+    │
+    ▼
+WorkspaceNav → setActive(ws-b)
+    │
+    ▼
+window.aide.workspace.open(ws-b.path)   ← Main: activeWorkspacePath = ws-b
+    │ (await)
+    ▼
+usePluginStore.loadPlugins()            ← IPC: PLUGIN_LIST
+    │
+    ▼
+Main: refreshLocalPlugins(ws-b)
+    │  if (lastLocalDir !== ws-b local dir)
+    │    registry.clearLocalPlugins()   ← ws-a 로컬 플러그인 제거
+    │    loadDirIntoRegistry(ws-b, 'local')
+    ▼
+렌더러: 플러그인 목록 갱신 (ws-b 로컬 + 글로벌)
+```
+
+**구현 규칙**:
+- `window.aide.workspace.open()` IPC가 완료된 후에 `loadPlugins()`를 호출해야 한다 — 순서가 바뀌면 메인 프로세스가 구 경로를 기준으로 플러그인을 반환한다.
+- `PluginRegistry.clearLocalPlugins()`는 scope가 `local`인 플러그인만 제거하며, `global` 플러그인과 활성 sandbox는 유지된다.
+- 동일 워크스페이스로 재전환 시 (`lastLocalDir` 동일) 불필요한 스캔을 생략한다.
+
 ### 3. Terminal Panel (Renderer)
 
 xterm.js 기반 다중 탭 터미널.

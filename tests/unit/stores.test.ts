@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useWorkspaceStore } from '../../src/renderer/stores/workspace-store';
 import { useTerminalStore } from '../../src/renderer/stores/terminal-store';
 import { useAgentStore } from '../../src/renderer/stores/agent-store';
+import { usePluginStore } from '../../src/renderer/stores/plugin-store';
 import type { WorkspaceInfo, TerminalTab } from '../../src/types/ipc';
 
 const mockWorkspace: WorkspaceInfo = {
@@ -179,5 +180,77 @@ describe('useAgentStore', () => {
     const statuses = useAgentStore.getState().sessionStatuses;
     expect(statuses['s1']).toBe('idle');
     expect(statuses['s2']).toBe('awaiting-input');
+  });
+});
+
+// ─── Plugin reload on workspace switch ───────────────────────────────────────
+
+const wsA: WorkspaceInfo = { id: 'ws-a', name: 'aide', path: '/projects/aide', color: '#6366f1', lastOpened: 1 };
+const wsB: WorkspaceInfo = { id: 'ws-b', name: 'rogue-shelf', path: '/projects/rogue-shelf', color: '#ec4899', lastOpened: 2 };
+
+describe('useWorkspaceStore – plugin reload on workspace switch', () => {
+  let workspaceOpenMock: ReturnType<typeof vi.fn>;
+  let pluginListMock: ReturnType<typeof vi.fn>;
+  let loadPluginsSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    workspaceOpenMock = vi.fn().mockResolvedValue('/projects/aide');
+    pluginListMock = vi.fn().mockResolvedValue([]);
+
+    vi.stubGlobal('window', {
+      aide: {
+        workspace: { open: workspaceOpenMock },
+        plugin: { list: pluginListMock },
+      },
+    });
+
+    loadPluginsSpy = vi.spyOn(usePluginStore.getState(), 'loadPlugins');
+
+    useWorkspaceStore.setState({
+      workspaces: [wsA, wsB],
+      activeWorkspaceId: null,
+      recentProjects: [],
+      navExpanded: true,
+    });
+    usePluginStore.setState({ plugins: [], loading: false, error: null, generating: false, generateError: null });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('calls window.aide.workspace.open with the workspace path on switch', async () => {
+    await useWorkspaceStore.getState().setActive('ws-a');
+    expect(workspaceOpenMock).toHaveBeenCalledWith('/projects/aide');
+  });
+
+  it('calls loadPlugins after workspace.open resolves', async () => {
+    await useWorkspaceStore.getState().setActive('ws-a');
+    expect(loadPluginsSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls workspace.open with the new workspace path when switching', async () => {
+    await useWorkspaceStore.getState().setActive('ws-a');
+    await useWorkspaceStore.getState().setActive('ws-b');
+    expect(workspaceOpenMock).toHaveBeenLastCalledWith('/projects/rogue-shelf');
+    expect(loadPluginsSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not call workspace.open or loadPlugins when switching to the same workspace', async () => {
+    await useWorkspaceStore.getState().setActive('ws-a');
+    workspaceOpenMock.mockClear();
+    loadPluginsSpy.mockClear();
+
+    await useWorkspaceStore.getState().setActive('ws-a');
+    expect(workspaceOpenMock).not.toHaveBeenCalled();
+    expect(loadPluginsSpy).not.toHaveBeenCalled();
+  });
+
+  it('still sets activeWorkspaceId even without a matching workspace in list', async () => {
+    await useWorkspaceStore.getState().setActive('ws-unknown');
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-unknown');
+    // No matching workspace path → workspace.open should not be called
+    expect(workspaceOpenMock).not.toHaveBeenCalled();
   });
 });

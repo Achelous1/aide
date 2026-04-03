@@ -73,6 +73,17 @@ export class PluginRegistry {
     return this.plugins.get(id);
   }
 
+  clearLocalPlugins(): void {
+    for (const [id, plugin] of this.plugins) {
+      if (plugin.scope !== 'local') continue;
+      if (plugin.active && plugin.sandbox) {
+        plugin.sandbox.stop();
+      }
+      this._deregisterTools(id);
+      this.plugins.delete(id);
+    }
+  }
+
   getRegisteredTools(): PluginTool[] {
     return Array.from(this.tools.values()).map((t) => t.tool);
   }

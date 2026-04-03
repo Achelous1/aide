@@ -71,6 +71,19 @@ function loadRegistryFromDisk(cwd: string): void {
   loadDirIntoRegistry(getLocalPluginsDir(cwd), 'local');
 }
 
+let lastLocalDir: string | null = null;
+
+// Clears local plugins and reloads from the new workspace directory.
+// No-op if the workspace hasn't changed.
+function refreshLocalPlugins(cwd: string): void {
+  const localDir = getLocalPluginsDir(cwd);
+  if (lastLocalDir === localDir) return;
+  registry.clearLocalPlugins();
+  lastLocalDir = localDir;
+  ensurePluginsDirs(cwd);
+  loadDirIntoRegistry(localDir, 'local');
+}
+
 export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
   loadRegistryFromDisk(cwd);
 
@@ -100,9 +113,9 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.PLUGIN_LIST, async () => {
-    // 활성 워크스페이스가 바뀌었을 수 있으므로 로컬 플러그인을 다시 스캔
     const effectiveCwd = getEffectiveCwd(cwd);
-    loadDirIntoRegistry(getLocalPluginsDir(effectiveCwd), 'local');
+    // Clears stale local plugins when workspace changes, then reloads from current workspace
+    refreshLocalPlugins(effectiveCwd);
     return registry.list();
   });
 
