@@ -1,7 +1,8 @@
-import { IpcMain, app } from 'electron';
+import { IpcMain, BrowserWindow, app } from 'electron';
 import * as fs from 'fs';
 import { userInfo } from 'os';
 import * as path from 'path';
+import chokidar from 'chokidar';
 import { IPC_CHANNELS } from './channels';
 import { generatePluginSpec } from '../plugin/spec-generator';
 import type { PluginSpec } from '../plugin/spec-generator';
@@ -71,6 +72,13 @@ function loadRegistryFromDisk(cwd: string): void {
   loadDirIntoRegistry(getLocalPluginsDir(cwd), 'local');
 }
 
+function broadcastPluginsChanged(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(IPC_CHANNELS.PLUGINS_CHANGED);
+  }
+}
+
+let localPluginsWatcher: ReturnType<typeof chokidar.watch> | null = null;
 let lastLocalDir: string | null = null;
 
 // Clears local plugins and reloads from the new workspace directory.
@@ -82,6 +90,11 @@ function refreshLocalPlugins(cwd: string): void {
   lastLocalDir = localDir;
   ensurePluginsDirs(cwd);
   loadDirIntoRegistry(localDir, 'local');
+  // Re-watch local plugins dir for the new workspace
+  localPluginsWatcher?.close();
+  localPluginsWatcher = chokidar
+    .watch(localDir, { ignoreInitial: true, depth: 2, ignored: /\/dev\/fd\// })
+    .on('all', broadcastPluginsChanged);
 }
 
 function makeEmitterFactory(getCwd: () => string) {
@@ -113,6 +126,11 @@ function makeEmitterFactory(getCwd: () => string) {
 export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
   loadRegistryFromDisk(cwd);
   registry.setEmitterFactory(makeEmitterFactory(getEffectiveCwd.bind(null, cwd)));
+  // Watch global plugins dir for changes
+  const globalDir = getGlobalPluginsDir();
+  chokidar
+    .watch(globalDir, { ignoreInitial: true, depth: 2, ignored: /\/dev\/fd\// })
+    .on('all', broadcastPluginsChanged);
 
   // Spec-only: generate and return spec without writing to disk
   ipcMain.handle(IPC_CHANNELS.PLUGIN_GENERATE_SPEC, async (_event, name: string, description: string) => {

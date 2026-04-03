@@ -109,6 +109,11 @@ const aideAPI: AideAPI = {
     invoke: (pluginId: string, toolName: string, args: Record<string, unknown>) =>
       ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_INVOKE, pluginId, toolName, args),
     getHtml: (id: string): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GET_HTML, id),
+    onChanged: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on(IPC_CHANNELS.PLUGINS_CHANGED, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.PLUGINS_CHANGED, listener);
+    },
   },
 
   mcp: {

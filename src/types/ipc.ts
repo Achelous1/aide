@@ -222,6 +222,7 @@ export interface AideAPI {
     delete(name: string): Promise<void>;
     invoke(pluginId: string, toolName: string, args: Record<string, unknown>): Promise<unknown>;
     getHtml: (id: string) => Promise<string | null>;
+    onChanged(callback: () => void): () => void;
   };
   mcp: {
     status(): Promise<McpStatus>;

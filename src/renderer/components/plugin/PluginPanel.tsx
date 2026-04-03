@@ -20,6 +20,8 @@ export function PluginPanel() {
 
   useEffect(() => {
     loadPlugins();
+    const unsub = window.aide.plugin.onChanged(loadPlugins);
+    return unsub;
   }, [loadPlugins]);
 
   const handleOpenTab = (plugin: typeof plugins[number]) => {
