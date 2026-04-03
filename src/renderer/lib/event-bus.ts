@@ -35,6 +35,9 @@ export async function emitFileEvent(
     return;
   }
 
+  // Broadcast to plugin iframe UIs first — must not be blocked by tool invocations
+  window.dispatchEvent(new CustomEvent('aide:file-event', { detail: { event, ...payload } }));
+
   const bindings = settings.eventBindings[event] ?? [];
   for (const binding of bindings) {
     try {
@@ -49,6 +52,4 @@ export async function emitFileEvent(
       );
     }
   }
-  // Broadcast to plugin iframe UIs
-  window.dispatchEvent(new CustomEvent('aide:file-event', { detail: { event, ...payload } }));
 }
