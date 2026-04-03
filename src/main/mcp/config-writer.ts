@@ -187,26 +187,46 @@ function resolvePluginDir(pluginName) {
 function invokePluginTool(pluginName, toolName, args) {
   const resolved = resolvePluginDir(pluginName);
   if (!resolved) throw new Error("Plugin not found: " + pluginName);
+  // Read permissions from spec
+  var permissions = [];
+  try { permissions = JSON.parse(fs.readFileSync(path.join(resolved.dir, "plugin.spec.json"), "utf-8")).permissions || []; } catch {}
+  var hasFsRead = permissions.includes("fs:read");
+  var hasFsWrite = permissions.includes("fs:write");
+  var hasFsPerm = hasFsRead || hasFsWrite;
+  var ws = WORKSPACE;
+  function assertInWs(p) {
+    if (!p.startsWith(ws + path.sep) && p !== ws) throw new Error("Access denied: path outside workspace");
+  }
+  function assertRead() { if (!hasFsRead) throw new Error("Permission denied: fs:read not granted"); }
+  function assertWrite() { if (!hasFsWrite) throw new Error("Permission denied: fs:write not granted"); }
+  var scopedFs = {
+    read: function(fp) { assertRead(); var a = path.resolve(ws, fp); assertInWs(a); return fs.readFileSync(a, "utf-8"); },
+    write: function(fp, c) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.writeFileSync(a, c); },
+    existsSync: function(fp) { var a = path.resolve(ws, fp); assertInWs(a); return fs.existsSync(a); },
+    readFileSync: function(fp, enc) { assertRead(); var a = path.resolve(ws, fp); assertInWs(a); return enc ? fs.readFileSync(a, enc) : fs.readFileSync(a); },
+    writeFileSync: function(fp, c) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.writeFileSync(a, c); },
+    mkdirSync: function(fp, opts) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.mkdirSync(a, opts); },
+    readdirSync: function(fp, opts) { assertRead(); var a = path.resolve(ws, fp); assertInWs(a); return fs.readdirSync(a, opts); },
+    statSync: function(fp) { var a = path.resolve(ws, fp); assertInWs(a); return fs.statSync(a); },
+    unlinkSync: function(fp) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.unlinkSync(a); }
+  };
+  var sandboxRequire = function(id) {
+    if (id === "path") return path;
+    if (id === "fs" && hasFsPerm) return scopedFs;
+    throw new Error("require('" + id + "') is not allowed in plugin sandbox");
+  };
   const entryPath = path.join(resolved.dir, "src", "index.js");
   const code = fs.readFileSync(entryPath, "utf-8");
   const sandbox = {
     module: { exports: {} }, exports: {},
-    require: function() { throw new Error("require() not allowed"); },
+    require: sandboxRequire,
+    Buffer: Buffer,
     console: { log: function(){}, error: function(){}, warn: function(){} },
     aide: {
-      fs: {
-        read: function(fp) {
-          const abs = path.resolve(WORKSPACE, fp);
-          if (!abs.startsWith(WORKSPACE)) throw new Error("Access denied");
-          return fs.readFileSync(abs, "utf-8");
-        },
-        write: function(fp, content) {
-          const abs = path.resolve(WORKSPACE, fp);
-          if (!abs.startsWith(WORKSPACE)) throw new Error("Access denied");
-          fs.writeFileSync(abs, content);
-        }
-      },
-      plugin: { id: pluginName, name: pluginName, version: "0.1.0" }
+      fs: scopedFs,
+      plugin: { id: pluginName, name: pluginName, version: "0.1.0" },
+      files: { reveal: function(){}, select: function(){}, refresh: function(){} },
+      plugins: { emit: function(){} }
     }
   };
   const ctx = vm.createContext(sandbox);
@@ -238,7 +258,7 @@ function createPlugin(params) {
     '.light{--background:#F5F5F0;--surface:#FAFAF7;--surface-elevated:#EBEBE6;--border:#E0E3E8;--text-primary:#0D0D0D;--text-secondary:#6B7280;--text-tertiary:#9CA3AF;--accent:#059669}' +
     '@media(prefers-color-scheme:light){:root:not(.dark){--background:#F5F5F0;--surface:#FAFAF7;--surface-elevated:#EBEBE6;--border:#E0E3E8;--text-primary:#0D0D0D;--text-secondary:#6B7280;--text-tertiary:#9CA3AF;--accent:#059669}}' +
     'body{margin:0;font-family:monospace;font-size:12px;background:var(--background);color:var(--text-primary)}' +
-    '</style><script>window.addEventListener("message",function(e){if(e.data&&e.data.theme){document.documentElement.className=e.data.theme}});</script></head><body>' +
+    '</style><script>window.aide={on:function(event,cb){window.addEventListener("message",function(e){if(e.data&&e.data.type==="aide:file-event"&&e.data.event===event){cb(e.data);}});},emit:function(){}};window.addEventListener("message",function(e){if(e.data&&e.data.theme){document.documentElement.className=e.data.theme;}});</script></head><body>' +
     '<div id="root" style="padding:12px;">' +
     '<p style="color:var(--text-secondary)">Plugin: ' + safeName + '</p>' +
     '<p style="color:var(--text-tertiary);font-size:10px;">' + (params.description || '') + '</p>' +

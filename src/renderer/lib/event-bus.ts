@@ -49,4 +49,6 @@ export async function emitFileEvent(
       );
     }
   }
+  // Broadcast to plugin iframe UIs
+  window.dispatchEvent(new CustomEvent('aide:file-event', { detail: { event, ...payload } }));
 }
