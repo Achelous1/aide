@@ -21,6 +21,31 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
     return () => window.removeEventListener('aide:file-event', handler);
   }, []);
 
+  // Handle invoke requests from plugin iframe
+  useEffect(() => {
+    const handler = async (e: MessageEvent) => {
+      if (e.data?.type !== 'aide:invoke') return;
+      // Only accept messages from our iframe
+      if (e.source !== iframeRef.current?.contentWindow) return;
+
+      const { callId, plugin, tool, args } = e.data;
+      try {
+        const result = await window.aide.plugin.invoke(plugin, tool, args ?? {});
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'aide:invoke-result', callId, result },
+          '*'
+        );
+      } catch (err) {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'aide:invoke-error', callId, error: String(err) },
+          '*'
+        );
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   // Send theme to iframe when it loads or theme changes
   const sendTheme = useCallback(() => {
     const isDark = !document.documentElement.classList.contains('light');
