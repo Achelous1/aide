@@ -13,8 +13,12 @@ import { registerPluginHandlers } from './ipc/plugin-handlers';
 import { registerSettingsHandlers } from './ipc/settings-handlers';
 import { killAllSessions } from './ipc/terminal-handlers';
 import { writeMcpConfig } from './mcp/config-writer';
+import { registerPluginScheme, registerPluginProtocol } from './plugin/protocol';
 
 fixPackagedEnv();
+
+// Must be called before app.whenReady() — registers aide-plugin:// scheme
+registerPluginScheme();
 
 // Suppress harmless EBADF errors on /dev/fd/ paths.
 // macOS fsevents reports these in packaged Electron apps when file descriptors
@@ -85,6 +89,7 @@ app.on('ready', () => {
   registerGithubHandlers(ipcMain);
   registerPluginHandlers(ipcMain, process.cwd());
   registerSettingsHandlers(ipcMain, process.cwd());
+  registerPluginProtocol(process.cwd());
   createWindow();
   // MCP setup runs after window creation — failures must not prevent the app from opening
   try {

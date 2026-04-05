@@ -191,9 +191,30 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.PLUGIN_GET_HTML, async (_event, pluginId: string) => {
+    // Try active registry first
     const plugin = registry.get(pluginId);
-    if (!plugin) return null;
-    const htmlPath = path.join(plugin.pluginDir, 'index.html');
+    let pluginDir: string | null = plugin?.pluginDir ?? null;
+
+    // Fallback: scan filesystem — plugin may be installed but not activated (OFF)
+    if (!pluginDir) {
+      const effectiveCwd = getEffectiveCwd(cwd);
+      for (const dir of [getLocalPluginsDir(effectiveCwd), getGlobalPluginsDir()]) {
+        if (!fs.existsSync(dir)) continue;
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue;
+          const candidate = path.join(dir, entry.name);
+          const spec = readPluginSpec(candidate);
+          if (spec && (spec.id === pluginId || spec.name === pluginId)) {
+            pluginDir = candidate;
+            break;
+          }
+        }
+        if (pluginDir) break;
+      }
+    }
+
+    if (!pluginDir) return null;
+    const htmlPath = path.join(pluginDir, 'index.html');
     if (!fs.existsSync(htmlPath)) return null;
     return fs.readFileSync(htmlPath, 'utf-8');
   });

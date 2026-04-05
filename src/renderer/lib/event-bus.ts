@@ -39,17 +39,17 @@ export async function emitFileEvent(
   window.dispatchEvent(new CustomEvent('aide:file-event', { detail: { event, ...payload } }));
 
   const bindings = settings.eventBindings[event] ?? [];
-  for (const binding of bindings) {
-    try {
-      await window.aide.plugin.invoke(binding.plugin, binding.tool, {
+  await Promise.allSettled(
+    bindings.map((binding) =>
+      window.aide.plugin.invoke(binding.plugin, binding.tool, {
         ...binding.args,
         ...payload,
-      });
-    } catch (e) {
-      console.error(
-        `[EventBus] ${binding.plugin}.${binding.tool} failed for ${event}:`,
-        e
-      );
-    }
-  }
+      }).catch((e) => {
+        console.error(
+          `[EventBus] ${binding.plugin}.${binding.tool} failed for ${event}:`,
+          e
+        );
+      })
+    )
+  );
 }
