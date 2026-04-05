@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../main/ipc/channels';
-import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions, PluginSpec, McpStatus, PluginTool } from '../types/ipc';
+import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions, PluginSpec, McpStatus, PluginTool, WorkspaceSettings } from '../types/ipc';
 
 const aideAPI: AideAPI = {
   fs: {
@@ -109,6 +109,11 @@ const aideAPI: AideAPI = {
     invoke: (pluginId: string, toolName: string, args: Record<string, unknown>) =>
       ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_INVOKE, pluginId, toolName, args),
     getHtml: (id: string): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GET_HTML, id),
+    onChanged: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on(IPC_CHANNELS.PLUGINS_CHANGED, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.PLUGINS_CHANGED, listener);
+    },
   },
 
   mcp: {
@@ -123,6 +128,33 @@ const aideAPI: AideAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.GITHUB_LIST_ISSUES, owner, repo),
     getPR: (owner: string, repo: string, prNumber: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.GITHUB_GET_PR, owner, repo, prNumber),
+  },
+
+  settings: {
+    read: (): Promise<WorkspaceSettings> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_READ),
+    write: (settings: WorkspaceSettings): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_WRITE, settings),
+  },
+
+  files: {
+    onReveal: (callback: (filePath: string) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, filePath: string) =>
+        callback(filePath);
+      ipcRenderer.on(IPC_CHANNELS.FILES_REVEAL, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.FILES_REVEAL, listener);
+    },
+    onSelect: (callback: (filePath: string) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, filePath: string) =>
+        callback(filePath);
+      ipcRenderer.on(IPC_CHANNELS.FILES_SELECT, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.FILES_SELECT, listener);
+    },
+    onRefresh: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on(IPC_CHANNELS.FILES_REFRESH, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.FILES_REFRESH, listener);
+    },
   },
 };
 

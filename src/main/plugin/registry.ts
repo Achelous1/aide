@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { PluginSpec, PluginTool } from './spec-generator';
 import { PluginSandbox } from './sandbox';
+import type { PluginEmitter } from './sandbox';
 
 interface RegisteredPlugin {
   spec: PluginSpec;
@@ -19,6 +20,11 @@ interface RegisteredTool {
 export class PluginRegistry {
   private plugins: Map<string, RegisteredPlugin> = new Map();
   private tools: Map<string, RegisteredTool> = new Map();
+  private emitterFactory: ((pluginId: string) => PluginEmitter) | null = null;
+
+  setEmitterFactory(factory: (pluginId: string) => PluginEmitter): void {
+    this.emitterFactory = factory;
+  }
 
   register(spec: PluginSpec, pluginDir: string, scope: 'local' | 'global' = 'local'): void {
     this.plugins.set(spec.id, {
@@ -44,10 +50,32 @@ export class PluginRegistry {
   activate(id: string, workspacePath: string): Record<string, unknown> | null {
     const plugin = this.plugins.get(id);
     if (!plugin || !plugin.sandbox) return null;
-    const exports = plugin.sandbox.run(workspacePath);
+    const emitter = this.emitterFactory?.(id);
+    const exports = plugin.sandbox.run(workspacePath, emitter);
     plugin.active = true;
     this._loadTools(plugin);
     return exports;
+  }
+
+  invokeTool(pluginId: string, toolName: string, args: Record<string, unknown>, workspacePath: string): unknown {
+    // Look up by ID first, then by name (event bindings use name, direct IPC calls use ID)
+    let plugin = this.plugins.get(pluginId);
+    if (!plugin) {
+      for (const p of this.plugins.values()) {
+        if (p.spec.name === pluginId) { plugin = p; break; }
+      }
+    }
+    if (!plugin) throw new Error(`Plugin not found: ${pluginId}`);
+    if (!plugin.sandbox) throw new Error(`Plugin ${pluginId} has no sandbox`);
+    if (!plugin.active) {
+      this.activate(pluginId, workspacePath);
+    }
+    const emitter = this.emitterFactory?.(pluginId);
+    const exports = plugin.sandbox.run(workspacePath, emitter);
+    if (typeof (exports as Record<string, unknown>).invoke !== 'function') {
+      throw new Error(`Plugin ${pluginId} does not export an invoke function`);
+    }
+    return (exports as { invoke: (t: string, a: Record<string, unknown>) => unknown }).invoke(toolName, args);
   }
 
   deactivate(id: string): boolean {

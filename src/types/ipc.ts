@@ -149,6 +149,25 @@ export interface PluginInvokeResult {
   error?: string;
 }
 
+/** A single event → tool binding in .aide/settings.json */
+export interface EventBinding {
+  plugin: string;
+  tool: string;
+  args: Record<string, unknown>;
+}
+
+/** Emit permissions for a plugin in .aide/settings.json */
+export interface PluginPermissions {
+  emit: string[];
+}
+
+/** Workspace-level settings stored in {workspace}/.aide/settings.json */
+export interface WorkspaceSettings {
+  eventBindings: Partial<Record<'file:clicked' | 'file:right-clicked', EventBinding[]>>;
+  pluginBindings: Record<string, EventBinding[]>;
+  pluginPermissions: Record<string, PluginPermissions>;
+}
+
 /** MCP server status */
 export interface McpStatus {
   running: boolean;
@@ -203,10 +222,20 @@ export interface AideAPI {
     delete(name: string): Promise<void>;
     invoke(pluginId: string, toolName: string, args: Record<string, unknown>): Promise<unknown>;
     getHtml: (id: string) => Promise<string | null>;
+    onChanged(callback: () => void): () => void;
   };
   mcp: {
     status(): Promise<McpStatus>;
     tools(): Promise<PluginTool[]>;
+  };
+  settings: {
+    read(): Promise<WorkspaceSettings>;
+    write(settings: WorkspaceSettings): Promise<void>;
+  };
+  files: {
+    onReveal(callback: (filePath: string) => void): () => void;
+    onSelect(callback: (filePath: string) => void): () => void;
+    onRefresh(callback: () => void): () => void;
   };
   github: {
     listPRs(owner: string, repo: string): Promise<GithubPR[]>;

@@ -187,26 +187,46 @@ function resolvePluginDir(pluginName) {
 function invokePluginTool(pluginName, toolName, args) {
   const resolved = resolvePluginDir(pluginName);
   if (!resolved) throw new Error("Plugin not found: " + pluginName);
+  // Read permissions from spec
+  var permissions = [];
+  try { permissions = JSON.parse(fs.readFileSync(path.join(resolved.dir, "plugin.spec.json"), "utf-8")).permissions || []; } catch {}
+  var hasFsRead = permissions.includes("fs:read");
+  var hasFsWrite = permissions.includes("fs:write");
+  var hasFsPerm = hasFsRead || hasFsWrite;
+  var ws = WORKSPACE;
+  function assertInWs(p) {
+    if (!p.startsWith(ws + path.sep) && p !== ws) throw new Error("Access denied: path outside workspace");
+  }
+  function assertRead() { if (!hasFsRead) throw new Error("Permission denied: fs:read not granted"); }
+  function assertWrite() { if (!hasFsWrite) throw new Error("Permission denied: fs:write not granted"); }
+  var scopedFs = {
+    read: function(fp) { assertRead(); var a = path.resolve(ws, fp); assertInWs(a); return fs.readFileSync(a, "utf-8"); },
+    write: function(fp, c) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.writeFileSync(a, c); },
+    existsSync: function(fp) { var a = path.resolve(ws, fp); assertInWs(a); return fs.existsSync(a); },
+    readFileSync: function(fp, enc) { assertRead(); var a = path.resolve(ws, fp); assertInWs(a); return enc ? fs.readFileSync(a, enc) : fs.readFileSync(a); },
+    writeFileSync: function(fp, c) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.writeFileSync(a, c); },
+    mkdirSync: function(fp, opts) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.mkdirSync(a, opts); },
+    readdirSync: function(fp, opts) { assertRead(); var a = path.resolve(ws, fp); assertInWs(a); return fs.readdirSync(a, opts); },
+    statSync: function(fp) { var a = path.resolve(ws, fp); assertInWs(a); return fs.statSync(a); },
+    unlinkSync: function(fp) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.unlinkSync(a); }
+  };
+  var sandboxRequire = function(id) {
+    if (id === "path") return path;
+    if (id === "fs" && hasFsPerm) return scopedFs;
+    throw new Error("require('" + id + "') is not allowed in plugin sandbox");
+  };
   const entryPath = path.join(resolved.dir, "src", "index.js");
   const code = fs.readFileSync(entryPath, "utf-8");
   const sandbox = {
     module: { exports: {} }, exports: {},
-    require: function() { throw new Error("require() not allowed"); },
+    require: sandboxRequire,
+    Buffer: Buffer,
     console: { log: function(){}, error: function(){}, warn: function(){} },
     aide: {
-      fs: {
-        read: function(fp) {
-          const abs = path.resolve(WORKSPACE, fp);
-          if (!abs.startsWith(WORKSPACE)) throw new Error("Access denied");
-          return fs.readFileSync(abs, "utf-8");
-        },
-        write: function(fp, content) {
-          const abs = path.resolve(WORKSPACE, fp);
-          if (!abs.startsWith(WORKSPACE)) throw new Error("Access denied");
-          fs.writeFileSync(abs, content);
-        }
-      },
-      plugin: { id: pluginName, name: pluginName, version: "0.1.0" }
+      fs: scopedFs,
+      plugin: { id: pluginName, name: pluginName, version: "0.1.0" },
+      files: { reveal: function(){}, select: function(){}, refresh: function(){} },
+      plugins: { emit: function(){} }
     }
   };
   const ctx = vm.createContext(sandbox);
@@ -232,17 +252,17 @@ function createPlugin(params) {
   fs.writeFileSync(path.join(pluginDir, "plugin.spec.json"), JSON.stringify(spec, null, 2));
   fs.writeFileSync(path.join(pluginDir, "tool.json"), JSON.stringify({ pluginId: id, pluginName: safeName, version: "0.1.0", tools }, null, 2));
   fs.writeFileSync(path.join(pluginDir, "src", "index.js"), params.code);
-  const indexHtml = '<!DOCTYPE html>' +
+  const indexHtml = params.html ? params.html : ('<!DOCTYPE html>' +
     '<html><head><meta charset="utf-8"><style>' +
     ':root{--background:#131519;--surface:#1A1C23;--surface-elevated:#24262E;--border:#2E3140;--text-primary:#E8E9ED;--text-secondary:#8B8D98;--text-tertiary:#5C5E6A;--accent:#10B981;--accent-warning:#F59E0B;--accent-info:#06B6D4}' +
     '.light{--background:#F5F5F0;--surface:#FAFAF7;--surface-elevated:#EBEBE6;--border:#E0E3E8;--text-primary:#0D0D0D;--text-secondary:#6B7280;--text-tertiary:#9CA3AF;--accent:#059669}' +
     '@media(prefers-color-scheme:light){:root:not(.dark){--background:#F5F5F0;--surface:#FAFAF7;--surface-elevated:#EBEBE6;--border:#E0E3E8;--text-primary:#0D0D0D;--text-secondary:#6B7280;--text-tertiary:#9CA3AF;--accent:#059669}}' +
     'body{margin:0;font-family:monospace;font-size:12px;background:var(--background);color:var(--text-primary)}' +
-    '</style><script>window.addEventListener("message",function(e){if(e.data&&e.data.theme){document.documentElement.className=e.data.theme}});</script></head><body>' +
+    '</style><script>window.aide={on:function(event,cb){window.addEventListener("message",function(e){if(e.data&&e.data.type==="aide:file-event"&&e.data.event===event){cb(e.data);}});},emit:function(){}};window.addEventListener("message",function(e){if(e.data&&e.data.theme){document.documentElement.className=e.data.theme;}});</script></head><body>' +
     '<div id="root" style="padding:12px;">' +
     '<p style="color:var(--text-secondary)">Plugin: ' + safeName + '</p>' +
     '<p style="color:var(--text-tertiary);font-size:10px;">' + (params.description || '') + '</p>' +
-    '</div></body></html>';
+    '</div></body></html>');
   fs.writeFileSync(path.join(pluginDir, "index.html"), indexHtml);
   try { vm.compileFunction(params.code, [], { filename: "index.js" }); } catch (err) {
     fs.rmSync(pluginDir, { recursive: true });
@@ -251,11 +271,35 @@ function createPlugin(params) {
   return spec;
 }
 
+function editPlugin(params) {
+  const resolved = resolvePluginDir(params.name);
+  if (!resolved) throw new Error("Plugin not found: " + params.name);
+  const pluginDir = resolved.dir;
+  const specPath = path.join(pluginDir, "plugin.spec.json");
+  const spec = JSON.parse(fs.readFileSync(specPath, "utf-8"));
+  if (params.description) spec.description = params.description;
+  if (params.permissions) spec.permissions = params.permissions;
+  if (params.tools) {
+    spec.tools = params.tools;
+    fs.writeFileSync(path.join(pluginDir, "tool.json"), JSON.stringify({ pluginId: spec.id, pluginName: spec.name, version: spec.version, tools: params.tools }, null, 2));
+  }
+  fs.writeFileSync(specPath, JSON.stringify(spec, null, 2));
+  if (params.code) {
+    try { vm.compileFunction(params.code, [], { filename: "index.js" }); } catch (err) {
+      throw new Error("Plugin code compilation failed: " + err.message);
+    }
+    fs.writeFileSync(path.join(pluginDir, "src", "index.js"), params.code);
+  }
+  if (params.html) fs.writeFileSync(path.join(pluginDir, "index.html"), params.html);
+  return spec;
+}
+
 function getBuiltinTools() {
   const builtins = [
-    { name: "aide_create_plugin", description: "Create a new AIDE plugin from code. The code must be a CommonJS module exporting { name, version, tools, invoke(toolName, args) }.\\n\\nSandbox Environment:\\n- require('path') → always available\\n- require('fs') → scoped to workspace directory. Available methods: existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, unlinkSync. All paths relative to workspace.\\n- require('fs') needs plugin permissions: fs:read for read operations, fs:write for write operations\\n- Buffer global available\\n- console.log/error/warn available (prefixed with plugin name)\\n- aide.fs.read(path)/aide.fs.write(path, content) also available\\n- No network access, no child_process, no other Node.js modules\\n- An index.html is auto-generated for iframe rendering. Override it by including an index.html in your plugin code if custom UI is needed.\\n\\nIMPORTANT — AIDE Design System Rules:\\nIf the plugin produces UI output (HTML/CSS), it MUST use these CSS custom properties (not hardcoded colors):\\n\\nDark theme (default):\\n  --background: #131519, --surface: #1A1C23, --surface-elevated: #24262E\\n  --border: #2E3140, --text-primary: #E8E9ED, --text-secondary: #8B8D98\\n  --text-tertiary: #5C5E6A, --accent: #10B981 (emerald green)\\n  --accent-warning: #F59E0B, --accent-info: #06B6D4\\n  --agent-claude: #D97706 (amber), --agent-gemini: #3B82F6 (blue), --agent-codex: #10B981 (green)\\n\\nLight theme (.light class on root):\\n  --background: #F5F5F0, --surface: #FAFAF7, --surface-elevated: #EBEBE6\\n  --border: #E0E3E8, --text-primary: #0D0D0D, --text-secondary: #6B7280\\n  --text-tertiary: #9CA3AF, --accent: #059669\\n\\nStyle rules:\\n- Use CSS var() references: color: var(--text-primary), background: var(--surface)\\n- Font: monospace (system mono stack), sizes 10px-12px for UI text\\n- Borders: 1px solid var(--border), border-radius 4-6px\\n- Buttons: bg var(--accent) with black text, disabled opacity 0.4\\n- Spacing: 4px/8px/12px increments (Tailwind-compatible)\\n- Never use hardcoded hex colors — always reference CSS variables", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plugin name (lowercase, hyphens)" }, description: { type: "string", description: "What the plugin does" }, code: { type: "string", description: "Complete plugin source code (CommonJS module)" }, permissions: { type: "array", items: { type: "string" }, description: "Required permissions: fs:read, fs:write, network, process" }, tools: { type: "array", description: "Tool definitions the plugin exposes", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, parameters: { type: "object" } } } }, scope: { type: "string", enum: ["global", "local"], description: "Where to install: global (~/.aide/plugins) or local ({workspace}/.aide/plugins). Default: local" } }, required: ["name", "description", "code"] } },
+    { name: "aide_create_plugin", description: "Create a new AIDE plugin from code. The code must be a CommonJS module exporting { name, version, tools, invoke(toolName, args) }.\\n\\nSandbox Environment:\\n- require('path') → always available\\n- require('fs') → scoped to workspace directory (requires fs:read or fs:write permission). Available methods: existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, unlinkSync. All paths resolved relative to workspace root.\\n- require('fs') needs plugin permissions: fs:read for read operations, fs:write for write operations\\n- Buffer global available\\n- console.log/error/warn available\\n- aide.fs → same scoped fs object. Methods: read(path), write(path,content), existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, unlinkSync\\n- aide.files.reveal(path) / aide.files.select(path) / aide.files.refresh() → control the FILES tab (no-op in MCP context, functional in Electron UI)\\n- aide.plugins.emit(event, data) → broadcast event to other plugins (no-op in MCP context)\\n- No network access, no child_process, no other Node.js modules\\n- An index.html is auto-generated for iframe rendering. Pass the optional 'html' parameter to aide_create_plugin to provide a custom UI in one step.\\n\\nHTML UI (iframe) Event API:\\nPlugin iframes receive FILES tab events via postMessage from the AIDE renderer.\\n\\nConstraints (sandbox=\\"allow-scripts\\", no allow-same-origin):\\n- file:// URLs are BLOCKED inside the iframe. Never set frame.src = 'file://' + path.\\n- window.aide shim provides only on() and emit() — no invoke() in the iframe.\\n- To display file content, read it in the backend tool and pass via event args, or encode as a data URI.\\n- data.filePath is an absolute OS path (e.g. /Users/alice/project/src/main.ts on macOS).\\n\\nEvents fire on every file click — eventBindings are NOT required for iframe postMessage:\\n  window.aide.on('file:clicked', function(data) { /* data.filePath — absolute path */ })\\n  window.aide.on('file:right-clicked', function(data) { /* data.filePath */ })\\n\\nCRITICAL — window.aide shim is NOT auto-injected into custom HTML. Auto-generated HTML includes it, but if you pass the 'html' parameter you MUST add this to <head>:\\n  <script>window.aide={on:function(e,cb){window.addEventListener('message',function(m){if(m.data&&m.data.type==='aide:file-event'&&m.data.event===e)cb(m.data);});},emit:function(){}};window.addEventListener('message',function(e){if(e.data&&e.data.theme)document.documentElement.className=e.data.theme;});</script>\\n\\neventBindings (.aide/settings.json): controls backend tool invocation on file events only — separate from iframe postMessage.\\n  Example: { \\"eventBindings\\": { \\"file:clicked\\": [{ \\"plugin\\": \\"my-plugin\\", \\"tool\\": \\"on-file-clicked\\", \\"args\\": {} }] } }\\n\\nIMPORTANT — AIDE Design System Rules:\\nIf the plugin produces UI output (HTML/CSS), it MUST use these CSS custom properties (not hardcoded colors):\\n\\nDark theme (default):\\n  --background: #131519, --surface: #1A1C23, --surface-elevated: #24262E\\n  --border: #2E3140, --text-primary: #E8E9ED, --text-secondary: #8B8D98\\n  --text-tertiary: #5C5E6A, --accent: #10B981 (emerald green)\\n  --accent-warning: #F59E0B, --accent-info: #06B6D4\\n  --agent-claude: #D97706 (amber), --agent-gemini: #3B82F6 (blue), --agent-codex: #10B981 (green)\\n\\nLight theme (.light class on root):\\n  --background: #F5F5F0, --surface: #FAFAF7, --surface-elevated: #EBEBE6\\n  --border: #E0E3E8, --text-primary: #0D0D0D, --text-secondary: #6B7280\\n  --text-tertiary: #9CA3AF, --accent: #059669\\n\\nStyle rules:\\n- Use CSS var() references: color: var(--text-primary), background: var(--surface)\\n- Font: monospace (system mono stack), sizes 10px-12px for UI text\\n- Borders: 1px solid var(--border), border-radius 4-6px\\n- Buttons: bg var(--accent) with black text, disabled opacity 0.4\\n- Spacing: 4px/8px/12px increments (Tailwind-compatible)\\n- Never use hardcoded hex colors — always reference CSS variables", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plugin name (lowercase, hyphens)" }, description: { type: "string", description: "What the plugin does" }, code: { type: "string", description: "Complete plugin source code (CommonJS module)" }, permissions: { type: "array", items: { type: "string" }, description: "Required permissions: fs:read, fs:write, network, process" }, tools: { type: "array", description: "Tool definitions the plugin exposes", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, parameters: { type: "object" } } } }, html: { type: "string", description: "Optional custom index.html for the plugin iframe UI. If omitted, a default UI is auto-generated. Use window.aide.on('file:clicked', cb) inside for file event integration." }, scope: { type: "string", enum: ["global", "local"], description: "Where to install: global (~/.aide/plugins) or local ({workspace}/.aide/plugins). Default: local" } }, required: ["name", "description", "code"] } },
     { name: "aide_list_plugins", description: "List all installed AIDE plugins with their tools.", inputSchema: { type: "object", properties: {} } },
     { name: "aide_invoke_tool", description: "Invoke a tool from an installed AIDE plugin.", inputSchema: { type: "object", properties: { plugin_name: { type: "string" }, tool_name: { type: "string" }, args: { type: "object" } }, required: ["plugin_name", "tool_name"] } },
+    { name: "aide_edit_plugin", description: "Edit an existing AIDE plugin in-place. Only provided fields are updated — omitted fields are left unchanged. Useful for patching code or UI without deleting and recreating the plugin.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plugin name to edit" }, code: { type: "string", description: "New index.js source (CommonJS module). Replaces existing code." }, html: { type: "string", description: "New index.html content. Replaces existing UI." }, description: { type: "string", description: "Updated plugin description." }, permissions: { type: "array", items: { type: "string" }, description: "Updated permissions list." }, tools: { type: "array", description: "Updated tool definitions.", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, parameters: { type: "object" } } } } }, required: ["name"] } },
     { name: "aide_delete_plugin", description: "Delete an installed AIDE plugin.", inputSchema: { type: "object", properties: { plugin_name: { type: "string" }, scope: { type: "string", enum: ["global", "local"], description: "Which scope to delete from. Default: local" } }, required: ["plugin_name"] } }
   ];
   const plugins = listPluginSpecs();
@@ -278,6 +322,7 @@ function handleRequest(method, id, params) {
       if (tn === "aide_create_plugin") { sendResult(id, { content: [{ type: "text", text: JSON.stringify(createPlugin(ta), null, 2) }] }); }
       else if (tn === "aide_list_plugins") { sendResult(id, { content: [{ type: "text", text: JSON.stringify(listPluginSpecs(), null, 2) }] }); }
       else if (tn === "aide_invoke_tool") { sendResult(id, { content: [{ type: "text", text: JSON.stringify(invokePluginTool(ta.plugin_name, ta.tool_name, ta.args || {})) }] }); }
+      else if (tn === "aide_edit_plugin") { sendResult(id, { content: [{ type: "text", text: JSON.stringify(editPlugin(ta), null, 2) }] }); }
       else if (tn === "aide_delete_plugin") {
         const scope = ta.scope || "local";
         const baseDir = scope === "global" ? GLOBAL_PLUGINS_DIR : PLUGINS_DIR;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { usePluginStore } from '../../stores/plugin-store';
+import { useLayoutStore } from '../../stores/layout-store';
 
 export function PluginPanel() {
   const {
@@ -12,11 +13,27 @@ export function PluginPanel() {
     deletePlugin,
   } = usePluginStore();
 
+  const focusedPaneId = useLayoutStore((s) => s.focusedPaneId);
+  const addTabToPane = useLayoutStore((s) => s.addTabToPane);
+
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     loadPlugins();
+    const unsub = window.aide.plugin.onChanged(loadPlugins);
+    return unsub;
   }, [loadPlugins]);
+
+  const handleOpenTab = (plugin: typeof plugins[number]) => {
+    const paneId = focusedPaneId ?? useLayoutStore.getState().focusedPaneId;
+    if (!paneId) return;
+    addTabToPane(paneId, {
+      id: `plugin-${plugin.id}-${Date.now()}`,
+      type: 'plugin',
+      pluginId: plugin.id,
+      title: plugin.name,
+    });
+  };
 
   const handleDeleteClick = (name: string) => {
     setDeleteConfirm(name);
@@ -60,8 +77,16 @@ export function PluginPanel() {
               ? 'bg-aide-accent text-black'
               : 'bg-aide-border text-aide-text-secondary hover:text-aide-text-primary'
           }`}
+          title={plugin.active ? 'Deactivate plugin' : 'Activate plugin'}
         >
           {plugin.active ? 'ON' : 'OFF'}
+        </button>
+        <button
+          onClick={() => handleOpenTab(plugin)}
+          className="px-1.5 py-0.5 rounded text-[10px] font-mono text-aide-text-tertiary hover:text-aide-text-primary hover:bg-aide-surface-hover transition-colors"
+          title="Open as tab"
+        >
+          ↗
         </button>
         <button
           onClick={() => handleDeleteClick(plugin.name)}

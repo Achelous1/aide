@@ -7,6 +7,7 @@ interface PluginViewProps {
 
 export function PluginView({ pluginId, pluginName }: PluginViewProps) {
   const [html, setHtml] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -25,6 +26,27 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
       });
     return () => { cancelled = true; };
   }, [pluginId]);
+
+  useEffect(() => {
+    if (!html) { setBlobUrl(null); return; }
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    setBlobUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [html]);
+
+  // Forward file events to plugin iframe via postMessage
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { event, filePath } = (e as CustomEvent<{ event: string; filePath: string }>).detail;
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'aide:file-event', event, filePath },
+        '*'
+      );
+    };
+    window.addEventListener('aide:file-event', handler);
+    return () => window.removeEventListener('aide:file-event', handler);
+  }, []);
 
   // Send theme to iframe when it loads or theme changes
   const sendTheme = useCallback(() => {
@@ -50,11 +72,11 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
     );
   }
 
-  if (html) {
+  if (blobUrl) {
     return (
       <iframe
         ref={iframeRef}
-        srcDoc={html}
+        src={blobUrl}
         sandbox="allow-scripts"
         className="w-full h-full border-0"
         title={pluginName}

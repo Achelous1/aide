@@ -1,7 +1,16 @@
 import * as vm from 'vm';
 import * as fs from 'fs';
 import * as path from 'path';
+import { BrowserWindow } from 'electron';
+import { IPC_CHANNELS } from '../ipc/channels';
 import type { PluginSpec } from './spec-generator';
+
+export type PluginEmitter = (event: string, data: Record<string, unknown>) => void;
+
+function sendToRenderer(channel: string, payload?: unknown): void {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send(channel, payload);
+}
 
 export class PluginSandbox {
   private context: vm.Context | null = null;
@@ -13,7 +22,7 @@ export class PluginSandbox {
     this.spec = spec;
   }
 
-  run(workspacePath: string): Record<string, unknown> {
+  run(workspacePath: string, pluginEmitter?: PluginEmitter): Record<string, unknown> {
     const entryPath = path.join(this.pluginDir, this.spec.entryPoint);
     if (!fs.existsSync(entryPath)) {
       throw new Error(`Plugin entry point not found: ${entryPath}`);
@@ -120,6 +129,16 @@ export class PluginSandbox {
           id: this.spec.id,
           name: this.spec.name,
           version: this.spec.version,
+        },
+        files: {
+          reveal: (filePath: string) => sendToRenderer(IPC_CHANNELS.FILES_REVEAL, filePath),
+          select: (filePath: string) => sendToRenderer(IPC_CHANNELS.FILES_SELECT, filePath),
+          refresh: () => sendToRenderer(IPC_CHANNELS.FILES_REFRESH),
+        },
+        plugins: {
+          emit: (event: string, data: Record<string, unknown>) => {
+            if (pluginEmitter) pluginEmitter(event, data);
+          },
         },
       },
     };

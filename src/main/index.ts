@@ -10,6 +10,7 @@ import { registerAgentHandlers } from './ipc/agent-handlers';
 import { registerGitHandlers } from './ipc/git-handlers';
 import { registerGithubHandlers } from './ipc/github-handlers';
 import { registerPluginHandlers } from './ipc/plugin-handlers';
+import { registerSettingsHandlers } from './ipc/settings-handlers';
 import { killAllSessions } from './ipc/terminal-handlers';
 import { writeMcpConfig } from './mcp/config-writer';
 
@@ -83,6 +84,7 @@ app.on('ready', () => {
   registerGitHandlers(ipcMain);
   registerGithubHandlers(ipcMain);
   registerPluginHandlers(ipcMain, process.cwd());
+  registerSettingsHandlers(ipcMain, process.cwd());
   createWindow();
   // MCP setup runs after window creation — failures must not prevent the app from opening
   try {

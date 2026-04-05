@@ -241,6 +241,75 @@ Main: refreshLocalPlugins(ws-b)
 - `PluginRegistry.clearLocalPlugins()`는 scope가 `local`인 플러그인만 제거하며, `global` 플러그인과 활성 sandbox는 유지된다.
 - 동일 워크스페이스로 재전환 시 (`lastLocalDir` 동일) 불필요한 스캔을 생략한다.
 
+#### 2.6 Plugin ↔ Plugin 이벤트 브릿지
+
+플러그인이 다른 플러그인에 이벤트를 브로드캐스트할 수 있는 단방향 fire-and-forget 통신 채널.
+
+**설계 원칙**:
+- 발신자(emitter)는 반환값을 받지 않는다 — 응답이 필요하면 수신 플러그인이 발신 플러그인으로 별도 emit
+- 바인딩은 `.aide/settings.json`에 선언적으로 정의
+- 권한(`pluginPermissions`)도 같은 파일에서 관리
+- 워크스페이스 스코프 내 로컬 + 글로벌 플러그인 간 통신 가능
+
+**`settings.json` 스키마**:
+
+```json
+{
+  "eventBindings": { ... },
+  "pluginBindings": {
+    "my:event": [
+      { "plugin": "plugin-b", "tool": "handleEvent", "args": {} },
+      { "plugin": "plugin-c", "tool": "onEvent", "args": { "mode": "silent" } }
+    ]
+  },
+  "pluginPermissions": {
+    "plugin-a": { "emit": ["my:event"] }
+  }
+}
+```
+
+**Plugin sandbox API**:
+
+```javascript
+// Plugin A 코드 내
+aide.plugins.emit('my:event', { filePath: '/some/file.ts' });
+// fire-and-forget — 반환값 없음
+```
+
+**이벤트 라우팅 흐름**:
+
+```
+Plugin A sandbox: aide.plugins.emit('my:event', data)
+    │
+    ▼  (pluginEmitter callback — main process)
+settings.json 로드 (fs.readFileSync 동기)
+    │
+    ▼
+pluginPermissions['plugin-a'].emit.includes('my:event') ?
+    │  No → console.warn + return
+    │  Yes ↓
+pluginBindings['my:event'] 순회
+    │
+    ▼
+registry.invokeTool('plugin-b', 'handleEvent', { ...args, ...data }, cwd)
+registry.invokeTool('plugin-c', 'onEvent', { ...args, ...data }, cwd)
+```
+
+**구현 구조**:
+
+| 구성요소 | 역할 |
+|---------|------|
+| `PluginEmitter` 타입 (`sandbox.ts`) | `(event, data) => void` 콜백 시그니처 |
+| `sandbox.run(workspacePath, emitter?)` | emitter를 `aide.plugins.emit`으로 노출 |
+| `registry.setEmitterFactory(factory)` | plugin-handlers에서 주입 |
+| `registry.invokeTool(id, tool, args, cwd)` | 대상 플러그인 도구 직접 호출 |
+| `makeEmitterFactory()` (`plugin-handlers.ts`) | settings.json 읽기 + 권한 체크 + 라우팅 |
+
+**구현 규칙**:
+- `pluginPermissions`에 명시되지 않은 이벤트 emit은 경고 로그 후 무시
+- 라우팅 중 개별 플러그인 오류는 다음 바인딩 실행을 막지 않음 (독립 try-catch)
+- 데이터 병합: `{ ...binding.args, ...data }` — 런타임 data가 선언적 args를 오버라이드
+
 ### 3. Terminal Panel (Renderer)
 
 xterm.js 기반 다중 탭 터미널.

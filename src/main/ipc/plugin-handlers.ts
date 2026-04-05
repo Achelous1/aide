@@ -1,7 +1,8 @@
-import { IpcMain, app } from 'electron';
+import { IpcMain, BrowserWindow, app } from 'electron';
 import * as fs from 'fs';
 import { userInfo } from 'os';
 import * as path from 'path';
+import chokidar from 'chokidar';
 import { IPC_CHANNELS } from './channels';
 import { generatePluginSpec } from '../plugin/spec-generator';
 import type { PluginSpec } from '../plugin/spec-generator';
@@ -71,6 +72,13 @@ function loadRegistryFromDisk(cwd: string): void {
   loadDirIntoRegistry(getLocalPluginsDir(cwd), 'local');
 }
 
+function broadcastPluginsChanged(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(IPC_CHANNELS.PLUGINS_CHANGED);
+  }
+}
+
+let localPluginsWatcher: ReturnType<typeof chokidar.watch> | null = null;
 let lastLocalDir: string | null = null;
 
 // Clears local plugins and reloads from the new workspace directory.
@@ -82,10 +90,47 @@ function refreshLocalPlugins(cwd: string): void {
   lastLocalDir = localDir;
   ensurePluginsDirs(cwd);
   loadDirIntoRegistry(localDir, 'local');
+  // Re-watch local plugins dir for the new workspace
+  localPluginsWatcher?.close();
+  localPluginsWatcher = chokidar
+    .watch(localDir, { ignoreInitial: true, depth: 2, ignored: /\/dev\/fd\// })
+    .on('all', broadcastPluginsChanged);
+}
+
+function makeEmitterFactory(getCwd: () => string) {
+  return (emittingPluginId: string) => (event: string, data: Record<string, unknown>): void => {
+    const cwd = getCwd();
+    const settingsPath = path.join(cwd, '.aide', 'settings.json');
+    let settings: { pluginBindings?: Record<string, Array<{ plugin: string; tool: string; args: Record<string, unknown> }>>; pluginPermissions?: Record<string, { emit: string[] }> };
+    try {
+      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    } catch {
+      return;
+    }
+    const permissions = settings.pluginPermissions?.[emittingPluginId];
+    if (!permissions?.emit?.includes(event)) {
+      console.warn(`[plugin-bridge] ${emittingPluginId} not permitted to emit: ${event}`);
+      return;
+    }
+    const bindings = settings.pluginBindings?.[event] ?? [];
+    for (const binding of bindings) {
+      try {
+        registry.invokeTool(binding.plugin, binding.tool, { ...binding.args, ...data }, cwd);
+      } catch (err) {
+        console.error(`[plugin-bridge] Error routing ${event} → ${binding.plugin}.${binding.tool}:`, err);
+      }
+    }
+  };
 }
 
 export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
   loadRegistryFromDisk(cwd);
+  registry.setEmitterFactory(makeEmitterFactory(getEffectiveCwd.bind(null, cwd)));
+  // Watch global plugins dir for changes
+  const globalDir = getGlobalPluginsDir();
+  chokidar
+    .watch(globalDir, { ignoreInitial: true, depth: 2, ignored: /\/dev\/fd\// })
+    .on('all', broadcastPluginsChanged);
 
   // Spec-only: generate and return spec without writing to disk
   ipcMain.handle(IPC_CHANNELS.PLUGIN_GENERATE_SPEC, async (_event, name: string, description: string) => {
@@ -132,19 +177,7 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
 
   ipcMain.handle(IPC_CHANNELS.PLUGIN_INVOKE, async (_event, pluginId: string, toolName: string, args: Record<string, unknown>) => {
     const effectiveCwd = getEffectiveCwd(cwd);
-    const plugin = registry.get(pluginId);
-    if (!plugin) throw new Error(`Plugin not found: ${pluginId}`);
-    if (!plugin.active) {
-      registry.activate(pluginId, effectiveCwd);
-    }
-    // Re-read after activation — sandbox exports are on the module
-    const activated = registry.get(pluginId);
-    if (!activated?.sandbox) throw new Error(`Plugin ${pluginId} failed to activate`);
-    const exports = activated.sandbox.run(effectiveCwd);
-    if (typeof (exports as Record<string, unknown>).invoke !== 'function') {
-      throw new Error(`Plugin ${pluginId} does not export an invoke function`);
-    }
-    return (exports as { invoke: (t: string, a: Record<string, unknown>) => unknown }).invoke(toolName, args);
+    return registry.invokeTool(pluginId, toolName, args, effectiveCwd);
   });
 
   ipcMain.handle(IPC_CHANNELS.MCP_STATUS, async () => {
