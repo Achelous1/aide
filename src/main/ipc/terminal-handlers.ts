@@ -13,7 +13,7 @@ function getResumeArgs(agentType: string, sessionId: string): string[] {
   switch (agentType) {
     case 'claude': return ['--resume', sessionId];
     case 'codex': return ['resume', sessionId];
-    case 'gemini': return ['--resume', sessionId];
+    // Gemini CLI does not support --resume in current versions
     default: return [];
   }
 }
@@ -22,8 +22,8 @@ function getResumeArgs(agentType: string, sessionId: string): string[] {
 function getContinueArgs(agentType: string): string[] {
   switch (agentType) {
     case 'claude': return ['--continue'];
-    case 'gemini': return ['--resume'];         // bare --resume = most recent
     case 'codex': return ['resume', '--last'];
+    // Gemini CLI does not support session resume in current versions
     default: return [];
   }
 }
