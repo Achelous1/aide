@@ -4,17 +4,9 @@
  */
 import { app } from 'electron';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { execSync } from 'child_process';
-
-/** Reliable home directory — getHome() returns '/' when Finder launches without HOME */
-function getHome(): string {
-  const env = process.env.HOME;
-  if (env && env !== '/') return env;
-  try { return os.userInfo().homedir; } catch { /* ignore */ }
-  return app.getPath('home');
-}
+import { getHome } from '../utils/home';
 
 function getUserData(): string {
   return app.getPath('userData');

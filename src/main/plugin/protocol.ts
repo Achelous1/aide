@@ -13,16 +13,9 @@
  */
 import { protocol } from 'electron';
 import * as fs from 'fs';
-import { userInfo } from 'os';
 import * as path from 'path';
 import { getActiveWorkspacePath } from '../ipc/workspace-handlers';
-
-function getHome(): string {
-  const env = process.env.HOME;
-  if (env && env !== '/') return env;
-  try { return userInfo().homedir; } catch { /* ignore */ }
-  return '/tmp';
-}
+import { getHome } from '../utils/home';
 
 /**
  * Scan local + global plugin directories for a plugin matching `pluginId`

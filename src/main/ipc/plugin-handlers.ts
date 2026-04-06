@@ -1,6 +1,5 @@
-import { IpcMain, BrowserWindow, app } from 'electron';
+import { IpcMain, BrowserWindow } from 'electron';
 import * as fs from 'fs';
-import { userInfo } from 'os';
 import * as path from 'path';
 import chokidar from 'chokidar';
 import { IPC_CHANNELS } from './channels';
@@ -9,15 +8,9 @@ import type { PluginSpec } from '../plugin/spec-generator';
 import { generatePluginCode } from '../plugin/code-generator';
 import { PluginRegistry } from '../plugin/registry';
 import { getActiveWorkspacePath } from './workspace-handlers';
+import { getHome } from '../utils/home';
 
 const registry = new PluginRegistry();
-
-function getHome(): string {
-  const env = process.env.HOME;
-  if (env && env !== '/') return env;
-  try { return userInfo().homedir; } catch { /* ignore */ }
-  return app.getPath('home');
-}
 
 function getGlobalPluginsDir(): string {
   return path.join(getHome(), '.aide', 'plugins');
