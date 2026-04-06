@@ -21,6 +21,8 @@
   --agent-codex: #10B981;
   --tab-active-bg: #131519;
   --tab-inactive-bg: #1A1C23;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
 }
 
 .light {
@@ -42,6 +44,8 @@
   --agent-codex: #10B981;
   --tab-active-bg: #F5F5F0;
   --tab-inactive-bg: #E8E8E3;
+  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.22);
 }
 
 html, body, #root {
@@ -55,4 +59,83 @@ body {
   font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
   background: var(--background);
   color: var(--text-primary);
+}
+
+/* ============================================================
+ * Theme switch — smooth color transition
+ * Applied briefly (400ms) when .theme-transitioning is on <html>
+ * so normal hover/focus transitions aren't affected.
+ * ============================================================ */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition:
+    background-color 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    fill 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    stroke 400ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-delay: 0ms !important;
+}
+
+/* ============================================================
+ * Agent status "ding" — scale pop on status change
+ * Uses easeOutBack curve (overshoot) for bell-like feedback.
+ * Trigger by remounting element (key={status}).
+ * ============================================================ */
+@keyframes status-ding {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.7); }
+  70%  { transform: scale(0.88); }
+  100% { transform: scale(1); }
+}
+.status-ding {
+  display: inline-block;
+  transform-origin: center;
+  animation: status-ding 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================================
+ * Processing dots — three dots bouncing with phase offset
+ * ============================================================ */
+@keyframes dot-bounce {
+  0%, 60%, 100% { transform: translateY(0);    opacity: 0.35; }
+  30%           { transform: translateY(-3px); opacity: 1; }
+}
+.dot-bounce {
+  display: inline-block;
+  animation: dot-bounce 900ms infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.dot-bounce:nth-child(1) { animation-delay: 0ms; }
+.dot-bounce:nth-child(2) { animation-delay: 150ms; }
+.dot-bounce:nth-child(3) { animation-delay: 300ms; }
+
+/* ============================================================
+ * Scrollbars — blend into both dark and light themes
+ * Transparent track + low-opacity thumb that matches the surface.
+ * ============================================================ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 150ms ease-out;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }

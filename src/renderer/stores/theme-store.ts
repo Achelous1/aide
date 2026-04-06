@@ -22,8 +22,19 @@ export const useThemeStore = create<ThemeState>((set) => ({
   },
 }));
 
+let themeTransitionTimer: ReturnType<typeof setTimeout> | null = null;
+
 function applyTheme(theme: Theme): void {
   const root = document.documentElement;
+
+  // Add a temporary class that applies color transitions globally during the switch
+  root.classList.add('theme-transitioning');
+  if (themeTransitionTimer) clearTimeout(themeTransitionTimer);
+  themeTransitionTimer = setTimeout(() => {
+    root.classList.remove('theme-transitioning');
+    themeTransitionTimer = null;
+  }, 450);
+
   if (theme === 'light') {
     root.classList.add('light');
   } else {
