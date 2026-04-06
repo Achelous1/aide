@@ -3,7 +3,7 @@ import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useAgentStore } from '../../stores/agent-store';
 import { useTerminalStore } from '../../stores/terminal-store';
 import { useLayoutStore } from '../../stores/layout-store';
-import { isSplitLayout, type AgentStatus, type GitStatus, type LayoutNode, type TerminalTab } from '../../../types/ipc';
+import { isSplitLayout, type AgentStatus, type LayoutNode, type TerminalTab } from '../../../types/ipc';
 import { StatusDot, StatusBadge } from './StatusIndicator';
 
 /** Recursively collect all tabs from a layout tree (source of truth for visible tabs). */
@@ -21,7 +21,6 @@ export function WorkspaceNav() {
   // Subscribe to layout so this component re-renders when active workspace tabs change
   const layout = useLayoutStore((s) => s.layout);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [gitStatuses, setGitStatuses] = useState<Record<string, GitStatus | null>>({});
 
   useEffect(() => {
     if (!window.aide?.agent?.onStatus) return;
@@ -30,29 +29,6 @@ export function WorkspaceNav() {
     });
     return unsubscribe;
   }, []);
-
-  // Fetch git status for each workspace
-  useEffect(() => {
-    if (!window.aide?.git?.status) return;
-
-    const fetchAll = async () => {
-      const results: Record<string, GitStatus | null> = {};
-      await Promise.all(
-        workspaces.map(async (ws) => {
-          try {
-            results[ws.id] = await window.aide.git.status(ws.path);
-          } catch {
-            results[ws.id] = null;
-          }
-        })
-      );
-      setGitStatuses(results);
-    };
-
-    fetchAll();
-    const interval = setInterval(fetchAll, 30000);
-    return () => clearInterval(interval);
-  }, [workspaces]);
 
   // Get tabs for a given workspace (active: from layout tree; inactive: from saved snapshot).
   // Excludes plugin tabs and sorts alphabetically by title.
@@ -148,10 +124,6 @@ export function WorkspaceNav() {
             const isExpanded = expandedProjects.has(ws.id);
             const wsTabs = getTabsForWorkspace(ws.id);
             const wsActiveTabId = getActiveTabIdForWorkspace(ws.id);
-            const gitStatus = gitStatuses[ws.id] ?? null;
-            const gitAdded = gitStatus ? gitStatus.added.length : 0;
-            const gitRemoved = gitStatus ? gitStatus.deleted.length + gitStatus.modified.length : 0;
-            const branch = gitStatus?.branch ?? null;
 
             return (
               <div key={ws.id}>
@@ -226,21 +198,6 @@ export function WorkspaceNav() {
                       <span className="text-[11px] font-mono text-aide-text-secondary truncate flex-1">
                         {tab.title}
                       </span>
-
-                      {/* Git diff stats */}
-                      {(gitAdded > 0 || gitRemoved > 0) && (
-                        <span className="shrink-0 text-[11px] font-mono flex gap-0.5">
-                          {gitAdded > 0 && <span style={{ color: '#22C55E' }}>+{gitAdded}</span>}
-                          {gitRemoved > 0 && <span style={{ color: '#EF4444' }}>-{gitRemoved}</span>}
-                        </span>
-                      )}
-
-                      {/* Branch */}
-                      {branch && (
-                        <span className="text-[11px] font-mono text-aide-text-tertiary truncate shrink-0 max-w-[60px]">
-                          {branch}
-                        </span>
-                      )}
                     </button>
                   );
                 })}
