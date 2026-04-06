@@ -82,6 +82,13 @@ export function PluginPanel() {
           {plugin.active ? 'ON' : 'OFF'}
         </button>
         <button
+          onClick={() => window.aide.plugin.reload(plugin.id)}
+          className="px-1.5 py-0.5 rounded text-[10px] font-mono text-aide-text-tertiary hover:text-aide-text-primary hover:bg-aide-surface-hover transition-colors"
+          title="Reload plugin"
+        >
+          ↻
+        </button>
+        <button
           onClick={() => handleOpenTab(plugin)}
           className="px-1.5 py-0.5 rounded text-[10px] font-mono text-aide-text-tertiary hover:text-aide-text-primary hover:bg-aide-surface-hover transition-colors"
           title="Open as tab"

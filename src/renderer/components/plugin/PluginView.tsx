@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 
 interface PluginViewProps {
   pluginId: string;
@@ -7,6 +7,7 @@ interface PluginViewProps {
 
 export function PluginView({ pluginId, pluginName }: PluginViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [iframeKey, setIframeKey] = useState(0);
 
   // Forward file events to plugin iframe via postMessage
   useEffect(() => {
@@ -46,6 +47,16 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
     return () => window.removeEventListener('message', handler);
   }, []);
 
+  // Reload iframe when its index.html changes on disk
+  useEffect(() => {
+    const unsub = window.aide.plugin.onHtmlChanged((changedName: string) => {
+      if (changedName === pluginName || changedName === pluginId) {
+        setIframeKey((k) => k + 1);
+      }
+    });
+    return unsub;
+  }, [pluginId, pluginName]);
+
   // Send theme to iframe when it loads or theme changes
   const sendTheme = useCallback(() => {
     const isDark = !document.documentElement.classList.contains('light');
@@ -63,6 +74,7 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
 
   return (
     <iframe
+      key={iframeKey}
       ref={iframeRef}
       src={`aide-plugin://${pluginId}/index.html`}
       sandbox="allow-scripts"

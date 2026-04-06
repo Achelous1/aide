@@ -35,6 +35,8 @@ export const IPC_CHANNELS = {
   PLUGIN_DELETE: 'plugin:delete',
   PLUGIN_INVOKE: 'plugin:invoke',
   PLUGIN_GET_HTML: 'plugin:get-html',
+  PLUGIN_HTML_CHANGED: 'plugin:html-changed',
+  PLUGIN_RELOAD: 'plugin:reload',
   PLUGINS_CHANGED: 'plugins:changed',
 
   // Settings

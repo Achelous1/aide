@@ -43,6 +43,29 @@ function loadDirIntoRegistry(dir: string, scope: 'local' | 'global'): void {
   }
 }
 
+/**
+ * Incremental rescan — called from chokidar events. Registers newly added
+ * plugins and unregisters plugins whose directory no longer exists. Unlike
+ * refreshLocalPlugins, this runs even when the workspace path hasn't changed,
+ * so plugins created at runtime (e.g. via MCP aide_create_plugin) are picked
+ * up without restarting the app.
+ */
+function rescanPluginsDir(dir: string, scope: 'local' | 'global'): void {
+  // 1. Register any new plugins found on disk
+  loadDirIntoRegistry(dir, scope);
+
+  // 2. Unregister plugins whose pluginDir no longer exists or whose spec
+  //    has disappeared (plugin deleted by user or MCP)
+  const scoped = registry.list().filter((p) => p.scope === scope);
+  for (const plugin of scoped) {
+    if (!plugin.pluginDir.startsWith(dir)) continue;
+    const specExists = fs.existsSync(path.join(plugin.pluginDir, 'plugin.spec.json'));
+    if (!specExists) {
+      registry.unregister(plugin.id);
+    }
+  }
+}
+
 function ensurePluginsDirs(cwd: string): void {
   try {
     const globalDir = getGlobalPluginsDir();
@@ -71,8 +94,16 @@ function broadcastPluginsChanged(): void {
   }
 }
 
+function broadcastHtmlChanged(pluginName: string): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(IPC_CHANNELS.PLUGIN_HTML_CHANGED, pluginName);
+  }
+}
+
 let localPluginsWatcher: ReturnType<typeof chokidar.watch> | null = null;
+let localHtmlWatcher: ReturnType<typeof chokidar.watch> | null = null;
 let lastLocalDir: string | null = null;
+const localHtmlDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 // Clears local plugins and reloads from the new workspace directory.
 // No-op if the workspace hasn't changed.
@@ -83,11 +114,30 @@ function refreshLocalPlugins(cwd: string): void {
   lastLocalDir = localDir;
   ensurePluginsDirs(cwd);
   loadDirIntoRegistry(localDir, 'local');
-  // Re-watch local plugins dir for the new workspace
+  // Re-watch local plugins dir for add/remove changes.
+  // On any filesystem event, rescan the directory to register newly added
+  // plugins (e.g. created by MCP aide_create_plugin at runtime) and drop
+  // plugins whose spec no longer exists.
   localPluginsWatcher?.close();
   localPluginsWatcher = chokidar
     .watch(localDir, { ignoreInitial: true, depth: 2, ignored: /\/dev\/fd\// })
-    .on('all', broadcastPluginsChanged);
+    .on('all', () => {
+      rescanPluginsDir(localDir, 'local');
+      broadcastPluginsChanged();
+    });
+  // Re-watch local plugins dir for index.html changes (debounced 300ms)
+  localHtmlWatcher?.close();
+  localHtmlWatcher = chokidar
+    .watch(path.join(localDir, '**/index.html'), { ignoreInitial: true, ignored: /\/dev\/fd\// })
+    .on('change', (filePath: string) => {
+      const pluginName = path.basename(path.dirname(filePath));
+      const existing = localHtmlDebounceTimers.get(pluginName);
+      if (existing) clearTimeout(existing);
+      localHtmlDebounceTimers.set(pluginName, setTimeout(() => {
+        localHtmlDebounceTimers.delete(pluginName);
+        broadcastHtmlChanged(pluginName);
+      }, 300));
+    });
 }
 
 function makeEmitterFactory(getCwd: () => string) {
@@ -119,11 +169,33 @@ function makeEmitterFactory(getCwd: () => string) {
 export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
   loadRegistryFromDisk(cwd);
   registry.setEmitterFactory(makeEmitterFactory(getEffectiveCwd.bind(null, cwd)));
-  // Watch global plugins dir for changes
+
+  // Broadcast existing plugins immediately so the UI shows them on launch
+  broadcastPluginsChanged();
+
+  // Watch global plugins dir for add/remove changes.
+  // Rescan on any event so runtime-added plugins become visible without restart.
   const globalDir = getGlobalPluginsDir();
   chokidar
     .watch(globalDir, { ignoreInitial: true, depth: 2, ignored: /\/dev\/fd\// })
-    .on('all', broadcastPluginsChanged);
+    .on('all', () => {
+      rescanPluginsDir(globalDir, 'global');
+      broadcastPluginsChanged();
+    });
+
+  // Watch global plugins dir for index.html changes (debounced 300ms)
+  const htmlDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  chokidar
+    .watch(path.join(globalDir, '**/index.html'), { ignoreInitial: true, ignored: /\/dev\/fd\// })
+    .on('change', (filePath: string) => {
+      const pluginName = path.basename(path.dirname(filePath));
+      const existing = htmlDebounceTimers.get(pluginName);
+      if (existing) clearTimeout(existing);
+      htmlDebounceTimers.set(pluginName, setTimeout(() => {
+        htmlDebounceTimers.delete(pluginName);
+        broadcastHtmlChanged(pluginName);
+      }, 300));
+    });
 
   // Spec-only: generate and return spec without writing to disk
   ipcMain.handle(IPC_CHANNELS.PLUGIN_GENERATE_SPEC, async (_event, name: string, description: string) => {
@@ -210,6 +282,25 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
     const htmlPath = path.join(pluginDir, 'index.html');
     if (!fs.existsSync(htmlPath)) return null;
     return fs.readFileSync(htmlPath, 'utf-8');
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_RELOAD, async (_event, pluginId: string) => {
+    const plugin = registry.get(pluginId);
+    if (!plugin) return false;
+    const wasActive = plugin.active;
+    if (wasActive) registry.deactivate(pluginId);
+    // Re-read spec from disk in case it changed
+    const freshSpec = readPluginSpec(plugin.pluginDir);
+    if (freshSpec) {
+      registry.unregister(pluginId);
+      registry.register(freshSpec, plugin.pluginDir, plugin.scope);
+      if (wasActive) {
+        const effectiveCwd = getEffectiveCwd(cwd);
+        registry.activate(freshSpec.id, effectiveCwd);
+      }
+    }
+    broadcastPluginsChanged();
+    return true;
   });
 
   ipcMain.handle(IPC_CHANNELS.PLUGIN_DELETE, async (_event, pluginName: string) => {
