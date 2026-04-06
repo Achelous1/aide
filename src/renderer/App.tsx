@@ -32,12 +32,13 @@ export function App() {
     useLayoutStore.getState().restoreSession(activeWorkspaceId);
   }, [activeWorkspaceId]);
 
-  // Save session on app quit
+  // Save session on app quit — use sendSync to guarantee write before window closes
   useEffect(() => {
     const handler = () => {
       const wsId = useWorkspaceStore.getState().activeWorkspaceId;
       if (wsId) {
-        useLayoutStore.getState().saveSession(wsId);
+        const session = useLayoutStore.getState().buildSavedSession(wsId);
+        window.aide.session.saveSync(session);
       }
     };
     window.addEventListener('beforeunload', handler);

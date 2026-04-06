@@ -1,5 +1,7 @@
 import { type IpcMain, BrowserWindow } from 'electron';
 import * as pty from 'node-pty';
+import * as fs from 'fs';
+import * as path from 'path';
 import os from 'os';
 import { IPC_CHANNELS } from './channels';
 import { AgentStatusDetector } from '../agent/status-detector';
@@ -16,29 +18,62 @@ function getResumeArgs(agentType: string, sessionId: string): string[] {
   }
 }
 
-function parseAgentSessionId(agentType: string, data: string): string | null {
+/** Args to resume the most recent session (no specific ID needed) */
+function getContinueArgs(agentType: string): string[] {
   switch (agentType) {
-    case 'claude': {
-      // Claude session IDs are ULIDs (26-char Crockford Base32)
-      const match = data.match(/session[:\s]+([0-9A-HJKMNP-TV-Z]{26})\b/i);
-      return match ? match[1] : null;
-    }
-    case 'gemini': {
-      const match = data.match(/session[:\s]+([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
-      return match ? match[1] : null;
-    }
-    case 'codex': {
-      const match = data.match(/session[:\s]+(\S+\.jsonl)/i);
-      return match ? match[1] : null;
-    }
-    default: return null;
+    case 'claude': return ['--continue'];
+    case 'gemini': return ['--resume'];         // bare --resume = most recent
+    case 'codex': return ['resume', '--last'];
+    default: return [];
   }
+}
+
+/**
+ * Detect the agent's session ID from its session files on disk.
+ * Each agent stores sessions in a known directory; we find the most recently modified file.
+ */
+/**
+ * Detect session ID from the agent's session files on disk.
+ * Claude and Codex store sessions in known directories.
+ * Gemini uses an unknown project hash — relies on --resume (bare) instead.
+ */
+function detectSessionIdFromFs(agentType: string, cwd: string): string | null {
+  const home = process.env.HOME || os.homedir();
+  try {
+    switch (agentType) {
+      case 'claude': {
+        // ~/.claude/projects/<cwd-with-separators-replaced-by-hyphens>/
+        const encoded = cwd.replace(/[\\/]/g, '-');
+        const dir = path.join(home, '.claude', 'projects', encoded);
+        return newestJsonlId(dir);
+      }
+      case 'codex': {
+        const dir = path.join(home, '.codex', 'sessions');
+        return newestJsonlId(dir);
+      }
+      default: return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
+function newestJsonlId(dir: string): string | null {
+  if (!fs.existsSync(dir)) return null;
+  let best: { name: string; mtime: number } | null = null;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.jsonl')) continue;
+    const mtime = fs.statSync(path.join(dir, entry.name)).mtimeMs;
+    if (!best || mtime > best.mtime) best = { name: entry.name, mtime };
+  }
+  return best ? best.name.replace(/\.jsonl$/, '') : null;
 }
 
 interface PtySession {
   pty: pty.IPty;
   webContentsId: number;
   agentSessionId?: string;
+  sessionDetectTimer?: ReturnType<typeof setInterval>;
 }
 
 const sessions = new Map<string, PtySession>();
@@ -72,6 +107,7 @@ function broadcastToRenderer(webContentsId: number, channel: string, ...args: un
 
 export function killAllSessions(): void {
   for (const [, session] of sessions) {
+    if (session.sessionDetectTimer) clearInterval(session.sessionDetectTimer);
     try {
       session.pty.kill();
     } catch {
@@ -84,7 +120,7 @@ export function killAllSessions(): void {
 export function registerTerminalHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(
     IPC_CHANNELS.TERMINAL_SPAWN,
-    (event, options?: { shell?: string; cwd?: string; agentType?: AgentType; resumeSessionId?: string }) => {
+    (event, options?: { shell?: string; cwd?: string; agentType?: AgentType; resumeSessionId?: string; continueSession?: boolean }) => {
       const defaultShell = getDefaultShell();
       const cwd = options?.cwd || os.homedir();
       const sessionId = `term-${++sessionCounter}`;
@@ -106,8 +142,12 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
       }
 
       let spawnArgs = [...agentConfig.args];
-      if (options?.resumeSessionId && options?.agentType && options.agentType !== 'shell') {
-        spawnArgs = [...spawnArgs, ...getResumeArgs(options.agentType, options.resumeSessionId)];
+      if (options?.agentType && options.agentType !== 'shell') {
+        if (options.resumeSessionId) {
+          spawnArgs = [...spawnArgs, ...getResumeArgs(options.agentType, options.resumeSessionId)];
+        } else if (options.continueSession) {
+          spawnArgs = [...spawnArgs, ...getContinueArgs(options.agentType)];
+        }
       }
 
       const ptyProcess = pty.spawn(shell, spawnArgs, {
@@ -136,19 +176,32 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
           data
         );
         statusDetector.feed(sessionId, data);
-        if (options?.agentType && options.agentType !== 'shell') {
-          const agentSid = parseAgentSessionId(options.agentType, data);
-          if (agentSid && agentSid !== session.agentSessionId) {
-            session.agentSessionId = agentSid;
-            broadcastToRenderer(session.webContentsId, IPC_CHANNELS.AGENT_SESSION_ID, sessionId, agentSid);
-          }
-        }
       });
 
       ptyProcess.onExit(() => {
+        if (session.sessionDetectTimer) clearInterval(session.sessionDetectTimer);
         sessions.delete(sessionId);
         statusDetector.remove(sessionId);
       });
+
+      // Poll filesystem to detect the agent's session ID (1s interval, up to 15 attempts)
+      if (options?.agentType && options.agentType !== 'shell') {
+        let attempts = 0;
+        session.sessionDetectTimer = setInterval(() => {
+          if (!sessions.has(sessionId) || ++attempts > 15) {
+            clearInterval(session.sessionDetectTimer!);
+            session.sessionDetectTimer = undefined;
+            return;
+          }
+          const fsSessionId = detectSessionIdFromFs(options.agentType!, cwd);
+          if (fsSessionId && fsSessionId !== session.agentSessionId) {
+            session.agentSessionId = fsSessionId;
+            broadcastToRenderer(session.webContentsId, IPC_CHANNELS.AGENT_SESSION_ID, sessionId, fsSessionId);
+            clearInterval(session.sessionDetectTimer!);
+            session.sessionDetectTimer = undefined;
+          }
+        }, 1000);
+      }
 
       return sessionId;
     }

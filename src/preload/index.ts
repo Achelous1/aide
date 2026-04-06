@@ -147,6 +147,8 @@ const aideAPI: AideAPI = {
   session: {
     save: (session: SavedSession): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.SESSION_SAVE, session),
+    saveSync: (session: SavedSession): void =>
+      ipcRenderer.sendSync(IPC_CHANNELS.SESSION_SAVE_SYNC, session),
     load: (workspaceId: string): Promise<SavedSession | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.SESSION_LOAD, workspaceId),
   },

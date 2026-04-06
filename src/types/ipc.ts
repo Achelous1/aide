@@ -3,7 +3,8 @@ export interface TerminalSpawnOptions {
   shell?: string;
   cwd?: string;
   agentType?: 'claude' | 'gemini' | 'codex' | 'shell';
-  resumeSessionId?: string;  // Agent session ID for resume
+  resumeSessionId?: string;  // Agent session ID for resume (--resume <id>)
+  continueSession?: boolean; // Resume most recent session (--continue / --resume bare)
 }
 
 /** File tree node */
@@ -283,6 +284,7 @@ export interface AideAPI {
   };
   session: {
     save(session: SavedSession): Promise<void>;
+    saveSync(session: SavedSession): void;
     load(workspaceId: string): Promise<SavedSession | null>;
   };
 }

@@ -12,6 +12,12 @@ export function registerSessionHandlers(ipcMain: IpcMain): void {
     store.set(session.workspaceId, session);
   });
 
+  // Synchronous save used in beforeunload — guarantees write before window closes
+  ipcMain.on(IPC_CHANNELS.SESSION_SAVE_SYNC, (event, session: SavedSession) => {
+    store.set(session.workspaceId, session);
+    event.returnValue = true;
+  });
+
   ipcMain.handle(IPC_CHANNELS.SESSION_LOAD, (_event, workspaceId: string): SavedSession | null => {
     const session = store.get(workspaceId) as SavedSession | undefined;
     if (!session || session.version !== CURRENT_VERSION) return null;

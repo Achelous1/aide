@@ -52,6 +52,7 @@ export const IPC_CHANNELS = {
 
   // Session
   SESSION_SAVE: 'session:save',
+  SESSION_SAVE_SYNC: 'session:save-sync',
   SESSION_LOAD: 'session:load',
 
   // GitHub

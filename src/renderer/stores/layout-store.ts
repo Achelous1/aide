@@ -140,6 +140,7 @@ interface LayoutState {
 
   // Session save/restore (persistent via electron-store)
   saveSession: (workspaceId: string) => Promise<void>;
+  buildSavedSession: (workspaceId: string) => SavedSession;
   restoreSession: (workspaceId: string) => Promise<void>;
 
   // Helpers
@@ -510,6 +511,11 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   },
 
   saveSession: async (workspaceId) => {
+    const session = get().buildSavedSession(workspaceId);
+    await window.aide.session.save(session);
+  },
+
+  buildSavedSession: (workspaceId) => {
     const { layout, focusedPaneId } = get();
 
     function serializeNode(node: LayoutNode): SerializableLayoutNode {
@@ -544,7 +550,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       .map((p) => p.id);
     const sidePanelTab = useWorkspaceStore.getState().sidePanelTab;
 
-    const session: SavedSession = {
+    return {
       version: 1,
       workspaceId,
       savedAt: Date.now(),
@@ -552,9 +558,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       focusedPaneId,
       activePlugins,
       sidePanelTab,
-    };
-
-    await window.aide.session.save(session);
+    } as SavedSession;
   },
 
   restoreSession: async (workspaceId) => {
@@ -614,11 +618,13 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
           // shell or agent — spawn new PTY
           let sessionId: string | null = null;
           try {
+            const isAgent = savedTab.type === 'agent';
             sessionId = await window.aide.terminal.spawn({
               shell: savedTab.agentId || undefined,
               cwd: wsPath,
-              agentType: savedTab.type === 'agent' ? (savedTab.agentId as 'claude' | 'gemini' | 'codex' | undefined) : undefined,
+              agentType: isAgent ? (savedTab.agentId as 'claude' | 'gemini' | 'codex' | undefined) : undefined,
               resumeSessionId: savedTab.agentSessionId,
+              continueSession: isAgent && !savedTab.agentSessionId,
             });
           } catch {
             // agent not installed — fall back to plain shell
