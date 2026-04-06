@@ -45,7 +45,7 @@ export function getAgentSpawnConfig(agentType: AgentType, defaultShell: string, 
         promptPattern: /[❯>]\s*$/,
       };
     case 'gemini':
-      // TODO: add MCP support when gemini CLI supports it
+      // MCP registered globally via ~/.gemini/settings.json (no --mcp-config flag support)
       return {
         command: 'gemini',
         args: [],
@@ -53,7 +53,7 @@ export function getAgentSpawnConfig(agentType: AgentType, defaultShell: string, 
         promptPattern: />\s*$/,
       };
     case 'codex':
-      // TODO: add MCP support when codex CLI supports it
+      // MCP registered globally via ~/.codex/config.toml (no --mcp-config flag support)
       return {
         command: 'codex',
         args: [],

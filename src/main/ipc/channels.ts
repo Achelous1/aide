@@ -50,6 +50,10 @@ export const IPC_CHANNELS = {
   MCP_STATUS: 'mcp:status',
   MCP_TOOLS: 'mcp:tools',
 
+  // Session
+  SESSION_SAVE: 'session:save',
+  SESSION_LOAD: 'session:load',
+
   // GitHub
   GITHUB_LIST_PRS: 'github:list-prs',
   GITHUB_LIST_ISSUES: 'github:list-issues',
@@ -59,6 +63,7 @@ export const IPC_CHANNELS = {
   AGENT_LIST_INSTALLED: 'agent:list-installed',
   AGENT_DETECT: 'agent:detect',
   AGENT_STATUS: 'agent:status',
+  AGENT_SESSION_ID: 'agent:session-id',
 
   // Workspace
   WORKSPACE_LIST: 'workspace:list',

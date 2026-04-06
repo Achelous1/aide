@@ -7,9 +7,38 @@ import { getAgentSpawnConfig, COMMON_ENV, type AgentType } from '../agent/agent-
 import { getMcpConfigPath } from '../mcp/config-writer';
 import type { AgentStatus } from '../../types/ipc';
 
+function getResumeArgs(agentType: string, sessionId: string): string[] {
+  switch (agentType) {
+    case 'claude': return ['--resume', sessionId];
+    case 'codex': return ['resume', sessionId];
+    case 'gemini': return ['--resume', sessionId];
+    default: return [];
+  }
+}
+
+function parseAgentSessionId(agentType: string, data: string): string | null {
+  switch (agentType) {
+    case 'claude': {
+      // Claude session IDs are ULIDs (26-char Crockford Base32)
+      const match = data.match(/session[:\s]+([0-9A-HJKMNP-TV-Z]{26})\b/i);
+      return match ? match[1] : null;
+    }
+    case 'gemini': {
+      const match = data.match(/session[:\s]+([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
+      return match ? match[1] : null;
+    }
+    case 'codex': {
+      const match = data.match(/session[:\s]+(\S+\.jsonl)/i);
+      return match ? match[1] : null;
+    }
+    default: return null;
+  }
+}
+
 interface PtySession {
   pty: pty.IPty;
   webContentsId: number;
+  agentSessionId?: string;
 }
 
 const sessions = new Map<string, PtySession>();
@@ -55,7 +84,7 @@ export function killAllSessions(): void {
 export function registerTerminalHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(
     IPC_CHANNELS.TERMINAL_SPAWN,
-    (event, options?: { shell?: string; cwd?: string; agentType?: AgentType }) => {
+    (event, options?: { shell?: string; cwd?: string; agentType?: AgentType; resumeSessionId?: string }) => {
       const defaultShell = getDefaultShell();
       const cwd = options?.cwd || os.homedir();
       const sessionId = `term-${++sessionCounter}`;
@@ -76,7 +105,12 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
         if (process.env[key]) safeBaseEnv[key] = process.env[key] as string;
       }
 
-      const ptyProcess = pty.spawn(shell, agentConfig.args, {
+      let spawnArgs = [...agentConfig.args];
+      if (options?.resumeSessionId && options?.agentType && options.agentType !== 'shell') {
+        spawnArgs = [...spawnArgs, ...getResumeArgs(options.agentType, options.resumeSessionId)];
+      }
+
+      const ptyProcess = pty.spawn(shell, spawnArgs, {
         name: 'xterm-256color',
         cols: 80,
         rows: 24,
@@ -102,6 +136,13 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
           data
         );
         statusDetector.feed(sessionId, data);
+        if (options?.agentType && options.agentType !== 'shell') {
+          const agentSid = parseAgentSessionId(options.agentType, data);
+          if (agentSid && agentSid !== session.agentSessionId) {
+            session.agentSessionId = agentSid;
+            broadcastToRenderer(session.webContentsId, IPC_CHANNELS.AGENT_SESSION_ID, sessionId, agentSid);
+          }
+        }
       });
 
       ptyProcess.onExit(() => {

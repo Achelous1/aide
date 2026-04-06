@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../main/ipc/channels';
-import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions, PluginSpec, McpStatus, PluginTool, WorkspaceSettings } from '../types/ipc';
+import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions, PluginSpec, McpStatus, PluginTool, WorkspaceSettings, SavedSession } from '../types/ipc';
 
 const aideAPI: AideAPI = {
   fs: {
@@ -67,6 +67,13 @@ const aideAPI: AideAPI = {
       return () => {
         ipcRenderer.removeListener(IPC_CHANNELS.TERMINAL_DATA, listener);
       };
+    },
+
+    onAgentSessionId: (callback: (sessionId: string, agentSessionId: string) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, sessionId: string, agentSessionId: string) =>
+        callback(sessionId, agentSessionId);
+      ipcRenderer.on(IPC_CHANNELS.AGENT_SESSION_ID, handler);
+      return () => { ipcRenderer.removeListener(IPC_CHANNELS.AGENT_SESSION_ID, handler); };
     },
   },
 
@@ -135,6 +142,13 @@ const aideAPI: AideAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_READ),
     write: (settings: WorkspaceSettings): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_WRITE, settings),
+  },
+
+  session: {
+    save: (session: SavedSession): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SESSION_SAVE, session),
+    load: (workspaceId: string): Promise<SavedSession | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SESSION_LOAD, workspaceId),
   },
 
   files: {

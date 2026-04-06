@@ -135,6 +135,56 @@ macOS Finder launches packaged apps with `HOME=/` (not the user's home). `app.ge
 ### Packaging: macOS fsevents EBADF on /dev/fd/
 In packaged apps, the `fsevents` native module reports `/dev/fd/N` paths. When chokidar tries to `lstat` them, the FD is already closed → `EBADF`. The `ignored` option doesn't help because the error occurs before filtering. **A process-level `uncaughtException` handler suppresses this specific error** (see `src/main/index.ts`).
 
+### Zustand: Never mutate state snapshots directly
+`useLayoutStore.getState().getAllPanes()` returns a snapshot. Mutating objects in that snapshot (`tab.agentSessionId = x`) does NOT update the store — the change is invisible to future `get()` calls and won't be serialized by `saveSession()`. **Always update Zustand state via a `set()` action.** When adding a new field that needs persistence, add a dedicated action that calls `set()`:
+```ts
+// BAD: mutation on snapshot — lost immediately
+const panes = useLayoutStore.getState().getAllPanes();
+panes[0].tabs[0].agentSessionId = id; // store never sees this
+
+// GOOD: proper Zustand action
+updateTabAgentSessionId: (ptySessionId, agentSessionId) => {
+  set((state) => {
+    const layout = cloneNode(state.layout);
+    // find and mutate the clone, then return it
+    return { layout };
+  });
+}
+```
+
+### beforeunload: async IPC is fire-and-forget
+`window.addEventListener('beforeunload', handler)` is synchronous. Any `async` work inside (e.g. `ipcRenderer.invoke`) is fired but not awaited — the renderer can be torn down before the IPC round-trip completes. **Don't rely on `beforeunload` as the sole persistence point for critical data.** Instead, persist eagerly on state change (debounced) so `beforeunload` is only a best-effort supplement.
+
+### TOML regex: character class `[^[]*` stops at first `[` inside values
+When removing a TOML section with a regex like `/\[section][^[]*/s`, the `[^[]*` part stops at any `[` character — including those inside TOML array values like `args = ["server.js"]`. This leaves orphaned fragments and corrupts the file. **Use line-by-line parsing instead:**
+```ts
+function removeTomlSection(content: string, header: string): string {
+  const lines = content.split('\n');
+  let inSection = false;
+  return lines.filter((line) => {
+    if (line.trimEnd() === header) { inSection = true; return false; }
+    if (inSection && line.startsWith('[')) inSection = false;
+    return !inSection;
+  }).join('\n');
+}
+```
+
+### Agent session ID formats differ by CLI
+Each agent uses a different format for session IDs captured from PTY output:
+- **Claude**: ULID — 26-char Crockford Base32 (`[0-9A-HJKMNP-TV-Z]{26}`), e.g. `01JRMZ5AB9MAERFFQN7YVBFKRX`
+- **Gemini**: UUID — standard hyphenated hex, e.g. `a3f2c1d0-...`
+- **Codex**: `.jsonl` file path — full path to session history file
+
+Regex patterns must be anchored to the word `session:` to avoid false positives. A bare UUID regex (no anchor) will match trace IDs, file references, etc.
+
+### MCP global config paths per agent (no --mcp-config flag for Gemini/Codex)
+Claude accepts `--mcp-config <path>` per invocation. Gemini and Codex do not — they only read fixed global config files:
+- **Claude**: `~/.claude.json` → `mcpServers` key (JSON) — also accepts `--mcp-config`
+- **Gemini**: `~/.gemini/settings.json` → `mcpServers` key (JSON)
+- **Codex**: `~/.codex/config.toml` → `[mcp_servers.<name>]` table (TOML)
+
+All three are written by `writeMcpConfig()` in `src/main/mcp/config-writer.ts`. See `registerJsonMcpConfig()` for the shared JSON merge helper.
+
 ## Platform Notes
 
 - macOS: bash/zsh default shell, .dmg/.zip packaging

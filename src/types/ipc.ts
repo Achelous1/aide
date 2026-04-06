@@ -3,6 +3,7 @@ export interface TerminalSpawnOptions {
   shell?: string;
   cwd?: string;
   agentType?: 'claude' | 'gemini' | 'codex' | 'shell';
+  resumeSessionId?: string;  // Agent session ID for resume
 }
 
 /** File tree node */
@@ -66,6 +67,7 @@ export interface TerminalTab {
   agentId?: string;
   pluginId?: string;
   sessionId?: string;
+  agentSessionId?: string;  // Captured agent session ID for resume
   title: string;
 }
 
@@ -175,6 +177,42 @@ export interface McpStatus {
   pluginCount: number;
 }
 
+/** Serializable layout node for session persistence */
+export type SerializableLayoutNode = SerializablePane | SerializableSplitLayout;
+
+export interface SerializablePane {
+  id: string;
+  tabs: SavedTab[];
+  activeTabId: string | null;
+}
+
+export interface SerializableSplitLayout {
+  id: string;
+  direction: 'horizontal' | 'vertical';
+  children: SerializableLayoutNode[];
+  sizes: number[];
+}
+
+export interface SavedTab {
+  id: string;
+  type: 'agent' | 'shell' | 'plugin';
+  title: string;
+  isActive: boolean;
+  agentId?: string;
+  pluginId?: string;
+  agentSessionId?: string;
+}
+
+export interface SavedSession {
+  version: 1;
+  workspaceId: string;
+  savedAt: number;
+  layout: SerializableLayoutNode;
+  focusedPaneId: string | null;
+  activePlugins: string[];
+  sidePanelTab: 'files' | 'plugins';
+}
+
 /** IPC API exposed to renderer via contextBridge */
 export interface AideAPI {
   fs: {
@@ -199,6 +237,7 @@ export interface AideAPI {
     resize(sessionId: string, cols: number, rows: number): Promise<void>;
     kill(sessionId: string): Promise<void>;
     onData(callback: (sessionId: string, data: string) => void): () => void;
+    onAgentSessionId(callback: (sessionId: string, agentSessionId: string) => void): () => void;
   };
   workspace: {
     list(): Promise<WorkspaceInfo[]>;
@@ -241,5 +280,9 @@ export interface AideAPI {
     listPRs(owner: string, repo: string): Promise<GithubPR[]>;
     listIssues(owner: string, repo: string): Promise<GithubIssue[]>;
     getPR(owner: string, repo: string, prNumber: number): Promise<GithubPR & { body: string; additions: number; deletions: number; changedFiles: number }>;
+  };
+  session: {
+    save(session: SavedSession): Promise<void>;
+    load(workspaceId: string): Promise<SavedSession | null>;
   };
 }

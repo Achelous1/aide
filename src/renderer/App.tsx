@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { TitleBar } from './components/layout/TitleBar';
 import { StatusBar } from './components/layout/StatusBar';
 import { SplitContainer } from './components/layout/SplitContainer';
@@ -23,6 +23,43 @@ export function App() {
   useEffect(() => {
     loadWorkspaces();
   }, [loadWorkspaces]);
+
+  // Restore session on initial workspace load (workspace switches handled by setActive)
+  const initialRestoreDone = useRef(false);
+  useEffect(() => {
+    if (!activeWorkspaceId || initialRestoreDone.current) return;
+    initialRestoreDone.current = true;
+    useLayoutStore.getState().restoreSession(activeWorkspaceId);
+  }, [activeWorkspaceId]);
+
+  // Save session on app quit
+  useEffect(() => {
+    const handler = () => {
+      const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+      if (wsId) {
+        useLayoutStore.getState().saveSession(wsId);
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
+
+  // Track agent session IDs for resume support
+  useEffect(() => {
+    let saveTimer: ReturnType<typeof setTimeout> | null = null;
+    const unsub = window.aide.terminal.onAgentSessionId((sessionId, agentSessionId) => {
+      useLayoutStore.getState().updateTabAgentSessionId(sessionId, agentSessionId);
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+        if (wsId) useLayoutStore.getState().saveSession(wsId);
+      }, 250);
+    });
+    return () => {
+      if (saveTimer) clearTimeout(saveTimer);
+      unsub();
+    };
+  }, []);
 
   // PaneView auto-spawns a shell when empty — no App-level auto-create needed
 

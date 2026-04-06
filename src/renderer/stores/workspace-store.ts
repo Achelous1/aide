@@ -36,21 +36,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setActive: async (id) => {
     const prevId = get().activeWorkspaceId;
     if (id && id !== prevId) {
-      // Save current layout before switching
+      // Save current session before switching
       if (prevId) {
-        useLayoutStore.getState().saveWorkspaceLayout(prevId);
+        await useLayoutStore.getState().saveSession(prevId);
       }
       useTerminalStore.getState().switchWorkspace(prevId, id);
-      // Restore layout for new workspace
-      useLayoutStore.getState().restoreWorkspaceLayout(id);
+      // Restore session for new workspace
+      await useLayoutStore.getState().restoreSession(id);
       // Notify main process so getActiveWorkspacePath() is updated before loadPlugins()
       const workspace = get().workspaces.find((w) => w.id === id);
       if (workspace) {
         await window.aide.workspace.open(workspace.path);
       }
-      // Reload plugins scoped to the new workspace
       usePluginStore.getState().loadPlugins();
-      // Invalidate settings cache so next file event reads the new workspace's settings
       invalidateSettingsCache();
     }
     set({ activeWorkspaceId: id });

@@ -22,12 +22,27 @@ const mockTab: TerminalTab = {
 
 describe('useWorkspaceStore', () => {
   beforeEach(() => {
+    vi.stubGlobal('window', {
+      aide: {
+        session: {
+          save: vi.fn().mockResolvedValue(undefined),
+          load: vi.fn().mockResolvedValue(null),
+        },
+        terminal: { spawn: vi.fn().mockResolvedValue('session-test') },
+        workspace: { open: vi.fn().mockResolvedValue(undefined) },
+        plugin: { list: vi.fn().mockResolvedValue([]), activate: vi.fn().mockResolvedValue(undefined) },
+      },
+    });
     useWorkspaceStore.setState({
       workspaces: [],
       activeWorkspaceId: null,
       recentProjects: [],
       navExpanded: true,
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('should start with empty state', () => {
@@ -50,14 +65,14 @@ describe('useWorkspaceStore', () => {
     expect(useWorkspaceStore.getState().workspaces).toHaveLength(0);
   });
 
-  it('setActive should set activeWorkspaceId', () => {
-    useWorkspaceStore.getState().setActive('ws-1');
+  it('setActive should set activeWorkspaceId', async () => {
+    await useWorkspaceStore.getState().setActive('ws-1');
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-1');
   });
 
-  it('setActive(null) should clear active workspace', () => {
-    useWorkspaceStore.getState().setActive('ws-1');
-    useWorkspaceStore.getState().setActive(null);
+  it('setActive(null) should clear active workspace', async () => {
+    await useWorkspaceStore.getState().setActive('ws-1');
+    await useWorkspaceStore.getState().setActive(null);
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull();
   });
 
@@ -200,7 +215,12 @@ describe('useWorkspaceStore – plugin reload on workspace switch', () => {
     vi.stubGlobal('window', {
       aide: {
         workspace: { open: workspaceOpenMock },
-        plugin: { list: pluginListMock },
+        plugin: { list: pluginListMock, activate: vi.fn().mockResolvedValue(undefined) },
+        session: {
+          save: vi.fn().mockResolvedValue(undefined),
+          load: vi.fn().mockResolvedValue(null),
+        },
+        terminal: { spawn: vi.fn().mockResolvedValue('session-test') },
       },
     });
 
