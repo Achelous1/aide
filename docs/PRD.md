@@ -298,6 +298,63 @@ $ npm test
 - [x] Git 기본 기능 (simple-git: status, commit, push, pull, branch, log)
 - [x] 다크/라이트 테마 토글 (StatusBar 버튼, .light 클래스 전환)
 - [x] Navbar expanded 토글 (collapsed 48px ↔ expanded 220px, «/» 버튼)
+- [x] 세션 저장/복원 (레이아웃, 탭, 활성 플러그인 — 앱 재시작/워크스페이스 전환 시 복원)
+
+### F6. Session Save/Restore
+
+앱을 종료하고 다시 열었을 때, 또는 워크스페이스를 전환할 때 이전 작업 환경을 그대로 복원.
+
+**저장 대상**:
+- 전체 레이아웃 트리 (pane/split 구조, 크기 비율, focused pane)
+- 각 pane 내 탭 목록 (타입, agentId/pluginId, 활성 탭)
+- 활성화(ON)된 플러그인 ID 목록
+- 사이드 패널 탭 선택 상태 (FILES/PLUGINS)
+
+**저장하지 않는 것**:
+- PTY 세션 (프로세스 복원 불가 → 새로 spawn)
+- 터미널 출력 히스토리 (xterm 버퍼)
+- 에이전트 대화 상태 (에이전트 자체 히스토리 관리)
+
+**저장/복원 시점**:
+
+| 이벤트 | 동작 |
+|--------|------|
+| 워크스페이스 전환 | 현재 세션 저장 → 대상 세션 복원 |
+| 앱 종료 (`beforeunload`) | 활성 워크스페이스 세션 저장 |
+| 앱 시작 | 마지막 활성 워크스페이스 세션 복원 |
+
+**복원 절차**:
+1. electron-store에서 `SavedSession` 로드
+2. layout 트리 복원 (pane/split 구조)
+3. 각 탭에 대해 PTY spawn (shell/agent) 또는 plugin 탭 생성
+4. activeTabId, focusedPaneId 복원
+5. 활성 플러그인 복원 (각 pluginId에 대해 activate 호출)
+6. sidePanelTab 복원
+
+**엣지 케이스**:
+
+| 케이스 | 처리 |
+|--------|------|
+| 저장된 세션 없음 | 기본 레이아웃(빈 pane 1개)으로 시작 |
+| 저장된 agent가 미설치 | 해당 탭을 shell로 fallback |
+| 저장된 plugin 삭제됨 | 해당 탭 제거, 로그 경고 |
+| 세션 스키마 버전 불일치 | 세션 무시, 기본 레이아웃 |
+| 복원 중 pty spawn 실패 | 해당 탭 제거, 나머지 계속 복원 |
+
+**데이터 스키마**:
+```typescript
+interface SavedSession {
+  version: 1;
+  workspaceId: string;
+  savedAt: number;
+  layout: SerializableLayoutNode;
+  focusedPaneId: string | null;
+  activePlugins: string[];
+  sidePanelTab: 'files' | 'plugins';
+}
+```
+
+**구현**: electron-store 백엔드 (`aide-sessions`), IPC 채널 `session:save`/`session:load`, preload bridge `window.aide.session`, layout-store `saveSession()`/`restoreSession()`
 
 ### Out of Scope (Post-MVP)
 - 커뮤니티 플러그인 허브 (아래 Post-MVP 로드맵 참조)
