@@ -135,9 +135,9 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
           data
         );
         statusDetector.feed(sessionId, data);
-        if (options?.agentType && options.agentType !== 'shell' && !session.agentSessionId) {
+        if (options?.agentType && options.agentType !== 'shell') {
           const agentSid = parseAgentSessionId(options.agentType, data);
-          if (agentSid) {
+          if (agentSid && agentSid !== session.agentSessionId) {
             session.agentSessionId = agentSid;
             broadcastToRenderer(session.webContentsId, IPC_CHANNELS.AGENT_SESSION_ID, sessionId, agentSid);
           }
