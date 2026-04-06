@@ -1,6 +1,9 @@
 import { create } from 'zustand';
-import type { TerminalTab, Pane, SplitLayout, LayoutNode } from '../../types/ipc';
+import type { TerminalTab, Pane, SplitLayout, LayoutNode, SerializableLayoutNode, SerializablePane, SerializableSplitLayout, SavedTab, SavedSession } from '../../types/ipc';
 import { isSplitLayout } from '../../types/ipc';
+import { useTerminalStore } from './terminal-store';
+import { useWorkspaceStore } from './workspace-store';
+import { usePluginStore } from './plugin-store';
 
 let paneCounter = 0;
 let splitCounter = 0;
@@ -133,6 +136,10 @@ interface LayoutState {
   // Workspace layout persistence
   saveWorkspaceLayout: (workspaceId: string) => void;
   restoreWorkspaceLayout: (workspaceId: string) => void;
+
+  // Session save/restore (persistent via electron-store)
+  saveSession: (workspaceId: string) => Promise<void>;
+  restoreSession: (workspaceId: string) => Promise<void>;
 
   // Helpers
   getAllPanes: () => Pane[];
@@ -484,6 +491,176 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       const pane = createPane();
       set({ layout: pane, focusedPaneId: pane.id });
     }
+  },
+
+  saveSession: async (workspaceId) => {
+    const { layout, focusedPaneId } = get();
+
+    function serializeNode(node: LayoutNode): SerializableLayoutNode {
+      if (isSplitLayout(node)) {
+        const split = node as SplitLayout;
+        return {
+          id: split.id,
+          direction: split.direction,
+          children: split.children.map(serializeNode),
+          sizes: split.sizes,
+        } as SerializableSplitLayout;
+      }
+      const pane = node as Pane;
+      const tabs: SavedTab[] = pane.tabs.map((tab) => ({
+        id: tab.id,
+        paneId: pane.id,
+        type: tab.type,
+        title: tab.title,
+        isActive: tab.id === pane.activeTabId,
+        agentId: tab.agentId,
+        pluginId: tab.pluginId,
+      }));
+      return {
+        id: pane.id,
+        tabs,
+        activeTabId: pane.activeTabId,
+      } as SerializablePane;
+    }
+
+    const activePlugins = usePluginStore.getState().plugins
+      .filter((p) => p.active)
+      .map((p) => p.id);
+    const sidePanelTab = useWorkspaceStore.getState().sidePanelTab;
+
+    const session: SavedSession = {
+      version: 1,
+      workspaceId,
+      savedAt: Date.now(),
+      layout: serializeNode(layout),
+      focusedPaneId,
+      activePlugins,
+      sidePanelTab,
+    };
+
+    await window.aide.session.save(session);
+  },
+
+  restoreSession: async (workspaceId) => {
+    const session = await window.aide.session.load(workspaceId);
+    if (!session) {
+      get().resetLayout();
+      return;
+    }
+
+    // Update counters to avoid ID collisions
+    function updateCounters(node: SerializableLayoutNode): void {
+      if ('direction' in node && 'children' in node) {
+        const split = node as SerializableSplitLayout;
+        const num = parseInt(split.id.replace('split-', ''), 10);
+        if (!isNaN(num) && num >= splitCounter) splitCounter = num + 1;
+        split.children.forEach(updateCounters);
+      } else {
+        const pane = node as SerializablePane;
+        const num = parseInt(pane.id.replace('pane-', ''), 10);
+        if (!isNaN(num) && num >= paneCounter) paneCounter = num + 1;
+      }
+    }
+    updateCounters(session.layout);
+
+    const wsPath = useWorkspaceStore.getState().workspaces.find(
+      (w) => w.id === workspaceId,
+    )?.path;
+
+    async function rebuildNode(node: SerializableLayoutNode): Promise<LayoutNode> {
+      if ('direction' in node && 'children' in node) {
+        const split = node as SerializableSplitLayout;
+        const children = await Promise.all(split.children.map(rebuildNode));
+        return {
+          id: split.id,
+          direction: split.direction,
+          children,
+          sizes: split.sizes,
+        } as SplitLayout;
+      }
+
+      const savedPane = node as SerializablePane;
+      const tabs: TerminalTab[] = [];
+      let activeTabId: string | null = null;
+
+      for (const savedTab of savedPane.tabs) {
+        if (savedTab.type === 'plugin') {
+          const tab: TerminalTab = {
+            id: savedTab.id,
+            type: 'plugin',
+            pluginId: savedTab.pluginId,
+            title: savedTab.title,
+          };
+          tabs.push(tab);
+          useTerminalStore.getState().addTab(tab);
+          if (savedTab.isActive) activeTabId = tab.id;
+        } else {
+          // shell or agent — spawn new PTY
+          let sessionId: string | null = null;
+          try {
+            sessionId = await window.aide.terminal.spawn({
+              shell: savedTab.agentId || undefined,
+              cwd: wsPath,
+            });
+          } catch {
+            // agent not installed — fall back to plain shell
+            try {
+              sessionId = await window.aide.terminal.spawn({ cwd: wsPath });
+            } catch {
+              // spawn failed entirely, skip tab
+            }
+          }
+
+          if (sessionId) {
+            const tab: TerminalTab = {
+              id: savedTab.id,
+              type: savedTab.type,
+              agentId: savedTab.agentId,
+              sessionId,
+              title: savedTab.title,
+            };
+            tabs.push(tab);
+            useTerminalStore.getState().addTab(tab);
+            if (savedTab.isActive) activeTabId = tab.id;
+          }
+        }
+      }
+
+      // Fallback: ensure pane has at least one tab
+      if (tabs.length === 0) {
+        try {
+          const sessionId = await window.aide.terminal.spawn({ cwd: wsPath });
+          const tab: TerminalTab = {
+            id: crypto.randomUUID(),
+            type: 'shell',
+            sessionId,
+            title: '$ shell',
+          };
+          tabs.push(tab);
+          useTerminalStore.getState().addTab(tab);
+          activeTabId = tab.id;
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!activeTabId && tabs.length > 0) {
+        activeTabId = tabs[0].id;
+      }
+
+      return { id: savedPane.id, tabs, activeTabId } as Pane;
+    }
+
+    const restoredLayout = await rebuildNode(session.layout);
+    set({ layout: restoredLayout, focusedPaneId: session.focusedPaneId });
+
+    // Restore active plugins
+    for (const pluginId of session.activePlugins) {
+      window.aide.plugin.activate(pluginId).catch(() => {});
+    }
+
+    // Restore side panel tab
+    useWorkspaceStore.getState().setSidePanelTab(session.sidePanelTab);
   },
 
   getAllPanes: () => collectPanes(get().layout),

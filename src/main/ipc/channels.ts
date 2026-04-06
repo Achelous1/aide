@@ -50,6 +50,10 @@ export const IPC_CHANNELS = {
   MCP_STATUS: 'mcp:status',
   MCP_TOOLS: 'mcp:tools',
 
+  // Session
+  SESSION_SAVE: 'session:save',
+  SESSION_LOAD: 'session:load',
+
   // GitHub
   GITHUB_LIST_PRS: 'github:list-prs',
   GITHUB_LIST_ISSUES: 'github:list-issues',

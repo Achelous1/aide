@@ -175,6 +175,42 @@ export interface McpStatus {
   pluginCount: number;
 }
 
+/** Serializable layout node for session persistence */
+export type SerializableLayoutNode = SerializablePane | SerializableSplitLayout;
+
+export interface SerializablePane {
+  id: string;
+  tabs: SavedTab[];
+  activeTabId: string | null;
+}
+
+export interface SerializableSplitLayout {
+  id: string;
+  direction: 'horizontal' | 'vertical';
+  children: SerializableLayoutNode[];
+  sizes: number[];
+}
+
+export interface SavedTab {
+  id: string;
+  paneId: string;
+  type: 'agent' | 'shell' | 'plugin';
+  title: string;
+  isActive: boolean;
+  agentId?: string;
+  pluginId?: string;
+}
+
+export interface SavedSession {
+  version: 1;
+  workspaceId: string;
+  savedAt: number;
+  layout: SerializableLayoutNode;
+  focusedPaneId: string | null;
+  activePlugins: string[];
+  sidePanelTab: 'files' | 'plugins';
+}
+
 /** IPC API exposed to renderer via contextBridge */
 export interface AideAPI {
   fs: {
@@ -241,5 +277,9 @@ export interface AideAPI {
     listPRs(owner: string, repo: string): Promise<GithubPR[]>;
     listIssues(owner: string, repo: string): Promise<GithubIssue[]>;
     getPR(owner: string, repo: string, prNumber: number): Promise<GithubPR & { body: string; additions: number; deletions: number; changedFiles: number }>;
+  };
+  session: {
+    save(session: SavedSession): Promise<void>;
+    load(workspaceId: string): Promise<SavedSession | null>;
   };
 }

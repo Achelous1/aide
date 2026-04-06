@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { TitleBar } from './components/layout/TitleBar';
 import { StatusBar } from './components/layout/StatusBar';
 import { SplitContainer } from './components/layout/SplitContainer';
@@ -23,6 +23,26 @@ export function App() {
   useEffect(() => {
     loadWorkspaces();
   }, [loadWorkspaces]);
+
+  // Restore session on initial workspace load (workspace switches handled by setActive)
+  const initialRestoreDone = useRef(false);
+  useEffect(() => {
+    if (!activeWorkspaceId || initialRestoreDone.current) return;
+    initialRestoreDone.current = true;
+    useLayoutStore.getState().restoreSession(activeWorkspaceId);
+  }, [activeWorkspaceId]);
+
+  // Save session on app quit
+  useEffect(() => {
+    const handler = () => {
+      const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+      if (wsId) {
+        useLayoutStore.getState().saveSession(wsId);
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
 
   // PaneView auto-spawns a shell when empty — no App-level auto-create needed
 
