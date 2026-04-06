@@ -14,12 +14,13 @@ import { registerSettingsHandlers } from './ipc/settings-handlers';
 import { registerSessionHandlers } from './ipc/session-handlers';
 import { killAllSessions } from './ipc/terminal-handlers';
 import { writeMcpConfig } from './mcp/config-writer';
-import { registerPluginScheme, registerPluginProtocol } from './plugin/protocol';
+import { registerCustomSchemes, registerPluginProtocol } from './plugin/protocol';
+import { registerCdnProtocol } from './plugin/cdn-protocol';
 
 fixPackagedEnv();
 
-// Must be called before app.whenReady() — registers aide-plugin:// scheme
-registerPluginScheme();
+// Must be called before app.whenReady() — registers aide-plugin:// and aide-cdn:// schemes
+registerCustomSchemes();
 
 // Suppress harmless EBADF errors on /dev/fd/ paths.
 // macOS fsevents reports these in packaged Electron apps when file descriptors
@@ -92,6 +93,7 @@ app.on('ready', () => {
   registerSettingsHandlers(ipcMain, process.cwd());
   registerSessionHandlers(ipcMain);
   registerPluginProtocol(process.cwd());
+  registerCdnProtocol();
   createWindow();
   // MCP setup runs after window creation — failures must not prevent the app from opening
   try {

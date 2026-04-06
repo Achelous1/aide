@@ -59,10 +59,14 @@ function findPluginHtml(pluginId: string, fallbackCwd: string): string | null {
  * Must be called BEFORE app.whenReady() — registers the scheme as privileged
  * so Chromium treats it like https:// (standard URL parsing, secure context).
  */
-export function registerPluginScheme(): void {
+export function registerCustomSchemes(): void {
   protocol.registerSchemesAsPrivileged([
     {
       scheme: 'aide-plugin',
+      privileges: { standard: true, secure: true, supportFetchAPI: true },
+    },
+    {
+      scheme: 'aide-cdn',
       privileges: { standard: true, secure: true, supportFetchAPI: true },
     },
   ]);
