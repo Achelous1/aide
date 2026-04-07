@@ -58,6 +58,12 @@ export const IPC_CHANNELS = {
   SESSION_SAVE_SYNC: 'session:save-sync',
   SESSION_LOAD: 'session:load',
 
+  // Updater
+  UPDATER_CHECK: 'updater:check',
+  UPDATER_DOWNLOAD: 'updater:download',
+  UPDATER_INFO_CHANGED: 'updater:info-changed',
+  UPDATER_GET_INFO: 'updater:get-info',
+
   // GitHub
   GITHUB_LIST_PRS: 'github:list-prs',
   GITHUB_LIST_ISSUES: 'github:list-issues',

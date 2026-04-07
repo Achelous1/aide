@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../main/ipc/channels';
-import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions, PluginSpec, McpStatus, PluginTool, WorkspaceSettings, SavedSession } from '../types/ipc';
+import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions, PluginSpec, McpStatus, PluginTool, WorkspaceSettings, SavedSession, UpdateInfo } from '../types/ipc';
 
 const aideAPI: AideAPI = {
   fs: {
@@ -182,6 +182,21 @@ const aideAPI: AideAPI = {
       const listener = () => callback();
       ipcRenderer.on(IPC_CHANNELS.FILES_REFRESH, listener);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.FILES_REFRESH, listener);
+    },
+  },
+
+  updater: {
+    check: (): Promise<UpdateInfo | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATER_CHECK),
+    getInfo: (): Promise<UpdateInfo | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATER_GET_INFO),
+    download: (): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATER_DOWNLOAD),
+    onChanged: (callback: (info: UpdateInfo | null) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, info: UpdateInfo | null) =>
+        callback(info);
+      ipcRenderer.on(IPC_CHANNELS.UPDATER_INFO_CHANGED, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.UPDATER_INFO_CHANGED, listener);
     },
   },
 };
