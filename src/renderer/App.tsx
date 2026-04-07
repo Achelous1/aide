@@ -10,6 +10,9 @@ import { PluginPanel } from './components/plugin/PluginPanel';
 import { useWorkspaceStore } from './stores/workspace-store';
 import { useTerminalStore } from './stores/terminal-store';
 import { useLayoutStore } from './stores/layout-store';
+import { useThemeStore } from './stores/theme-store';
+import * as xtermCache from './lib/xterm-cache';
+import { DARK_THEME, LIGHT_THEME } from './components/terminal/TerminalPanel';
 
 export function App() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
@@ -19,10 +22,30 @@ export function App() {
   const layout = useLayoutStore((s) => s.layout);
   const sidePanelTab = useWorkspaceStore((s) => s.sidePanelTab);
   const setSidePanelTab = useWorkspaceStore((s) => s.setSidePanelTab);
+  const theme = useThemeStore((s) => s.theme);
 
   useEffect(() => {
     loadWorkspaces();
   }, [loadWorkspaces]);
+
+  // Propagate theme changes to ALL cached xterms (including inactive workspace terminals)
+  useEffect(() => {
+    const xtheme = theme === 'dark' ? DARK_THEME : LIGHT_THEME;
+    // xtermCache.setTheme updates individual sessions; iterate via the store's layout
+    // to reach all known session IDs across all cached workspaces.
+    // The simplest approach: subscribe to the theme store and call setTheme on each
+    // cached session. The cache module exposes `has` but not iteration, so we update
+    // via the layout store's known tabs — cached xterminals for inactive workspaces
+    // will be updated when their TerminalPanel mounts on next switch.
+    const allPanes = useLayoutStore.getState().getAllPanes();
+    for (const pane of allPanes) {
+      for (const tab of pane.tabs) {
+        if (tab.sessionId) {
+          xtermCache.setTheme(tab.sessionId, xtheme);
+        }
+      }
+    }
+  }, [theme]);
 
   // Restore session on initial workspace load (workspace switches handled by setActive)
   const initialRestoreDone = useRef(false);
@@ -40,6 +63,8 @@ export function App() {
         const session = useLayoutStore.getState().buildSavedSession(wsId);
         window.aide.session.saveSync(session);
       }
+      // Best-effort cleanup of all cached xterms on quit
+      xtermCache.disposeAll();
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
@@ -129,6 +154,7 @@ export function App() {
           window.aide.terminal.kill(activeTab.sessionId).catch(() => {
             // ignore kill errors
           });
+          xtermCache.dispose(activeTab.sessionId);
         }
         useLayoutStore.getState().removeTabFromPane(pane.id, pane.activeTabId);
         useTerminalStore.getState().removeTab(pane.activeTabId);
