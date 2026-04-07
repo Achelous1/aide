@@ -214,6 +214,22 @@ export interface SavedSession {
   sidePanelTab: 'files' | 'plugins';
 }
 
+/** Update information from GitHub releases */
+export interface UpdateInfo {
+  /** Latest tag from GitHub (e.g. "v0.0.2") */
+  latestTag: string;
+  /** Currently running app version (e.g. "0.0.1") */
+  currentVersion: string;
+  /** True if latestTag > currentVersion */
+  hasUpdate: boolean;
+  /** Download URL of the macOS DMG asset, if present */
+  downloadUrl: string | null;
+  /** Human-readable release name */
+  releaseName: string | null;
+  /** Web URL of the release page (fallback for non-DMG platforms) */
+  htmlUrl: string | null;
+}
+
 /** IPC API exposed to renderer via contextBridge */
 export interface AideAPI {
   fs: {
@@ -289,5 +305,11 @@ export interface AideAPI {
     save(session: SavedSession): Promise<void>;
     saveSync(session: SavedSession): void;
     load(workspaceId: string): Promise<SavedSession | null>;
+  };
+  updater: {
+    check(): Promise<UpdateInfo | null>;
+    getInfo(): Promise<UpdateInfo | null>;
+    download(): Promise<{ ok: boolean; path?: string; error?: string }>;
+    onChanged(callback: (info: UpdateInfo | null) => void): () => void;
   };
 }

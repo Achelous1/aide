@@ -256,6 +256,67 @@ Collapsed ↔ Expanded 토글:
 Welcome Page의 Workspace Navbar와 동일한 구조.
 추가로 Terminal Page에서는 FileExplorer 좌측에 위치.
 
+### 3.5.5 Update Notice (Workspace Nav 하단 슬롯)
+
+PRD F7 자동 업데이트 알림 컴포넌트. **WorkspaceNav 가장 하단 — `+ New Workspace` 버튼 위쪽**에 배치.
+
+**디자인 참조**: `design.pen` 노드 `4qEgJ`
+
+**가시성**:
+- `updateInfo.hasUpdate === false` → 컴포넌트 완전히 숨김 (`return null`), nav 하단 공간 차지 안 함
+- `updateInfo.hasUpdate === true` → 슬라이드업 + 페이드인 (300ms ease-out)으로 등장
+
+**Expanded layout (220px wide)**:
+
+| Element | Spec |
+|---------|------|
+| Container | 220 × fit-content, padding 12px, gap 10px, horizontal flex, alignItems center, fill `var(--surface-sidebar)`, border-top 1px `var(--border)` |
+| 좌측 Info stack | vertical flex, gap 2px, fill_container width |
+| Line 1 (Label) | `⬆ Update available` — 9px JetBrains Mono uppercase 600, fill `var(--accent)` |
+| Line 2 (Version) | `v0.0.X` — 13px JetBrains Mono 700, fill `var(--text-primary)` |
+| 우측 Download Button | 28×28, fill `var(--accent)`, cornerRadius 4, justify+align center |
+| 버튼 안 ⬇ 아이콘 | 13px 700, fill `var(--terminal-bg)` (dark) / `#FFFFFF` (light) |
+
+**Collapsed layout (48px nav 폭)**:
+
+| Element | Spec |
+|---------|------|
+| Container | 48 × 48, justifyContent + alignItems center, fill `var(--surface-sidebar)` |
+| Button | 28×28 동일 사양 (라벨 없음) |
+| Tooltip | hover 시 `Update available — v0.0.X` (12px text-primary, surface-elevated bg) |
+
+**상태 전환**:
+
+| State | Trigger | UI |
+|-------|---------|-----|
+| `idle` | 기본 | 다운로드 버튼 활성, hover 시 `opacity: 0.85` |
+| `downloading` | 클릭 직후 | 버튼 비활성 + 11px `Downloading...` 텍스트 (label 영역 대체) |
+| `done` | DMG `~/Downloads`에 저장 + Finder reveal 완료 | 5초 후 알림 제거 또는 "Installed?" 확인 (선택) |
+| `error` | 다운로드 실패 | 토스트 + 컴포넌트는 `idle` 상태로 복귀 |
+
+**클릭 동작**:
+1. `setDownloading(true)` → 버튼 비활성, 라벨 변경
+2. `await window.aide.updater.download()` 호출
+3. Main process가 GitHub asset (`browser_download_url`)에서 DMG fetch
+4. `~/Downloads/AIDE-<tag>.dmg` 저장
+5. `shell.showItemInFolder(path)` → Finder가 다운로드 폴더 자동 오픈
+6. 성공/실패에 따라 `idle` 또는 `error` 상태로 복귀
+
+**애니메이션**:
+- 등장: `transform: translateY(8px) → 0` + `opacity: 0 → 1`, 300ms cubic-bezier(0.4, 0, 0.2, 1)
+- 다운로드 버튼 hover: `opacity` transition 150ms ease-out
+- 다운로드 버튼 active(pressed): `transform: scale(0.95)` 100ms
+
+**테마 색상 매핑**:
+
+| Token | Dark | Light |
+|-------|------|-------|
+| 컨테이너 bg | `#181A21` | `#EFEFEA` |
+| 라벨 색상 | `#10B981` | `#059669` |
+| 버전 색상 | `#E8E9ED` | `#0D0D0D` |
+| 버튼 bg | `#10B981` | `#059669` |
+| 버튼 ⬇ 아이콘 | `#0F1117` | `#FFFFFF` |
+
 ### 3.6 File Explorer (220px)
 
 | Element | Spec | 동작 |

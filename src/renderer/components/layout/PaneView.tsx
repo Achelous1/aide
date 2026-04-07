@@ -8,6 +8,7 @@ import { PluginView } from '../plugin/PluginView';
 import { EmptyState } from './EmptyState';
 import { useLayoutStore } from '../../stores/layout-store';
 import { useTerminalStore } from '../../stores/terminal-store';
+import * as xtermCache from '../../lib/xterm-cache';
 import type { Pane, TerminalTab } from '../../../types/ipc';
 
 const AGENT_COLORS: Record<string, string> = {
@@ -166,6 +167,7 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
     e.stopPropagation();
     if (tab.sessionId && tab.type !== 'plugin') {
       try { await window.aide.terminal.kill(tab.sessionId); } catch { /* ignore */ }
+      xtermCache.dispose(tab.sessionId);
     }
     removeTabFromPane(pane.id, tab.id);
     useTerminalStore.getState().removeTab(tab.id);

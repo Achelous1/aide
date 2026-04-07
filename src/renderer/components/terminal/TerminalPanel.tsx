@@ -1,10 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { Terminal } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
 import { useThemeStore } from '../../stores/theme-store';
+import * as xtermCache from '../../lib/xterm-cache';
 import '@xterm/xterm/css/xterm.css';
 
-const DARK_THEME = {
+export const DARK_THEME = {
   background: '#0F1117',
   foreground: '#CDD1E0',
   cursor: '#CDD1E0',
@@ -29,7 +28,7 @@ const DARK_THEME = {
   brightWhite: '#E8E9ED',
 };
 
-const LIGHT_THEME = {
+export const LIGHT_THEME = {
   background: '#FAFAF7',
   foreground: '#374151',
   cursor: '#374151',
@@ -54,117 +53,88 @@ const LIGHT_THEME = {
   brightWhite: '#FFFFFF',
 };
 
+function currentTheme() {
+  return useThemeStore.getState().theme === 'dark' ? DARK_THEME : LIGHT_THEME;
+}
+
 interface TerminalPanelProps {
   sessionId: string;
   visible?: boolean;
 }
 
 export function TerminalPanel({ sessionId, visible = true }: TerminalPanelProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const terminalRef = useRef<Terminal | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
-  const sessionIdRef = useRef<string>(sessionId);
+  const mountRef = useRef<HTMLDivElement>(null);
   const theme = useThemeStore((s) => s.theme);
 
-  // Keep sessionId ref in sync
+  // On mount: get-or-create the cached xterm, then attach it to our mount div.
+  // On unmount: detach only — do NOT dispose (xterm survives workspace switches).
   useEffect(() => {
-    sessionIdRef.current = sessionId;
-  }, [sessionId]);
-
-  // Initialize xterm + connect to pty session (deferred by one frame for layout)
-  useEffect(() => {
-    console.log('[TerminalPanel] init effect', { sessionId, hasContainer: !!containerRef.current });
-    if (!containerRef.current || !sessionId) return;
-    let cancelled = false;
+    if (!mountRef.current || !sessionId) return;
+    const parent = mountRef.current;
     let resizeObserver: ResizeObserver | null = null;
-    let inputDisposable: { dispose: () => void } | null = null;
-    let unsubscribe: (() => void) | null = null;
 
     const raf = requestAnimationFrame(() => {
-      if (cancelled || !containerRef.current) return;
+      // Ensure the xterm exists and is attached
+      xtermCache.getOrCreate(sessionId, currentTheme());
+      xtermCache.attach(sessionId, parent);
 
-      const terminal = new Terminal({
-        theme: useThemeStore.getState().theme === 'dark' ? DARK_THEME : LIGHT_THEME,
-        fontFamily: "'JetBrains Mono', 'IBM Plex Mono', Menlo, Monaco, monospace",
-        fontSize: 13,
-        cursorBlink: true,
-        cursorStyle: 'block',
-        allowTransparency: false,
-      });
+      // Initial PTY resize after attach
+      const fitAddon = xtermCache.getFitAddon(sessionId);
+      if (fitAddon) {
+        try { fitAddon.fit(); } catch { /* ignore */ }
+      }
+      const dims = xtermCache.getDimensions(sessionId);
+      if (dims) {
+        window.aide.terminal.resize(sessionId, dims.cols, dims.rows);
+      }
 
-      const fitAddon = new FitAddon();
-      terminal.loadAddon(fitAddon);
-      terminal.open(containerRef.current);
-      fitAddon.fit();
-
-      terminalRef.current = terminal;
-      fitAddonRef.current = fitAddon;
-
-      console.log('[TerminalPanel] xterm opened', { sessionId: sessionIdRef.current, cols: terminal.cols, rows: terminal.rows, containerW: containerRef.current?.offsetWidth, containerH: containerRef.current?.offsetHeight });
-
-      // Connect pty input/output immediately after xterm is ready
-      inputDisposable = terminal.onData((data) => {
-        window.aide.terminal.write(sessionIdRef.current, data);
-      });
-      unsubscribe = window.aide.terminal.onData((incomingSessionId, data) => {
-        if (incomingSessionId === sessionIdRef.current) {
-          terminal.write(data);
-        }
-      });
-
-      // Resize pty to match terminal dimensions
-      window.aide.terminal.resize(sessionIdRef.current, terminal.cols, terminal.rows);
-
+      // ResizeObserver to refit when the container resizes (split pane drags)
       resizeObserver = new ResizeObserver((entries) => {
         const entry = entries[0];
-        if (!entry || !fitAddonRef.current || !terminalRef.current) return;
+        if (!entry) return;
         const { width, height } = entry.contentRect;
         if (width === 0 || height === 0) return;
-        fitAddonRef.current.fit();
-        const sid = sessionIdRef.current;
-        if (sid) {
-          window.aide.terminal.resize(sid, terminalRef.current.cols, terminalRef.current.rows);
+        const fitAddon = xtermCache.getFitAddon(sessionId);
+        if (!fitAddon) return;
+        try { fitAddon.fit(); } catch { /* ignore */ }
+        const dims = xtermCache.getDimensions(sessionId);
+        if (dims) {
+          window.aide.terminal.resize(sessionId, dims.cols, dims.rows);
         }
       });
-      resizeObserver.observe(containerRef.current);
+      resizeObserver.observe(parent);
     });
 
     return () => {
-      cancelled = true;
       cancelAnimationFrame(raf);
       resizeObserver?.disconnect();
-      inputDisposable?.dispose();
-      unsubscribe?.();
-      if (terminalRef.current) {
-        terminalRef.current.dispose();
-        terminalRef.current = null;
-        fitAddonRef.current = null;
-      }
+      xtermCache.detach(sessionId);
     };
   }, [sessionId]);
 
-  // Update terminal theme when app theme changes
+  // Update theme on this cached xterm when app theme changes
   useEffect(() => {
-    if (!terminalRef.current) return;
-    terminalRef.current.options.theme = theme === 'dark' ? DARK_THEME : LIGHT_THEME;
-  }, [theme]);
+    xtermCache.setTheme(sessionId, theme === 'dark' ? DARK_THEME : LIGHT_THEME);
+  }, [theme, sessionId]);
 
   // Re-fit when tab becomes visible (display: none → block)
   useEffect(() => {
-    if (!visible || !fitAddonRef.current || !terminalRef.current) return;
+    if (!visible) return;
     const timer = setTimeout(() => {
-      fitAddonRef.current?.fit();
-      const sid = sessionIdRef.current;
-      if (sid && terminalRef.current) {
-        window.aide.terminal.resize(sid, terminalRef.current.cols, terminalRef.current.rows);
+      const fitAddon = xtermCache.getFitAddon(sessionId);
+      if (!fitAddon) return;
+      try { fitAddon.fit(); } catch { /* ignore */ }
+      const dims = xtermCache.getDimensions(sessionId);
+      if (dims) {
+        window.aide.terminal.resize(sessionId, dims.cols, dims.rows);
       }
     }, 50);
     return () => clearTimeout(timer);
-  }, [visible]);
+  }, [visible, sessionId]);
 
   return (
     <div
-      ref={containerRef}
+      ref={mountRef}
       className="w-full h-full"
     />
   );
