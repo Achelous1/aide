@@ -20541,6 +20541,360 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "4qEgJ",
+      "x": 0,
+      "y": 8300,
+      "name": "AIDE — Auto-Update Notice (F7)",
+      "width": 700,
+      "height": 780,
+      "fill": "$--surface",
+      "layout": "vertical",
+      "gap": 20,
+      "padding": 32,
+      "children": [
+        {
+          "type": "text",
+          "id": "GTooD",
+          "name": "title",
+          "fill": "$--text-primary",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "AIDE — Auto-Update Notice (F7)",
+          "fontFamily": "$--font-mono",
+          "fontSize": 18,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "5RmKI",
+          "name": "subtitle",
+          "fill": "$--text-tertiary",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "Bottom slot of WorkspaceNav. Visible only when latestTag > currentVersion.",
+          "fontFamily": "$--font-mono",
+          "fontSize": 11,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "i0ukP",
+          "name": "Row1 — Expanded states",
+          "width": "fill_container",
+          "gap": 24,
+          "children": [
+            {
+              "type": "frame",
+              "id": "veY0d",
+              "name": "Dark column",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "qHAau",
+                  "name": "darkLabel",
+                  "fill": "$--text-tertiary",
+                  "content": "DARK — Update available",
+                  "fontFamily": "$--font-mono",
+                  "fontSize": 9,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "jDYwY",
+                  "name": "Dark nav bottom slot",
+                  "width": 220,
+                  "fill": "#181A21",
+                  "gap": 10,
+                  "padding": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "xrxkK",
+                      "name": "darkInfo",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "mLJ33",
+                          "name": "darkLabelText",
+                          "fill": "#10B981",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "⬆ Update available",
+                          "fontFamily": "$--font-mono",
+                          "fontSize": 9,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "eUXdc",
+                          "name": "darkVerText",
+                          "fill": "#E8E9ED",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "v0.0.2",
+                          "fontFamily": "$--font-mono",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "lu9Re",
+                      "name": "download button",
+                      "width": 28,
+                      "height": 28,
+                      "fill": "#10B981",
+                      "cornerRadius": 4,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "PviNd",
+                          "name": "darkBtnIcon",
+                          "fill": "#0F1117",
+                          "content": "⬇",
+                          "fontFamily": "$--font-mono",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "wNTb5",
+              "name": "Light column",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "c14KJ",
+                  "name": "lightLabel",
+                  "fill": "#6B7280",
+                  "content": "LIGHT — Update available",
+                  "fontFamily": "$--font-mono",
+                  "fontSize": 9,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "fTPBg",
+                  "name": "Light nav bottom slot",
+                  "width": 220,
+                  "fill": "#EFEFEA",
+                  "gap": 10,
+                  "padding": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "T2qIA",
+                      "name": "lightInfo",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Oi5Ks",
+                          "name": "lightLabelText",
+                          "fill": "#059669",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "⬆ Update available",
+                          "fontFamily": "$--font-mono",
+                          "fontSize": 9,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "3cujF",
+                          "name": "lightVerText",
+                          "fill": "#0D0D0D",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "v0.0.2",
+                          "fontFamily": "$--font-mono",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "gmKuD",
+                      "name": "download button",
+                      "width": 28,
+                      "height": 28,
+                      "fill": "#059669",
+                      "cornerRadius": 4,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "2yNtT",
+                          "name": "lightBtnIcon",
+                          "fill": "#FFFFFF",
+                          "content": "⬇",
+                          "fontFamily": "$--font-mono",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "BcgT7",
+          "name": "Row2 — Collapsed and Hidden states",
+          "width": "fill_container",
+          "gap": 24,
+          "children": [
+            {
+              "type": "frame",
+              "id": "92Z6Z",
+              "name": "Collapsed column",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "OrhMu",
+                  "name": "collapsedLabel",
+                  "fill": "#5C5E6A",
+                  "content": "COLLAPSED — Badge on icon",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 9,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "mK175",
+                  "name": "Collapsed nav bottom slot",
+                  "width": 48,
+                  "height": 48,
+                  "fill": "#181A21",
+                  "padding": 10,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "KeeV6",
+                      "name": "icon button with badge",
+                      "width": 28,
+                      "height": 28,
+                      "fill": "#10B981",
+                      "cornerRadius": 6,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ua0uN",
+                          "name": "collapsedIcon",
+                          "fill": "#0F1117",
+                          "content": "⬇",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "49WId",
+              "name": "Hidden column",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ptSXS",
+                  "name": "hiddenLabel",
+                  "fill": "#5C5E6A",
+                  "content": "NO UPDATE — Component hidden, zero space",
+                  "fontFamily": "JetBrains Mono",
+                  "fontSize": 9,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "dnBmm",
+                  "name": "Nav with no notice",
+                  "width": 220,
+                  "height": 32,
+                  "fill": "#181A21",
+                  "padding": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "gmf4a",
+                      "name": "hiddenText",
+                      "fill": "#5C5E6A",
+                      "content": "+ New Workspace",
+                      "fontFamily": "JetBrains Mono",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "nMIK2",
+          "name": "specHeader",
+          "fill": "#8B8D98",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "SPEC",
+          "fontFamily": "JetBrains Mono",
+          "fontSize": 11,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "Zpw3b",
+          "name": "specBody",
+          "fill": "#E8E9ED",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "Position: WorkspaceNav bottom slot, above the New Workspace button.\nVisibility: hidden when no update; appears when latestTag > currentVersion.\nPolling: 5s after launch, then every 60 min via GitHub Releases API.\n\nExpanded layout (220 wide, 12px padding, 10px gap):\n  Two-line text stack on left + 28x28 button on right.\n  Line 1 — '⬆ Update available' (9px font-mono uppercase, accent color).\n  Line 2 — tag name 'v0.0.X' (13px bold, text-primary).\n  Button — accent green bg, ⬇ icon, 4px radius. Hover: opacity 0.85.\n\nCollapsed layout (48px wide):\n  Single 28x28 button with the same accent + ⬇ icon. No text label.\n  Optional amber dot badge top-right (planned for v0.0.3).\n\nClick action: main process downloads DMG to ~/Downloads → reveals in Finder.\nFallback: if no DMG asset, opens the GitHub release page in default browser.\n\nAnimation: slide-up + fade on first appearance (300ms ease-out).",
+          "lineHeight": 1.6,
+          "fontFamily": "JetBrains Mono",
+          "fontSize": 10,
+          "fontWeight": "normal"
+        }
+      ]
     }
   ],
   "themes": {
