@@ -89,11 +89,12 @@ export class PluginRegistry {
     return true;
   }
 
-  list(): Array<PluginSpec & { active: boolean; scope: 'local' | 'global' }> {
+  list(): Array<PluginSpec & { active: boolean; scope: 'local' | 'global'; pluginDir: string }> {
     return Array.from(this.plugins.values()).map((p) => ({
       ...p.spec,
       active: p.active,
       scope: p.scope,
+      pluginDir: p.pluginDir,
     }));
   }
 
