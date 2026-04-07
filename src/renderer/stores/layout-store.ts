@@ -138,6 +138,10 @@ interface LayoutState {
   saveWorkspaceLayout: (workspaceId: string) => void;
   restoreWorkspaceLayout: (workspaceId: string) => void;
 
+  // In-memory layout cache for instant workspace switching
+  saveLayoutToCache: (workspaceId: string) => void;
+  loadLayoutFromCache: (workspaceId: string) => boolean;
+
   // Session save/restore (persistent via electron-store)
   saveSession: (workspaceId: string) => Promise<void>;
   buildSavedSession: (workspaceId: string) => SavedSession;
@@ -508,6 +512,18 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       const pane = createPane();
       set({ layout: pane, focusedPaneId: pane.id });
     }
+  },
+
+  saveLayoutToCache: (workspaceId) => {
+    const { layout, focusedPaneId } = get();
+    workspaceLayouts.set(workspaceId, { layout: cloneNode(layout), focusedPaneId });
+  },
+
+  loadLayoutFromCache: (workspaceId) => {
+    const cached = workspaceLayouts.get(workspaceId);
+    if (!cached) return false;
+    set({ layout: cloneNode(cached.layout), focusedPaneId: cached.focusedPaneId });
+    return true;
   },
 
   saveSession: async (workspaceId) => {
