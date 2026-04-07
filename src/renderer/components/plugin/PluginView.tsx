@@ -46,6 +46,17 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
     return () => window.removeEventListener('message', handler);
   }, []);
 
+  // Forward data-changed events to plugin iframe so it can refresh
+  useEffect(() => {
+    const unsub = window.aide.plugin.onDataChanged(() => {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'aide:file-event', event: 'data:changed' },
+        '*'
+      );
+    });
+    return unsub;
+  }, []);
+
   // Send theme to iframe when it loads or theme changes
   const sendTheme = useCallback(() => {
     const isDark = !document.documentElement.classList.contains('light');

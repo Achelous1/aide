@@ -121,6 +121,11 @@ const aideAPI: AideAPI = {
       ipcRenderer.on(IPC_CHANNELS.PLUGINS_CHANGED, listener);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.PLUGINS_CHANGED, listener);
     },
+    onDataChanged: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on(IPC_CHANNELS.PLUGIN_DATA_CHANGED, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.PLUGIN_DATA_CHANGED, listener);
+    },
   },
 
   mcp: {

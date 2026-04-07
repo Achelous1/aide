@@ -149,6 +149,29 @@ export function writeMcpConfig(workspacePath: string): string {
 
   const mcpConfigPath = getMcpConfigPath();
   fs.writeFileSync(mcpConfigPath, JSON.stringify(config, null, 2));
+
+  // Write project-level .mcp.json at workspace root so Claude Code CLI auto-detects
+  // workspace-specific env vars (AIDE_WORKSPACE, AIDE_PLUGINS_DIR) when running in the project.
+  try {
+    const projectMcpPath = path.join(workspacePath, '.mcp.json');
+    const projectConfig = {
+      mcpServers: {
+        aide: {
+          command: nodePath,
+          args: [serverPath],
+          env: {
+            AIDE_GLOBAL_PLUGINS_DIR: globalPluginsDir,
+            AIDE_PLUGINS_DIR: localPluginsDir,
+            AIDE_WORKSPACE: workspacePath,
+          },
+        },
+      },
+    };
+    fs.writeFileSync(projectMcpPath, JSON.stringify(projectConfig, null, 2));
+  } catch (err) {
+    console.warn('[AIDE] Failed to write project .mcp.json:', (err as Error).message);
+  }
+
   return mcpConfigPath;
 }
 

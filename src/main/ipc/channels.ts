@@ -36,6 +36,7 @@ export const IPC_CHANNELS = {
   PLUGIN_INVOKE: 'plugin:invoke',
   PLUGIN_GET_HTML: 'plugin:get-html',
   PLUGINS_CHANGED: 'plugins:changed',
+  PLUGIN_DATA_CHANGED: 'plugin:data-changed',
 
   // Settings
   SETTINGS_READ: 'settings:read',

@@ -100,3 +100,4 @@ playwright-report/
 # claude-mem auto-generated context files
 CLAUDE.md
 .aide/
+.mcp.json

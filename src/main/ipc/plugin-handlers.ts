@@ -43,6 +43,25 @@ function loadDirIntoRegistry(dir: string, scope: 'local' | 'global'): void {
   }
 }
 
+/**
+ * Rescan a plugin directory and register any plugins found on disk that
+ * aren't already in the registry.
+ *
+ * On develop, `loadRegistryFromDisk` only runs once at startup and the
+ * chokidar 'all' handler only broadcasts without updating the registry.
+ * Result: global plugins added after startup were invisible inside a
+ * workspace because `PLUGIN_LIST` → `refreshLocalPlugins` only touches
+ * the local scope.
+ *
+ * This helper is called from `PLUGIN_LIST` for both scopes, guaranteeing
+ * the registry is in sync with disk on every list query. Deletions are
+ * still handled by chokidar's unlink events and the explicit PLUGIN_DELETE
+ * IPC handler, so we only need to cover the add-after-startup case here.
+ */
+function rescanPluginsDir(dir: string, scope: 'local' | 'global'): void {
+  loadDirIntoRegistry(dir, scope);
+}
+
 function ensurePluginsDirs(cwd: string): void {
   try {
     const globalDir = getGlobalPluginsDir();
@@ -73,6 +92,13 @@ function broadcastPluginsChanged(): void {
 
 let localPluginsWatcher: ReturnType<typeof chokidar.watch> | null = null;
 let lastLocalDir: string | null = null;
+let dataWatcher: ReturnType<typeof chokidar.watch> | null = null;
+
+function broadcastDataChanged(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(IPC_CHANNELS.PLUGIN_DATA_CHANGED);
+  }
+}
 
 // Clears local plugins and reloads from the new workspace directory.
 // No-op if the workspace hasn't changed.
@@ -88,6 +114,16 @@ function refreshLocalPlugins(cwd: string): void {
   localPluginsWatcher = chokidar
     .watch(localDir, { ignoreInitial: true, depth: 2, ignored: /\/dev\/fd\// })
     .on('all', broadcastPluginsChanged);
+  // Re-watch .aide/ data files so MCP-triggered writes refresh the UI
+  dataWatcher?.close();
+  const aideDir = path.join(cwd, '.aide');
+  dataWatcher = chokidar
+    .watch(aideDir, { ignoreInitial: true, depth: 0, ignored: /\/dev\/fd\// })
+    .on('change', (filePath: string) => {
+      if (filePath.endsWith('.json') && !filePath.endsWith('settings.json')) {
+        broadcastDataChanged();
+      }
+    });
 }
 
 function makeEmitterFactory(getCwd: () => string) {
@@ -119,11 +155,17 @@ function makeEmitterFactory(getCwd: () => string) {
 export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
   loadRegistryFromDisk(cwd);
   registry.setEmitterFactory(makeEmitterFactory(getEffectiveCwd.bind(null, cwd)));
-  // Watch global plugins dir for changes
+  // Broadcast existing plugins immediately so the UI shows them on launch
+  broadcastPluginsChanged();
+  // Watch global plugins dir for changes — rescan into registry before
+  // broadcasting so the UI's subsequent list() call sees new plugins.
   const globalDir = getGlobalPluginsDir();
   chokidar
     .watch(globalDir, { ignoreInitial: true, depth: 2, ignored: /\/dev\/fd\// })
-    .on('all', broadcastPluginsChanged);
+    .on('all', () => {
+      rescanPluginsDir(globalDir, 'global');
+      broadcastPluginsChanged();
+    });
 
   // Spec-only: generate and return spec without writing to disk
   ipcMain.handle(IPC_CHANNELS.PLUGIN_GENERATE_SPEC, async (_event, name: string, description: string) => {
@@ -154,6 +196,11 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
     const effectiveCwd = getEffectiveCwd(cwd);
     // Clears stale local plugins when workspace changes, then reloads from current workspace
     refreshLocalPlugins(effectiveCwd);
+    // Self-healing: rescan both scopes so plugins added at runtime (e.g. global
+    // plugins installed via MCP or a file manager after startup) become visible
+    // without restarting the app.
+    rescanPluginsDir(getGlobalPluginsDir(), 'global');
+    rescanPluginsDir(getLocalPluginsDir(effectiveCwd), 'local');
     return registry.list();
   });
 
@@ -170,7 +217,9 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
 
   ipcMain.handle(IPC_CHANNELS.PLUGIN_INVOKE, async (_event, pluginId: string, toolName: string, args: Record<string, unknown>) => {
     const effectiveCwd = getEffectiveCwd(cwd);
-    return registry.invokeTool(pluginId, toolName, args, effectiveCwd);
+    const result = registry.invokeTool(pluginId, toolName, args, effectiveCwd);
+    broadcastDataChanged();
+    return result;
   });
 
   ipcMain.handle(IPC_CHANNELS.MCP_STATUS, async () => {
