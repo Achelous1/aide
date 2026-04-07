@@ -370,6 +370,83 @@ interface GitHubService {
 
 Git 작업은 에이전트를 통한 자연어 실행도 가능하고, UI 버튼으로 직접 실행도 가능.
 
+### 6. Auto-Updater (Main Process)
+
+GitHub Releases 기반 업데이트 체크 및 DMG 다운로드 모듈. **PRD F7 참조**.
+
+```typescript
+// src/main/updater/check.ts
+interface UpdateInfo {
+  latestTag: string;          // "v0.0.2"
+  currentVersion: string;     // app.getVersion(), e.g. "0.0.1"
+  hasUpdate: boolean;
+  downloadUrl: string | null; // first .dmg asset URL from the release
+  releaseName: string | null;
+  htmlUrl: string | null;     // release page URL (fallback)
+}
+
+interface UpdaterModule {
+  checkForUpdate(): Promise<UpdateInfo | null>;
+  getCachedUpdateInfo(): UpdateInfo | null;
+  downloadUpdate(): Promise<{ ok: boolean; path?: string; error?: string }>;
+  startUpdatePolling(): void;
+  stopUpdatePolling(): void;
+}
+```
+
+**구현 핵심**:
+
+| 항목 | 결정 |
+|------|------|
+| HTTP 클라이언트 | `electron.net.fetch` (system proxy 자동 사용) |
+| API 엔드포인트 | `https://api.github.com/repos/Achelous1/aide/releases/latest` |
+| 폴링 주기 | 시작 5초 후 1회 + 60분 간격 (`setInterval`) |
+| 캐시 | 메모리 변수 (`cachedInfo: UpdateInfo \| null`) — 디스크 영속화 불필요 |
+| 동시 다운로드 차단 | 모듈 레벨 `downloading: boolean` 플래그 |
+| Draft/Prerelease 처리 | `release.draft \|\| release.prerelease` 면 캐시 유지 + 무시 |
+| 버전 비교 | `parseVersion()`이 leading `v` 제거 후 점 분리, 숫자 배열 사전순 비교 |
+| Atomic write | 불필요 — `~/Downloads`는 사용자 영역, 부분 쓰기 위험 낮음 |
+| Reveal | `shell.showItemInFolder(targetPath)` |
+| Fallback | DMG asset 없거나 실패 시 `shell.openExternal(release.html_url)` |
+
+**IPC 채널**:
+
+| 채널 | 방향 | 페이로드 | 응답 |
+|------|------|---------|------|
+| `updater:check` | Renderer → Main | — | `Promise<UpdateInfo \| null>` |
+| `updater:get-info` | Renderer → Main | — | 캐시된 `UpdateInfo \| null` (네트워크 호출 없음) |
+| `updater:download` | Renderer → Main | — | `Promise<{ok, path?, error?}>` |
+| `updater:info-changed` | Main → Renderer | `UpdateInfo \| null` | 캐시 변경 시 푸시 |
+
+**렌더러 컴포넌트** (`src/renderer/components/updater/UpdateNotice.tsx`):
+
+```tsx
+function UpdateNotice() {
+  const [info, setInfo] = useState<UpdateInfo | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  useEffect(() => {
+    // 1. Pull cached state on mount (sync, no network)
+    window.aide.updater.getInfo().then(setInfo);
+    // 2. Subscribe to updates pushed from main
+    return window.aide.updater.onChanged(setInfo);
+  }, []);
+
+  if (!info?.hasUpdate) return null;
+  // ... render the notice (see UI-SPEC.md)
+}
+```
+
+**Lifecycle**:
+- App `ready` → `startUpdatePolling()` 호출 (`main/index.ts`)
+- App `before-quit` → `stopUpdatePolling()` (interval clear)
+- 첫 체크는 5초 지연으로 창이 먼저 그려지도록 보장
+
+**보안 고려**:
+- GitHub API 호출에 인증 없음 (rate limit 60/h, 폴링 60분이라 충분)
+- 다운로드 URL은 오직 `assets.browser_download_url`만 사용 (사용자 입력 신뢰 X)
+- 다운로드 후 `~/Downloads/AIDE-<tag>.dmg`로 저장 — 워크스페이스 외부
+
 ---
 
 ## IPC Communication

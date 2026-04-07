@@ -247,3 +247,20 @@ button:focus-visible .drag-handle-icon {
 .resize-divider--active .resize-divider__icon {
   opacity: 1;
 }
+
+/* ============================================================
+ * Update notice — slide-up + fade entrance
+ * ============================================================ */
+@keyframes update-notice-enter {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.update-notice-enter {
+  animation: update-notice-enter 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}

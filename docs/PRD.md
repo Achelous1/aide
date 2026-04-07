@@ -353,6 +353,81 @@ interface SavedSession {
 
 **구현**: electron-store 백엔드 (`aide-sessions`), IPC 채널 `session:save`/`session:load`, preload bridge `window.aide.session`, layout-store `saveSession()`/`restoreSession()`
 
+### F7. Auto-Update Check & Download
+
+GitHub Releases 기반 자동 업데이트 알림. 현재 실행 중인 버전과 최신 릴리즈 태그를 비교하여 워크스페이스 nav 하단에 업데이트 알림을 노출하고, 클릭 시 DMG를 자동으로 다운로드합니다.
+
+**핵심 사용자 흐름**:
+1. 앱이 백그라운드에서 GitHub Releases API 폴링
+2. 새 버전 발견 시 워크스페이스 nav 하단에 "Update available" 알림 + 버전 태그 + ⬇ 다운로드 버튼 표시
+3. 사용자가 다운로드 버튼 클릭 → DMG가 `~/Downloads`로 다운로드 → Finder에서 자동으로 열림
+4. 사용자가 DMG에서 AIDE.app을 Applications로 드래그하여 설치
+
+**폴링 정책**:
+- 앱 시작 5초 후 최초 1회 체크 (창이 먼저 그려지도록)
+- 이후 60분마다 백그라운드 폴링
+- GitHub API rate limit (60/h unauthenticated) 충분
+- draft / prerelease는 무시
+
+**버전 비교 로직**:
+- `app.getVersion()`으로 현재 버전 가져옴 (예: `0.0.1`)
+- 릴리즈 `tag_name`에서 leading `v` 제거 (예: `v0.0.2` → `0.0.2`)
+- 점으로 분리해 숫자 배열로 변환 후 사전순 비교
+- semver prerelease 표기는 v0.0.x에서는 미지원
+
+**UI 사양** (디자인: design.pen `4qEgJ`):
+
+| 상태 | 표시 |
+|--------|------|
+| 업데이트 없음 | 컴포넌트 완전히 숨김. nav 하단 공간 차지 안 함 |
+| 업데이트 있음 (Expanded nav) | 220×fit-content 박스: 좌측 2줄 텍스트(`⬆ Update available` + `v0.0.X`) + 우측 28×28 다운로드 버튼 |
+| 업데이트 있음 (Collapsed nav) | 48×48 슬롯에 28×28 accent 색상 ⬇ 버튼 |
+| 다운로드 진행 중 | 버튼 비활성화, "Downloading..." 텍스트 |
+| 다운로드 완료 | Finder reveal 후 알림 자동 제거 또는 "Installed?" 확인 |
+
+**색상**: accent 그린 (`var(--accent)` — dark `#10B981` / light `#059669`). 버튼 안 ⬇ 아이콘은 dark에서는 검정, light에서는 흰색.
+
+**위치**: WorkspaceNav 컴포넌트의 "+ New Workspace" 버튼 **위쪽**에 배치. nav가 collapsed 모드일 때는 해당 영역의 마지막 슬롯.
+
+**다운로드 동작**:
+1. GitHub Release의 assets에서 `*.dmg`로 끝나는 파일 찾기
+2. `electron.net.fetch`로 다운로드
+3. `~/Downloads/AIDE-v0.0.X.dmg`에 저장 (atomic write 불필요 — Downloads는 사용자 영역)
+4. `shell.showItemInFolder(path)`로 Finder에서 열기
+5. 실패 시 fallback: `shell.openExternal(release.html_url)`로 릴리즈 페이지 열기
+
+**엣지 케이스**:
+
+| 케이스 | 처리 |
+|--------|------|
+| 네트워크 없음 | 조용히 무시. 다음 폴링까지 대기 |
+| GitHub API 5xx | 캐시된 마지막 정보 유지. 알림 변화 없음 |
+| DMG asset 없음 | 다운로드 버튼 클릭 시 GitHub release 페이지 브라우저 오픈 |
+| 다운로드 실패 | 에러 토스트 + 릴리즈 페이지 fallback |
+| 동시 다운로드 요청 | 첫 번째만 처리, 추가 클릭 무시 |
+| draft/prerelease만 있음 | hasUpdate=false, 알림 표시 안 함 |
+
+**스코프 제외 (Post-v0.0.x)**:
+- 인플레이스 .app 교체 (Squirrel.Mac 자동 업데이트) — 코드 사이닝 필요
+- 백그라운드 다운로드 진행률 표시
+- 변경 로그 표시
+- "나중에 알림" 옵션
+- Windows/Linux 자동 업데이트
+
+**데이터 스키마**:
+```typescript
+interface UpdateInfo {
+  latestTag: string;        // "v0.0.2"
+  currentVersion: string;   // "0.0.1"
+  hasUpdate: boolean;
+  downloadUrl: string | null;  // GitHub asset URL
+  releaseName: string | null;
+  htmlUrl: string | null;   // release page (fallback)
+}
+```
+
+**구현 모듈**: `src/main/updater/check.ts`, IPC 채널 `updater:check`/`updater:download`/`updater:info-changed`/`updater:get-info`, preload bridge `window.aide.updater`, 렌더러 컴포넌트 `UpdateNotice.tsx` (WorkspaceNav 통합).
+
 ### Out of Scope (Post-MVP)
 - 커뮤니티 플러그인 허브 (아래 Post-MVP 로드맵 참조)
 - 코드 에디터 (Monaco 등) 내장

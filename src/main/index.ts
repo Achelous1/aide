@@ -12,6 +12,8 @@ import { registerGithubHandlers } from './ipc/github-handlers';
 import { registerPluginHandlers } from './ipc/plugin-handlers';
 import { registerSettingsHandlers } from './ipc/settings-handlers';
 import { registerSessionHandlers } from './ipc/session-handlers';
+import { registerUpdaterHandlers } from './ipc/updater-handlers';
+import { startUpdatePolling } from './updater/check';
 import { killAllSessions } from './ipc/terminal-handlers';
 import { writeMcpConfig } from './mcp/config-writer';
 import { registerCustomSchemes, registerPluginProtocol } from './plugin/protocol';
@@ -94,7 +96,9 @@ app.on('ready', () => {
   registerSessionHandlers(ipcMain);
   registerPluginProtocol(process.cwd());
   registerCdnProtocol();
+  registerUpdaterHandlers(ipcMain);
   createWindow();
+  startUpdatePolling();
   // MCP setup runs after window creation — failures must not prevent the app from opening
   try {
     const mcpHome = (process.env.HOME && process.env.HOME !== '/') ? process.env.HOME : userInfo().homedir;

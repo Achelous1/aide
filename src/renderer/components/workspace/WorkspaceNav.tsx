@@ -5,6 +5,7 @@ import { useTerminalStore } from '../../stores/terminal-store';
 import { useLayoutStore } from '../../stores/layout-store';
 import { isSplitLayout, type AgentStatus, type LayoutNode, type TerminalTab } from '../../../types/ipc';
 import { StatusDot, StatusBadge } from './StatusIndicator';
+import { UpdateNotice } from '../updater/UpdateNotice';
 
 /** Recursively collect all tabs from a layout tree (source of truth for visible tabs). */
 function collectPaneTabs(node: LayoutNode): TerminalTab[] {
@@ -206,6 +207,8 @@ export function WorkspaceNav() {
           })}
         </div>
 
+        <UpdateNotice />
+
         {/* Add button */}
         <div className="px-2 mt-2">
           <button
@@ -260,6 +263,8 @@ export function WorkspaceNav() {
       })}
 
       <div className="w-6 border-t border-aide-border my-1" />
+
+      <UpdateNotice collapsed />
 
       <button
         onClick={handleAddWorkspace}
