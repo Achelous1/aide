@@ -47,6 +47,17 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
     return () => window.removeEventListener('message', handler);
   }, []);
 
+  // Forward data-changed events to plugin iframe so it can refresh
+  useEffect(() => {
+    const unsub = window.aide.plugin.onDataChanged(() => {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'aide:file-event', event: 'data:changed' },
+        '*'
+      );
+    });
+    return unsub;
+  }, []);
+
   // Reload iframe when its index.html changes on disk
   useEffect(() => {
     const unsub = window.aide.plugin.onHtmlChanged((changedName: string) => {

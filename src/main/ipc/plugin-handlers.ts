@@ -44,11 +44,14 @@ function loadDirIntoRegistry(dir: string, scope: 'local' | 'global'): void {
 }
 
 /**
- * Incremental rescan — called from chokidar events. Registers newly added
- * plugins and unregisters plugins whose directory no longer exists. Unlike
- * refreshLocalPlugins, this runs even when the workspace path hasn't changed,
- * so plugins created at runtime (e.g. via MCP aide_create_plugin) are picked
- * up without restarting the app.
+ * Incremental rescan — called from chokidar events AND from PLUGIN_LIST.
+ * Registers newly added plugins and unregisters plugins whose spec has
+ * disappeared. Unlike refreshLocalPlugins, this runs even when the workspace
+ * path hasn't changed, so plugins created at runtime (e.g. via MCP
+ * aide_create_plugin) are picked up without restarting the app.
+ *
+ * Self-healing: PLUGIN_LIST calls this for BOTH scopes so global plugins
+ * added after startup become visible inside a workspace without restart.
  */
 function rescanPluginsDir(dir: string, scope: 'local' | 'global'): void {
   // 1. Register any new plugins found on disk
@@ -103,7 +106,14 @@ function broadcastHtmlChanged(pluginName: string): void {
 let localPluginsWatcher: ReturnType<typeof chokidar.watch> | null = null;
 let localHtmlWatcher: ReturnType<typeof chokidar.watch> | null = null;
 let lastLocalDir: string | null = null;
+let dataWatcher: ReturnType<typeof chokidar.watch> | null = null;
 const localHtmlDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function broadcastDataChanged(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(IPC_CHANNELS.PLUGIN_DATA_CHANGED);
+  }
+}
 
 // Clears local plugins and reloads from the new workspace directory.
 // No-op if the workspace hasn't changed.
@@ -137,6 +147,16 @@ function refreshLocalPlugins(cwd: string): void {
         localHtmlDebounceTimers.delete(pluginName);
         broadcastHtmlChanged(pluginName);
       }, 300));
+    });
+  // Re-watch .aide/ data files so MCP-triggered writes refresh the UI
+  dataWatcher?.close();
+  const aideDir = path.join(cwd, '.aide');
+  dataWatcher = chokidar
+    .watch(aideDir, { ignoreInitial: true, depth: 0, ignored: /\/dev\/fd\// })
+    .on('change', (filePath: string) => {
+      if (filePath.endsWith('.json') && !filePath.endsWith('settings.json')) {
+        broadcastDataChanged();
+      }
     });
 }
 
@@ -226,6 +246,11 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
     const effectiveCwd = getEffectiveCwd(cwd);
     // Clears stale local plugins when workspace changes, then reloads from current workspace
     refreshLocalPlugins(effectiveCwd);
+    // Self-healing: rescan both scopes so plugins added at runtime (e.g. global
+    // plugins installed via MCP or a file manager after startup) become visible
+    // without restarting the app.
+    rescanPluginsDir(getGlobalPluginsDir(), 'global');
+    rescanPluginsDir(getLocalPluginsDir(effectiveCwd), 'local');
     return registry.list();
   });
 
@@ -242,7 +267,9 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
 
   ipcMain.handle(IPC_CHANNELS.PLUGIN_INVOKE, async (_event, pluginId: string, toolName: string, args: Record<string, unknown>) => {
     const effectiveCwd = getEffectiveCwd(cwd);
-    return registry.invokeTool(pluginId, toolName, args, effectiveCwd);
+    const result = registry.invokeTool(pluginId, toolName, args, effectiveCwd);
+    broadcastDataChanged();
+    return result;
   });
 
   ipcMain.handle(IPC_CHANNELS.MCP_STATUS, async () => {

@@ -4,6 +4,7 @@ import nodePath from 'path';
 import Store from 'electron-store';
 import { IPC_CHANNELS } from './channels';
 import type { WorkspaceInfo } from '../../types/ipc';
+import { writeMcpConfig } from '../mcp/config-writer';
 
 const store = new Store({ name: 'aide-workspaces' });
 
@@ -69,6 +70,9 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
     if (!fs.existsSync(aideDirPath)) {
       fs.mkdirSync(aideDirPath, { recursive: true });
     }
+    try { writeMcpConfig(path); } catch (err) {
+      console.warn('[AIDE] Failed to write workspace MCP config:', (err as Error).message);
+    }
     return workspace;
   });
 
@@ -83,6 +87,9 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
     const aideDirPath = nodePath.join(path, '.aide', 'plugins');
     if (!fs.existsSync(aideDirPath)) {
       fs.mkdirSync(aideDirPath, { recursive: true });
+    }
+    try { writeMcpConfig(path); } catch (err) {
+      console.warn('[AIDE] Failed to write workspace MCP config:', (err as Error).message);
     }
     return activeWorkspacePath;
   });
@@ -129,6 +136,9 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
     const workspaces = getWorkspaces();
     workspaces.push(workspace);
     setWorkspaces(workspaces);
+    try { writeMcpConfig(projectPath); } catch (err) {
+      console.warn('[AIDE] Failed to write workspace MCP config:', (err as Error).message);
+    }
     return workspace;
   });
 }

@@ -263,6 +263,7 @@ export interface AideAPI {
     invoke(pluginId: string, toolName: string, args: Record<string, unknown>): Promise<unknown>;
     getHtml: (id: string) => Promise<string | null>;
     onChanged(callback: () => void): () => void;
+    onDataChanged(callback: () => void): () => void;
     onHtmlChanged(callback: (pluginName: string) => void): () => void;
     reload(pluginId: string): Promise<boolean>;
   };
