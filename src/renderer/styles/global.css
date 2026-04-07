@@ -1,0 +1,249 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #131519;
+  --surface: #1A1C23;
+  --surface-elevated: #24262E;
+  --surface-sidebar: #181A21;
+  --border: #2E3140;
+  --terminal-bg: #0F1117;
+  --terminal-text: #CDD1E0;
+  --text-primary: #E8E9ED;
+  --text-secondary: #8B8D98;
+  --text-tertiary: #5C5E6A;
+  --accent: #10B981;
+  --accent-warning: #F59E0B;
+  --accent-info: #06B6D4;
+  --agent-claude: #D97706;
+  --agent-gemini: #3B82F6;
+  --agent-codex: #10B981;
+  --tab-active-bg: #131519;
+  --tab-inactive-bg: #1A1C23;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
+}
+
+.light {
+  --background: #F5F5F0;
+  --surface: #FAFAF7;
+  --surface-elevated: #EBEBE6;
+  --surface-sidebar: #EFEFEA;
+  --border: #E0E3E8;
+  --terminal-bg: #FAFAF7;
+  --terminal-text: #374151;
+  --text-primary: #0D0D0D;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --accent: #059669;
+  --accent-warning: #D97706;
+  --accent-info: #0891B2;
+  --agent-claude: #D97706;
+  --agent-gemini: #3B82F6;
+  --agent-codex: #10B981;
+  --tab-active-bg: #F5F5F0;
+  --tab-inactive-bg: #E8E8E3;
+  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.22);
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+  background: var(--background);
+  color: var(--text-primary);
+}
+
+/* ============================================================
+ * Theme switch — smooth color transition
+ * Applied briefly (400ms) when .theme-transitioning is on <html>
+ * so normal hover/focus transitions aren't affected.
+ * ============================================================ */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition:
+    background-color 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    fill 400ms cubic-bezier(0.4, 0, 0.2, 1),
+    stroke 400ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-delay: 0ms !important;
+}
+
+/* ============================================================
+ * Agent status "ding" — scale pop on status change
+ * Uses easeOutBack curve (overshoot) for bell-like feedback.
+ * Trigger by remounting element (key={status}).
+ * ============================================================ */
+@keyframes status-ding {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.7); }
+  70%  { transform: scale(0.88); }
+  100% { transform: scale(1); }
+}
+.status-ding {
+  display: inline-block;
+  transform-origin: center;
+  animation: status-ding 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================================
+ * Processing dots — three dots bouncing with phase offset
+ * ============================================================ */
+@keyframes dot-bounce {
+  0%, 60%, 100% { transform: translateY(0);    opacity: 0.35; }
+  30%           { transform: translateY(-3px); opacity: 1; }
+}
+.dot-bounce {
+  display: inline-block;
+  animation: dot-bounce 900ms infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.dot-bounce:nth-child(1) { animation-delay: 0ms; }
+.dot-bounce:nth-child(2) { animation-delay: 150ms; }
+.dot-bounce:nth-child(3) { animation-delay: 300ms; }
+
+/* ============================================================
+ * Scrollbars — blend into both dark and light themes
+ * Transparent track + low-opacity thumb that matches the surface.
+ * ============================================================ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 150ms ease-out;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ============================================================
+ * Drag interaction visual feedback
+ * ============================================================ */
+
+/* Insert position indicator — 2px blue vertical line between tabs */
+.drag-insert-line {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background-color: #3B82F6;
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* Cross-pane drop overlay — blue tint + centered label */
+.drag-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(59, 130, 246, 0.10);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  pointer-events: none;
+}
+
+.drag-drop-overlay__text {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: #3B82F6;
+  opacity: 0.9;
+}
+
+/* Drag handle braille icon on tabs — visible on hover */
+.drag-handle-icon {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity 100ms ease-out;
+  user-select: none;
+  line-height: 1;
+}
+
+button:hover .drag-handle-icon,
+button:focus-visible .drag-handle-icon {
+  opacity: 1;
+}
+
+/* Resize divider — 4px blue highlight on hover and active drag */
+.resize-divider {
+  background-color: var(--border);
+  transition: background-color 150ms ease-out;
+}
+
+.resize-divider:hover,
+.resize-divider--active {
+  background-color: #3B82F6;
+}
+
+/* Expand visual width/height to 4px via ::before pseudo-element */
+.resize-divider::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: transparent;
+  transition: background-color 150ms ease-out;
+  z-index: 5;
+}
+
+/* Horizontal divider: expand left/right by 1.5px each side = 4px total */
+.resize-divider.cursor-col-resize::before {
+  left: -1.5px;
+  right: -1.5px;
+}
+
+/* Vertical divider: expand top/bottom by 1.5px each side = 4px total */
+.resize-divider.cursor-row-resize::before {
+  top: -1.5px;
+  bottom: -1.5px;
+}
+
+.resize-divider:hover::before,
+.resize-divider--active::before {
+  background-color: #3B82F6;
+}
+
+/* Direction icon on resize divider */
+.resize-divider__icon {
+  position: absolute;
+  z-index: 15;
+  font-size: 10px;
+  color: #3B82F6;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+  pointer-events: none;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.resize-divider:hover .resize-divider__icon,
+.resize-divider--active .resize-divider__icon {
+  opacity: 1;
+}

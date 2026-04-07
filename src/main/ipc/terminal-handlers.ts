@@ -1,0 +1,254 @@
+import { type IpcMain, BrowserWindow } from 'electron';
+import * as pty from 'node-pty';
+import * as fs from 'fs';
+import * as path from 'path';
+import os from 'os';
+import { IPC_CHANNELS } from './channels';
+import { AgentStatusDetector } from '../agent/status-detector';
+import { getAgentSpawnConfig, COMMON_ENV, type AgentType } from '../agent/agent-config';
+import { getMcpConfigPath } from '../mcp/config-writer';
+import type { AgentStatus } from '../../types/ipc';
+
+function getResumeArgs(agentType: string, sessionId: string): string[] {
+  switch (agentType) {
+    case 'claude': return ['--resume', sessionId];
+    case 'codex': return ['resume', sessionId];
+    // Gemini CLI does not support --resume in current versions
+    default: return [];
+  }
+}
+
+/** Args to resume the most recent session (no specific ID needed) */
+function getContinueArgs(agentType: string): string[] {
+  switch (agentType) {
+    case 'claude': return ['--continue'];
+    case 'codex': return ['resume', '--last'];
+    // Gemini CLI does not support session resume in current versions
+    default: return [];
+  }
+}
+
+/**
+ * Detect the agent's session ID from its session files on disk.
+ * Each agent stores sessions in a known directory; we find the most recently modified file.
+ */
+/**
+ * Detect session ID from the agent's session files on disk.
+ * Claude and Codex store sessions in known directories.
+ * Gemini uses an unknown project hash — relies on --resume (bare) instead.
+ */
+function detectSessionIdFromFs(agentType: string, cwd: string): string | null {
+  const home = process.env.HOME || os.homedir();
+  try {
+    switch (agentType) {
+      case 'claude': {
+        // ~/.claude/projects/<cwd-with-separators-replaced-by-hyphens>/
+        const encoded = cwd.replace(/[\\/]/g, '-');
+        const dir = path.join(home, '.claude', 'projects', encoded);
+        return newestJsonlId(dir);
+      }
+      case 'codex': {
+        const dir = path.join(home, '.codex', 'sessions');
+        return newestJsonlId(dir);
+      }
+      default: return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
+function newestJsonlId(dir: string): string | null {
+  if (!fs.existsSync(dir)) return null;
+  let best: { name: string; mtime: number } | null = null;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.jsonl')) continue;
+    const mtime = fs.statSync(path.join(dir, entry.name)).mtimeMs;
+    if (!best || mtime > best.mtime) best = { name: entry.name, mtime };
+  }
+  return best ? best.name.replace(/\.jsonl$/, '') : null;
+}
+
+interface PtySession {
+  pty: pty.IPty;
+  webContentsId: number;
+  agentSessionId?: string;
+  sessionDetectTimer?: ReturnType<typeof setInterval>;
+  /** Timestamp of last user keystroke — used to ignore PTY echo in status detection */
+  lastUserInputAt: number;
+}
+
+/** PTY data arriving within this window after user input is treated as echo, not agent output */
+const USER_ECHO_WINDOW_MS = 150;
+
+const sessions = new Map<string, PtySession>();
+let sessionCounter = 0;
+
+const statusDetector = new AgentStatusDetector(
+  (sessionId: string, status: AgentStatus) => {
+    const session = sessions.get(sessionId);
+    if (session) {
+      broadcastToRenderer(session.webContentsId, IPC_CHANNELS.AGENT_STATUS, sessionId, status);
+    }
+  }
+);
+
+function getDefaultShell(): string {
+  if (process.platform === 'win32') {
+    return 'powershell.exe';
+  }
+  return process.env.SHELL || '/bin/zsh';
+}
+
+function broadcastToRenderer(webContentsId: number, channel: string, ...args: unknown[]): void {
+  const windows = BrowserWindow.getAllWindows();
+  for (const win of windows) {
+    if (win.webContents.id === webContentsId) {
+      win.webContents.send(channel, ...args);
+      break;
+    }
+  }
+}
+
+export function killAllSessions(): void {
+  for (const [, session] of sessions) {
+    if (session.sessionDetectTimer) clearInterval(session.sessionDetectTimer);
+    try {
+      session.pty.kill();
+    } catch {
+      // Ignore errors — process may already be dead
+    }
+  }
+  sessions.clear();
+}
+
+export function registerTerminalHandlers(ipcMain: IpcMain): void {
+  ipcMain.handle(
+    IPC_CHANNELS.TERMINAL_SPAWN,
+    (event, options?: { shell?: string; cwd?: string; agentType?: AgentType; resumeSessionId?: string; continueSession?: boolean }) => {
+      const defaultShell = getDefaultShell();
+      const cwd = options?.cwd || os.homedir();
+      const sessionId = `term-${++sessionCounter}`;
+
+      const mcpConfig = getMcpConfigPath();
+      const agentConfig = getAgentSpawnConfig(options?.agentType ?? 'shell', defaultShell, mcpConfig);
+      const shell = options?.agentType ? agentConfig.command : (options?.shell || defaultShell);
+
+      // Build env from explicit allowlist — never spread full process.env
+      // to prevent leaking secrets (AWS keys, tokens, etc.) to child processes
+      const safeBaseEnv: Record<string, string> = {};
+      const allowedKeys = [
+        'PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'LC_ALL', 'LC_CTYPE',
+        'SHELL', 'TERM', 'TMPDIR', 'XDG_RUNTIME_DIR',
+        'AIDE_PLUGINS_DIR', 'AIDE_WORKSPACE',
+      ];
+      for (const key of allowedKeys) {
+        if (process.env[key]) safeBaseEnv[key] = process.env[key] as string;
+      }
+
+      let spawnArgs = [...agentConfig.args];
+      if (options?.agentType && options.agentType !== 'shell') {
+        if (options.resumeSessionId) {
+          spawnArgs = [...spawnArgs, ...getResumeArgs(options.agentType, options.resumeSessionId)];
+        } else if (options.continueSession) {
+          spawnArgs = [...spawnArgs, ...getContinueArgs(options.agentType)];
+        }
+      }
+
+      const ptyProcess = pty.spawn(shell, spawnArgs, {
+        name: 'xterm-256color',
+        cols: 80,
+        rows: 24,
+        cwd,
+        env: {
+          ...safeBaseEnv,
+          ...COMMON_ENV,
+          ...agentConfig.extraEnv,
+        },
+      });
+
+      const session: PtySession = {
+        pty: ptyProcess,
+        webContentsId: event.sender.id,
+        lastUserInputAt: 0,
+      };
+      sessions.set(sessionId, session);
+      statusDetector.register(sessionId, options?.agentType ?? 'shell');
+
+      ptyProcess.onData((data: string) => {
+        broadcastToRenderer(
+          session.webContentsId,
+          IPC_CHANNELS.TERMINAL_DATA,
+          sessionId,
+          data
+        );
+        // For shell sessions, skip PTY echo that follows user keystrokes.
+        // Agent TUI sessions (claude, gemini, codex) don't echo keystrokes —
+        // their output is always legitimate UI content that must reach the detector.
+        const agentType = options?.agentType ?? 'shell';
+        const sinceInput = Date.now() - session.lastUserInputAt;
+        if (agentType !== 'shell' || sinceInput > USER_ECHO_WINDOW_MS) {
+          statusDetector.feed(sessionId, data);
+        }
+      });
+
+      ptyProcess.onExit(() => {
+        if (session.sessionDetectTimer) clearInterval(session.sessionDetectTimer);
+        sessions.delete(sessionId);
+        statusDetector.remove(sessionId);
+      });
+
+      // Poll filesystem to detect the agent's session ID (1s interval, up to 15 attempts)
+      if (options?.agentType && options.agentType !== 'shell') {
+        let attempts = 0;
+        session.sessionDetectTimer = setInterval(() => {
+          if (!sessions.has(sessionId) || ++attempts > 15) {
+            clearInterval(session.sessionDetectTimer!);
+            session.sessionDetectTimer = undefined;
+            return;
+          }
+          const fsSessionId = detectSessionIdFromFs(options.agentType!, cwd);
+          if (fsSessionId && fsSessionId !== session.agentSessionId) {
+            session.agentSessionId = fsSessionId;
+            broadcastToRenderer(session.webContentsId, IPC_CHANNELS.AGENT_SESSION_ID, sessionId, fsSessionId);
+            clearInterval(session.sessionDetectTimer!);
+            session.sessionDetectTimer = undefined;
+          }
+        }, 1000);
+      }
+
+      return sessionId;
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.TERMINAL_WRITE,
+    (_event, sessionId: string, data: string) => {
+      const session = sessions.get(sessionId);
+      if (session) {
+        session.lastUserInputAt = Date.now();
+        statusDetector.notifyUserInput(sessionId);
+        session.pty.write(data);
+      }
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.TERMINAL_RESIZE,
+    (_event, sessionId: string, cols: number, rows: number) => {
+      const session = sessions.get(sessionId);
+      if (session) {
+        session.pty.resize(cols, rows);
+      }
+    }
+  );
+
+  ipcMain.handle(IPC_CHANNELS.TERMINAL_KILL, (_event, sessionId: string) => {
+    const session = sessions.get(sessionId);
+    if (session) {
+      session.pty.kill();
+      sessions.delete(sessionId);
+      statusDetector.remove(sessionId);
+    }
+  });
+}
