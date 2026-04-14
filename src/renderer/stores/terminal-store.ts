@@ -10,10 +10,10 @@ interface TerminalState {
   workspaceTabs: Record<string, { tabs: TerminalTab[]; activeTabId: string | null }>;
   addTab: (tab: TerminalTab) => void;
   removeTab: (id: string) => void;
+  renameTab: (id: string, title: string) => void;
   setActiveTab: (id: string | null) => void;
   toggleDropdown: () => void;
   updateTabSession: (tabId: string, sessionId: string) => void;
-  createDefaultTab: () => string;
   /** Clear the active tabs array (called before restoring a new workspace's session) */
   clearTabs: () => void;
   /** Save current tabs snapshot for a workspace (for WorkspaceNav inactive display) */
@@ -22,13 +22,16 @@ interface TerminalState {
   switchWorkspace: (fromWorkspaceId: string | null, toWorkspaceId: string) => void;
 }
 
-export const useTerminalStore = create<TerminalState>((set, get) => ({
+export const useTerminalStore = create<TerminalState>((set) => ({
   tabs: [],
   activeTabId: null,
   dropdownOpen: false,
   workspaceTabs: {},
 
   addTab: (tab) => set((state) => ({ tabs: [...state.tabs, tab] })),
+
+  renameTab: (id, title) =>
+    set((state) => ({ tabs: state.tabs.map((t) => (t.id === id ? { ...t, title } : t)) })),
 
   removeTab: (id) =>
     set((state) => {
@@ -48,19 +51,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     set((state) => ({
       tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, sessionId } : t)),
     })),
-
-  createDefaultTab: () => {
-    const tabId = crypto.randomUUID();
-    const tab: TerminalTab = {
-      id: tabId,
-      type: 'shell',
-      sessionId: '',
-      title: '$ shell',
-    };
-    get().addTab(tab);
-    get().setActiveTab(tabId);
-    return tabId;
-  },
 
   clearTabs: () => set({ tabs: [], activeTabId: null }),
 

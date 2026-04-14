@@ -18,6 +18,7 @@ import { killAllSessions } from './ipc/terminal-handlers';
 import { writeMcpConfig } from './mcp/config-writer';
 import { registerCustomSchemes, registerPluginProtocol } from './plugin/protocol';
 import { registerCdnProtocol } from './plugin/cdn-protocol';
+import { getHome } from './utils/home';
 
 fixPackagedEnv();
 
@@ -87,14 +88,15 @@ app.on('ready', () => {
   }
   registerIpcHandlers();
   registerWorkspaceHandlers(ipcMain);
-  registerFsHandlers(ipcMain, process.cwd());
+  const fallbackCwd = getHome();
+  registerFsHandlers(ipcMain, fallbackCwd);
   registerAgentHandlers(ipcMain);
   registerGitHandlers(ipcMain);
   registerGithubHandlers(ipcMain);
-  registerPluginHandlers(ipcMain, process.cwd());
-  registerSettingsHandlers(ipcMain, process.cwd());
+  registerPluginHandlers(ipcMain, fallbackCwd);
+  registerSettingsHandlers(ipcMain, fallbackCwd);
   registerSessionHandlers(ipcMain);
-  registerPluginProtocol(process.cwd());
+  registerPluginProtocol(fallbackCwd);
   registerCdnProtocol();
   registerUpdaterHandlers(ipcMain);
   createWindow();

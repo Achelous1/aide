@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FileTreeNode } from '../../../types/ipc';
 import { emitFileEvent } from '../../lib/event-bus';
+import { useWorkspaceStore } from '../../stores/workspace-store';
+import { usePluginStore } from '../../stores/plugin-store';
 
 interface TreeNodeProps {
   node: FileTreeNode;
@@ -114,6 +116,23 @@ export function FileExplorer({ cwd }: FileExplorerProps) {
   const [revealPath, setRevealPath] = useState<string | null>(null);
   const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
+  const handleFileSelect = useCallback((filePath: string) => {
+    setSelectedPath(filePath);
+    useWorkspaceStore.getState().setSelectedFilePath(filePath);
+
+    // Auto-open plugin if one claims this file extension
+    const ext = filePath.includes('.')
+      ? '.' + filePath.split('.').pop()!.toLowerCase()
+      : '';
+    if (ext) {
+      const plugins = usePluginStore.getState().plugins;
+      const match = plugins.find((p) => p.fileAssociations?.includes(ext));
+      if (match) {
+        usePluginStore.getState().activate(match.id);
+      }
+    }
+  }, []);
+
   const loadTree = useCallback(() => {
     window.aide.fs.readTree(cwd).then((nodes) => {
       const sorted = [...nodes].sort((a, b) => {
@@ -134,14 +153,14 @@ export function FileExplorer({ cwd }: FileExplorerProps) {
   useEffect(() => {
     const unsubReveal = window.aide.files.onReveal((filePath) => {
       setRevealPath(filePath);
-      setSelectedPath(filePath);
+      handleFileSelect(filePath);
       // Scroll into view after tree re-renders with expanded state
       requestAnimationFrame(() => {
         nodeRefs.current.get(filePath)?.scrollIntoView({ block: 'nearest' });
       });
     });
     const unsubSelect = window.aide.files.onSelect((filePath) => {
-      setSelectedPath(filePath);
+      handleFileSelect(filePath);
     });
     const unsubRefresh = window.aide.files.onRefresh(() => {
       loadTree();
@@ -161,7 +180,7 @@ export function FileExplorer({ cwd }: FileExplorerProps) {
           node={node}
           depth={0}
           selectedPath={selectedPath}
-          onSelect={setSelectedPath}
+          onSelect={handleFileSelect}
           revealPath={revealPath}
           nodeRefs={nodeRefs}
         />

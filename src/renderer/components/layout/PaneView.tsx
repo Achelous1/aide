@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDroppable, useDndMonitor } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -27,16 +27,34 @@ interface DraggableTabProps {
   onActivate: () => void;
   onClose: (e: React.MouseEvent) => void;
   onContextMenu: (e: React.MouseEvent) => void;
+  onRename: (title: string) => void;
   canClose: boolean;
 }
 
-function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMenu, canClose }: DraggableTabProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
+function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMenu, onRename, canClose }: DraggableTabProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tab.id,
     data: { tab, paneId },
   });
   const isPlugin = tab.type === 'plugin';
   const dotColor = AGENT_COLORS[tab.agentId ?? 'shell'] ?? AGENT_COLORS.shell;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(tab.title);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing) {
+      setEditValue(tab.title);
+      requestAnimationFrame(() => inputRef.current?.select());
+    }
+  }, [isEditing, tab.title]);
+
+  const commitEdit = () => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== tab.title) onRename(trimmed);
+    setIsEditing(false);
+  };
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -46,22 +64,19 @@ function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMen
 
   return (
     <div className="relative flex items-stretch h-full">
-      {/* Insert position indicator — 2px blue vertical line on the left when a tab is dragged over */}
-      {isOver && !isDragging && (
-        <span className="drag-insert-line" />
-      )}
       <button
         ref={setNodeRef}
         style={style}
         {...attributes}
-        {...listeners}
-        onClick={onActivate}
+        {...(isEditing ? {} : listeners)}
+        onClick={isEditing ? undefined : onActivate}
+        onDoubleClick={(e) => { if (isPlugin) return; e.stopPropagation(); setIsEditing(true); }}
         onContextMenu={onContextMenu}
         className={`group relative flex items-center gap-1.5 px-3 h-full text-[12px] font-mono transition-colors ${
           isActive
             ? 'bg-aide-tab-active-bg text-aide-text-primary'
             : 'bg-aide-tab-inactive-bg text-aide-text-secondary hover:text-aide-text-primary'
-        } ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        } ${isDragging ? 'cursor-grabbing' : isEditing ? 'cursor-text' : 'cursor-grab'}`}
       >
         {isActive && (
           <span className="absolute top-0 left-0 right-0 h-[2px]" style={{ backgroundColor: 'var(--accent)' }} />
@@ -72,8 +87,24 @@ function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMen
         ) : (
           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
         )}
-        <span>{tab.title}</span>
-        {canClose && (
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitEdit();
+              if (e.key === 'Escape') setIsEditing(false);
+              e.stopPropagation();
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-transparent outline-none border-b border-aide-accent text-[12px] font-mono min-w-0 w-24"
+          />
+        ) : (
+          <span>{tab.title}</span>
+        )}
+        {canClose && !isEditing && (
           <span
             role="button"
             tabIndex={0}
@@ -109,6 +140,7 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
   const setFocusedPane = useLayoutStore((s) => s.setFocusedPane);
   const setActiveTab = useLayoutStore((s) => s.setActiveTab);
   const removeTabFromPane = useLayoutStore((s) => s.removeTabFromPane);
+  const renameTabInPane = useLayoutStore((s) => s.renameTabInPane);
   const splitPane = useLayoutStore((s) => s.splitPane);
   const closePaneAndMergeTabs = useLayoutStore((s) => s.closePaneAndMergeTabs);
 
@@ -140,10 +172,14 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
       setDraggingSourcePaneId(sourcePaneId ?? null);
     },
     onDragMove(event) {
-      if (!isOver || !dropAreaRef.current) { setDropEdge(null); return; }
+      if (!dropAreaRef.current) { setDropEdge(null); return; }
       const rect = dropAreaRef.current.getBoundingClientRect();
       const x = (event.activatorEvent as MouseEvent).clientX + (event.delta?.x ?? 0);
       const y = (event.activatorEvent as MouseEvent).clientY + (event.delta?.y ?? 0);
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+        setDropEdge(null);
+        return;
+      }
       const relX = (x - rect.left) / rect.width;
       const relY = (y - rect.top) / rect.height;
 
@@ -162,6 +198,11 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
 
   const isFocused = focusedPaneId === pane.id;
   const activeTab = pane.tabs.find((t) => t.id === pane.activeTabId) ?? pane.tabs[0];
+
+  const handleRenameTab = useCallback((tabId: string, title: string) => {
+    renameTabInPane(pane.id, tabId, title);
+    useTerminalStore.getState().renameTab(tabId, title);
+  }, [pane.id, renameTabInPane]);
 
   const handleCloseTab = useCallback(async (tab: TerminalTab, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -210,6 +251,7 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
               onActivate={() => setActiveTab(pane.id, tab.id)}
               onClose={(e) => handleCloseTab(tab, e)}
               onContextMenu={(e) => handleContextMenu(e, tab.id)}
+              onRename={(title) => handleRenameTab(tab.id, title)}
             />
           ))}
         </SortableContext>

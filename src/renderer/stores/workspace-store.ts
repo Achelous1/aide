@@ -13,11 +13,15 @@ interface WorkspaceState {
   recentProjects: WorkspaceInfo[];
   navExpanded: boolean;
   sidePanelTab: SidePanelTab;
+  /** Currently selected file path in the file explorer */
+  selectedFilePath: string | null;
   addWorkspace: (workspace: WorkspaceInfo) => void;
   removeWorkspace: (id: string) => void;
+  renameWorkspace: (id: string, name: string) => void;
   setActive: (id: string | null) => void;
   toggleNav: () => void;
   setSidePanelTab: (tab: SidePanelTab) => void;
+  setSelectedFilePath: (path: string | null) => void;
   loadRecent: (projects: WorkspaceInfo[]) => void;
   loadWorkspaces: () => Promise<void>;
 }
@@ -28,11 +32,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   recentProjects: [],
   navExpanded: true,
   sidePanelTab: 'files',
+  selectedFilePath: null,
   setSidePanelTab: (tab) => set({ sidePanelTab: tab }),
+  setSelectedFilePath: (path) => set({ selectedFilePath: path }),
   addWorkspace: (workspace) =>
     set((state) => ({ workspaces: [...state.workspaces, workspace] })),
   removeWorkspace: (id) =>
     set((state) => ({ workspaces: state.workspaces.filter((w) => w.id !== id) })),
+  renameWorkspace: (id, name) =>
+    set((state) => ({
+      workspaces: state.workspaces.map((w) => (w.id === id ? { ...w, name } : w)),
+    })),
   setActive: async (id) => {
     const prevId = get().activeWorkspaceId;
     if (id && id !== prevId) {

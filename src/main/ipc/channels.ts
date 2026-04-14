@@ -83,4 +83,6 @@ export const IPC_CHANNELS = {
   WORKSPACE_RECENT: 'workspace:recent',
   WORKSPACE_OPEN_DIALOG: 'workspace:open-dialog',
   WORKSPACE_CREATE_PROJECT: 'workspace:create-project',
+  WORKSPACE_RENAME: 'workspace:rename',
+  WORKSPACE_SHOW_IN_FINDER: 'workspace:show-in-finder',
 } as const;

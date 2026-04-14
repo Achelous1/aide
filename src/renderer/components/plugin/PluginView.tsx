@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { useWorkspaceStore } from '../../stores/workspace-store';
 
 interface PluginViewProps {
   pluginId: string;
@@ -8,6 +9,7 @@ interface PluginViewProps {
 export function PluginView({ pluginId, pluginName }: PluginViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeKey, setIframeKey] = useState(0);
+  const selectedFilePath = useWorkspaceStore((s) => s.selectedFilePath);
 
   // Forward file events to plugin iframe via postMessage
   useEffect(() => {
@@ -83,15 +85,26 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
     return () => observer.disconnect();
   }, [sendTheme]);
 
+  const handleLoad = useCallback(() => {
+    sendTheme();
+    // Send currently selected file so the plugin can show it immediately on open
+    if (selectedFilePath) {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'aide:file-event', event: 'file:clicked', filePath: selectedFilePath },
+        '*'
+      );
+    }
+  }, [sendTheme, selectedFilePath]);
+
   return (
     <iframe
       key={iframeKey}
       ref={iframeRef}
       src={`aide-plugin://${pluginId}/index.html`}
-      sandbox="allow-scripts"
+      sandbox="allow-scripts allow-same-origin"
       className="w-full h-full border-0"
       title={pluginName}
-      onLoad={sendTheme}
+      onLoad={handleLoad}
     />
   );
 }

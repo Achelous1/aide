@@ -15,6 +15,8 @@ export interface PluginSpec {
   entryPoint: string;
   dependencies: Record<string, string>;
   tools: PluginTool[];
+  /** File extensions this plugin handles, e.g. ['.json', '.yaml'] */
+  fileAssociations?: string[];
 }
 
 const ALL_PERMISSIONS = ['fs:read', 'fs:write', 'network', 'process'] as const;

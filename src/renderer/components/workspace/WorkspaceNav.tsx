@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useAgentStore } from '../../stores/agent-store';
 import { useTerminalStore } from '../../stores/terminal-store';
@@ -6,6 +6,7 @@ import { useLayoutStore } from '../../stores/layout-store';
 import { isSplitLayout, type AgentStatus, type LayoutNode, type TerminalTab } from '../../../types/ipc';
 import { StatusDot, StatusBadge } from './StatusIndicator';
 import { UpdateNotice } from '../updater/UpdateNotice';
+import { AgentDropdown } from '../terminal/AgentDropdown';
 
 /** Recursively collect all tabs from a layout tree (source of truth for visible tabs). */
 function collectPaneTabs(node: LayoutNode): TerminalTab[] {
@@ -16,12 +17,19 @@ function collectPaneTabs(node: LayoutNode): TerminalTab[] {
 }
 
 export function WorkspaceNav() {
-  const { workspaces, activeWorkspaceId, navExpanded, setActive, toggleNav, addWorkspace } = useWorkspaceStore();
+  const { workspaces, activeWorkspaceId, navExpanded, setActive, toggleNav, addWorkspace, removeWorkspace, renameWorkspace } = useWorkspaceStore();
   const { sessionStatuses } = useAgentStore();
   const { workspaceTabs, activeTabId, setActiveTab } = useTerminalStore();
   // Subscribe to layout so this component re-renders when active workspace tabs change
   const layout = useLayoutStore((s) => s.layout);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [dropdownWorkspaceId, setDropdownWorkspaceId] = useState<string | null>(null);
+  const [contextMenuId, setContextMenuId] = useState<string | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!window.aide?.agent?.onStatus) return;
@@ -30,6 +38,48 @@ export function WorkspaceNav() {
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!contextMenuId) return;
+    const handler = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [contextMenuId]);
+
+  const handleContextMenu = (e: React.MouseEvent, wsId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenuId(wsId);
+    setContextMenuPos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleStartRename = (ws: { id: string; name: string }) => {
+    setContextMenuId(null);
+    setEditingWorkspaceId(ws.id);
+    setEditingName(ws.name);
+  };
+
+  const handleCommitRename = async (id: string) => {
+    const name = editingName.trim();
+    if (name) {
+      renameWorkspace(id, name);
+      await window.aide.workspace.rename(id, name);
+    }
+    setEditingWorkspaceId(null);
+  };
+
+  const handleCancelRename = () => {
+    setEditingWorkspaceId(null);
+  };
+
+  const handleShowInFinder = (path: string) => {
+    setContextMenuId(null);
+    window.aide.workspace.showInFinder(path);
+  };
 
   // Get tabs for a given workspace (active: from layout tree; inactive: from saved snapshot).
   // Excludes plugin tabs and sorts alphabetically by title.
@@ -89,14 +139,30 @@ export function WorkspaceNav() {
     }
   };
 
-  const handleAddAgentTab = (workspaceId: string) => {
-    setActive(workspaceId);
-    useTerminalStore.getState().createDefaultTab();
+  const handleAddAgentTab = async (workspaceId: string) => {
+    await setActive(workspaceId);
+    setDropdownWorkspaceId(workspaceId);
   };
 
   const handleSelectTab = (workspaceId: string, tabId: string) => {
     setActive(workspaceId);
     setActiveTab(tabId);
+  };
+
+  const handleDeleteWorkspace = async (id: string) => {
+    if (workspaces.length <= 1) return; // Can't delete the last workspace
+    // If deleting the active workspace, switch to another one first
+    if (id === activeWorkspaceId) {
+      const other = workspaces.find((w) => w.id !== id);
+      if (other) await setActive(other.id);
+    }
+    try {
+      await window.aide.workspace.remove(id);
+    } catch {
+      // ignore IPC errors — still remove from local state
+    }
+    removeWorkspace(id);
+    setDeleteConfirmId(null);
   };
 
   if (navExpanded) {
@@ -130,9 +196,10 @@ export function WorkspaceNav() {
               <div key={ws.id}>
                 {/* Project row */}
                 <div
-                  className={`flex items-center gap-1 px-1 py-1.5 rounded transition-colors ${
+                  className={`relative group flex items-center gap-1 px-1 py-1.5 rounded transition-colors ${
                     isActive ? 'bg-aide-surface-elevated' : 'hover:bg-aide-surface-elevated'
                   }`}
+                  onContextMenu={(e) => handleContextMenu(e, ws.id)}
                 >
                   {/* Chevron toggle */}
                   <button
@@ -154,7 +221,25 @@ export function WorkspaceNav() {
                     >
                       {ws.name[0]?.toUpperCase() ?? '?'}
                     </span>
-                    <span className="text-xs font-mono text-aide-text-primary truncate flex-1">{ws.name}</span>
+                    <div className="flex flex-col flex-1 min-w-0">
+                      {editingWorkspaceId === ws.id ? (
+                        <input
+                          autoFocus
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onBlur={() => handleCommitRename(ws.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleCommitRename(ws.id);
+                            if (e.key === 'Escape') handleCancelRename();
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs font-mono text-aide-text-primary bg-aide-surface-elevated border border-aide-border rounded px-1 outline-none"
+                        />
+                      ) : (
+                        <span className="text-xs font-mono text-aide-text-primary truncate">{ws.name}</span>
+                      )}
+                      <span className="text-[10px] font-mono text-aide-text-tertiary truncate">{ws.path}</span>
+                    </div>
                     {/* Tab count */}
                     <span className="text-[10px] font-mono text-aide-text-tertiary shrink-0">
                       ({wsTabs.length})
@@ -174,6 +259,21 @@ export function WorkspaceNav() {
                     style={{ fontSize: '14px', width: '14px', height: '14px' }}
                   >
                     +
+                  </button>
+
+                  {/* Agent dropdown — shown when + is clicked for this workspace */}
+                  {dropdownWorkspaceId === ws.id && (
+                    <AgentDropdown onClose={() => setDropdownWorkspaceId(null)} />
+                  )}
+
+                  {/* Context menu button */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleContextMenu(e, ws.id); }}
+                    title="More options"
+                    className="opacity-0 group-hover:opacity-100 text-aide-text-tertiary hover:text-aide-text-primary shrink-0 flex items-center justify-center transition-opacity"
+                    style={{ fontSize: '12px', width: '14px', height: '14px' }}
+                  >
+                    ···
                   </button>
                 </div>
 
@@ -219,6 +319,61 @@ export function WorkspaceNav() {
             <span>New Workspace</span>
           </button>
         </div>
+
+        {/* Context menu */}
+        {contextMenuId && (
+          <div
+            ref={contextMenuRef}
+            className="fixed z-50 bg-aide-surface-elevated border border-aide-border rounded shadow-lg py-1 min-w-[160px]"
+            style={{ left: contextMenuPos.x, top: contextMenuPos.y }}
+          >
+            <button
+              onClick={() => { const ws = workspaces.find((w) => w.id === contextMenuId); if (ws) handleStartRename(ws); }}
+              className="flex items-center w-full px-3 py-2 text-xs font-mono text-aide-text-primary hover:bg-aide-surface-sidebar transition-colors"
+            >
+              Rename
+            </button>
+            <button
+              onClick={() => { const ws = workspaces.find((w) => w.id === contextMenuId); if (ws) handleShowInFinder(ws.path); }}
+              className="flex items-center w-full px-3 py-2 text-xs font-mono text-aide-text-primary hover:bg-aide-surface-sidebar transition-colors"
+            >
+              Show in Finder
+            </button>
+            <hr className="border-aide-border my-1" />
+            <button
+              onClick={() => { const id = contextMenuId; setContextMenuId(null); if (workspaces.length > 1) setDeleteConfirmId(id); }}
+              disabled={workspaces.length <= 1}
+              className="flex items-center w-full px-3 py-2 text-xs font-mono text-red-400 hover:bg-aide-surface-sidebar transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Remove from Workspace
+            </button>
+          </div>
+        )}
+
+        {/* Delete workspace confirmation dialog */}
+        {deleteConfirmId && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+            <div className="bg-aide-surface-elevated border border-aide-border rounded-lg px-4 py-3 flex flex-col gap-3 max-w-[180px] w-full mx-3">
+              <span className="text-xs font-mono text-aide-text-primary">
+                Delete &ldquo;{workspaces.find((w) => w.id === deleteConfirmId)?.name}&rdquo;?
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleDeleteWorkspace(deleteConfirmId)}
+                  className="flex-1 px-2 py-1 text-[10px] font-mono bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="flex-1 px-2 py-1 text-[10px] font-mono bg-aide-border text-aide-text-secondary rounded hover:text-aide-text-primary transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

@@ -25,6 +25,8 @@ export interface PluginInfo {
   active: boolean;
   scope: 'local' | 'global';
   tools: PluginTool[];
+  /** File extensions this plugin handles, e.g. ['.json', '.yaml'] */
+  fileAssociations?: string[];
 }
 
 /** Plugin tool definition */
@@ -264,6 +266,8 @@ export interface AideAPI {
     recent(): Promise<WorkspaceInfo[]>;
     openDialog(): Promise<string | null>;
     createProject(name: string): Promise<WorkspaceInfo | null>;
+    rename(id: string, name: string): Promise<WorkspaceInfo | null>;
+    showInFinder(path: string): Promise<void>;
   };
   agent: {
     detect(): Promise<AgentConfig[]>;

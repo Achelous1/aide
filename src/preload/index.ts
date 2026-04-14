@@ -85,6 +85,8 @@ const aideAPI: AideAPI = {
     recent: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RECENT),
     openDialog: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_OPEN_DIALOG),
     createProject: (name: string) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_CREATE_PROJECT, name),
+    rename: (id: string, name: string) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_RENAME, id, name),
+    showInFinder: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SHOW_IN_FINDER, path),
   },
 
   agent: {

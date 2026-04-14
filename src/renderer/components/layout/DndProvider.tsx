@@ -6,8 +6,22 @@ import {
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
+  type CollisionDetection,
   DragOverlay,
+  pointerWithin,
+  closestCenter,
 } from '@dnd-kit/core';
+
+// Use cursor position (not dragged item rect) for pane droppable detection.
+// rectIntersection keeps the tab's virtual rect in the tab bar zone (y=0-36),
+// so it never intersects the content area droppable (y=36+) during horizontal drags.
+// pointerWithin correctly detects the content area when the cursor enters it.
+// Fall back to closestCenter for gaps between tabs during reorder.
+const collisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) return pointerCollisions;
+  return closestCenter(args);
+};
 import { useLayoutStore } from '../../stores/layout-store';
 import type { TerminalTab } from '../../../types/ipc';
 
@@ -74,8 +88,11 @@ export function DndProvider({ children }: DndProviderProps) {
 
     const sourcePaneId = sourceData.paneId as string;
 
-    // Dropped on a pane drop zone (cross-pane move, split, or same-pane edge split)
-    if (overData?.paneId) {
+    // Pane drop zone: overData has paneId but NO tab field.
+    // Tab sortable data: overData has BOTH paneId and tab.
+    // Must distinguish — otherwise tab-to-tab drops enter this branch and return early,
+    // skipping reorder entirely.
+    if (overData?.paneId && !overData?.tab) {
       const targetPaneId = overData.paneId as string;
       const tab = sourceData.tab as TerminalTab;
       const isSamePane = targetPaneId === sourcePaneId;
@@ -96,8 +113,9 @@ export function DndProvider({ children }: DndProviderProps) {
         else if (relY > 0.7) dropEdge = 'bottom';
       }
 
-      if (dropEdge !== 'center' && tab) {
-        // Edge drop → split pane (works for both same-pane and cross-pane)
+      const sourcePaneTabCount = useLayoutStore.getState().getAllPanes().find((p) => p.id === sourcePaneId)?.tabs.length ?? 0;
+      if (dropEdge !== 'center' && tab && (!isSamePane || sourcePaneTabCount > 1)) {
+        // Edge drop → split pane (cross-pane always; same-pane only when source has >1 tab)
         const direction = (dropEdge === 'left' || dropEdge === 'right') ? 'horizontal' : 'vertical';
         const position = (dropEdge === 'left' || dropEdge === 'top') ? 'before' : 'after';
         useLayoutStore.getState().splitPaneWithTab(targetPaneId, direction, position, tab, sourcePaneId);
@@ -105,25 +123,33 @@ export function DndProvider({ children }: DndProviderProps) {
         // Center drop on different pane → move tab
         useLayoutStore.getState().moveTab(sourcePaneId, targetPaneId, active.id as string);
       }
+      // Same-pane center drop on content area: no-op
       return;
     }
 
-    // Dropped on a tab in the same pane (reorder via sortable)
-    if (sourceData?.paneId && active.id !== over.id) {
-      const paneId = sourceData.paneId as string;
-      const pane = useLayoutStore.getState().getAllPanes().find((p) => p.id === paneId);
-      if (pane) {
-        const oldIndex = pane.tabs.findIndex((t) => t.id === active.id);
-        const newIndex = pane.tabs.findIndex((t) => t.id === over.id);
-        if (oldIndex >= 0 && newIndex >= 0) {
-          useLayoutStore.getState().reorderTab(paneId, oldIndex, newIndex);
+    // Tab-to-tab drop (overData has tab field, or over is an unknown droppable)
+    if (active.id !== over.id) {
+      const overPaneId = overData?.paneId as string | undefined;
+
+      if (overPaneId && overPaneId !== sourcePaneId) {
+        // Cross-pane tab-to-tab: move tab to the other pane
+        useLayoutStore.getState().moveTab(sourcePaneId, overPaneId, active.id as string);
+      } else {
+        // Same-pane tab-to-tab: reorder
+        const pane = useLayoutStore.getState().getAllPanes().find((p) => p.id === sourcePaneId);
+        if (pane) {
+          const oldIndex = pane.tabs.findIndex((t) => t.id === active.id);
+          const newIndex = pane.tabs.findIndex((t) => t.id === over.id);
+          if (oldIndex >= 0 && newIndex >= 0) {
+            useLayoutStore.getState().reorderTab(sourcePaneId, oldIndex, newIndex);
+          }
         }
       }
     }
   }, [draggingTab, restoreIframePointerEvents]);
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
+    <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
       {children}
       <DragOverlay>
         {draggingTab && (

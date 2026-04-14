@@ -16971,6 +16971,30 @@
                   "children": [
                     {
                       "type": "frame",
+                      "id": "KnaQq",
+                      "name": "cm1",
+                      "width": "fill_container",
+                      "height": 32,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "aJx1z",
+                          "name": "newcm1txt",
+                          "fill": "$--text-primary",
+                          "content": "Rename",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
                       "id": "pGd6P",
                       "name": "cm2",
                       "width": "fill_container",

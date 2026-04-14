@@ -127,6 +127,7 @@ interface LayoutState {
   moveTab: (fromPaneId: string, toPaneId: string, tabId: string) => void;
   reorderTab: (paneId: string, fromIndex: number, toIndex: number) => void;
   updateTabAgentSessionId: (ptySessionId: string, agentSessionId: string) => void;
+  renameTabInPane: (paneId: string, tabId: string, title: string) => void;
 
   // Resize
   resizePanes: (splitId: string, sizes: number[]) => void;
@@ -471,6 +472,18 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
         }
       }
       return state;
+    });
+  },
+
+  renameTabInPane: (paneId, tabId, title) => {
+    set((state) => {
+      const layout = cloneNode(state.layout);
+      const pane = findPane(layout, paneId);
+      if (!pane) return state;
+      const tab = pane.tabs.find((t) => t.id === tabId);
+      if (!tab) return state;
+      tab.title = title;
+      return { layout };
     });
   },
 

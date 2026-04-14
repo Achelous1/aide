@@ -1,4 +1,4 @@
-import { dialog, BrowserWindow, type IpcMain } from 'electron';
+import { dialog, shell, BrowserWindow, type IpcMain } from 'electron';
 import fs from 'fs';
 import nodePath from 'path';
 import Store from 'electron-store';
@@ -112,6 +112,19 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
     const result = await dialog.showOpenDialog(win!, { properties: ['openDirectory'] });
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
+  });
+
+  ipcMain.handle(IPC_CHANNELS.WORKSPACE_RENAME, (_event, id: string, name: string) => {
+    const workspaces = getWorkspaces();
+    const ws = workspaces.find((w) => w.id === id);
+    if (!ws) return null;
+    ws.name = name;
+    setWorkspaces(workspaces);
+    return ws;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.WORKSPACE_SHOW_IN_FINDER, (_event, path: string) => {
+    shell.showItemInFolder(path);
   });
 
   ipcMain.handle(IPC_CHANNELS.WORKSPACE_CREATE_PROJECT, async (_event, projectName: string) => {
