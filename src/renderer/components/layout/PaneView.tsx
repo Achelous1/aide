@@ -32,7 +32,7 @@ interface DraggableTabProps {
 }
 
 function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMenu, onRename, canClose }: DraggableTabProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tab.id,
     data: { tab, paneId },
   });
@@ -64,17 +64,13 @@ function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMen
 
   return (
     <div className="relative flex items-stretch h-full">
-      {/* Insert position indicator — 2px blue vertical line on the left when a tab is dragged over */}
-      {isOver && !isDragging && (
-        <span className="drag-insert-line" />
-      )}
       <button
         ref={setNodeRef}
         style={style}
         {...attributes}
         {...(isEditing ? {} : listeners)}
         onClick={isEditing ? undefined : onActivate}
-        onDoubleClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+        onDoubleClick={(e) => { if (isPlugin) return; e.stopPropagation(); setIsEditing(true); }}
         onContextMenu={onContextMenu}
         className={`group relative flex items-center gap-1.5 px-3 h-full text-[12px] font-mono transition-colors ${
           isActive
@@ -176,10 +172,14 @@ export function PaneView({ pane, showHeader = false }: PaneViewProps) {
       setDraggingSourcePaneId(sourcePaneId ?? null);
     },
     onDragMove(event) {
-      if (!isOver || !dropAreaRef.current) { setDropEdge(null); return; }
+      if (!dropAreaRef.current) { setDropEdge(null); return; }
       const rect = dropAreaRef.current.getBoundingClientRect();
       const x = (event.activatorEvent as MouseEvent).clientX + (event.delta?.x ?? 0);
       const y = (event.activatorEvent as MouseEvent).clientY + (event.delta?.y ?? 0);
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+        setDropEdge(null);
+        return;
+      }
       const relX = (x - rect.left) / rect.width;
       const relY = (y - rect.top) / rect.height;
 

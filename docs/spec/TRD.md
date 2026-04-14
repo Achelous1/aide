@@ -330,6 +330,11 @@ interface TerminalTab {
 - 탭 간 전환, 탭 닫기
 - xterm.js 인스턴스가 IPC를 통해 Main Process의 node-pty와 연결
 
+**폰트 요구사항**:
+- `fontFamily`: Nerd Font 변종 우선 탐색 → 일반 모노스페이스 폴백 → Symbols Nerd Font Mono(번들)
+- `Symbols Nerd Font Mono Regular` TTF를 `src/renderer/assets/fonts/`에 번들링하여 Nerd Font 미설치 환경에서도 Powerline/oh-my-zsh 글리프 렌더링 보장
+- `unicodeVersion: '11'` — 이모지 및 광폭 문자 올바른 너비 계산
+
 ### 4. File Explorer (Renderer)
 
 ```typescript

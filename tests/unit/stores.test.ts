@@ -147,13 +147,14 @@ describe('useTerminalStore', () => {
     expect(useTerminalStore.getState().tabs[0].sessionId).toBe('new-session-xyz');
   });
 
-  it('createDefaultTab should create a shell tab and set it active', () => {
-    const tabId = useTerminalStore.getState().createDefaultTab();
-    expect(tabId).toBeTruthy();
+  it('addTab + setActiveTab should add a shell tab and set it active', () => {
+    const tab = { id: 'tab-shell-1', type: 'shell' as const, title: '$ shell', sessionId: '' };
+    useTerminalStore.getState().addTab(tab);
+    useTerminalStore.getState().setActiveTab(tab.id);
     expect(useTerminalStore.getState().tabs).toHaveLength(1);
     expect(useTerminalStore.getState().tabs[0].type).toBe('shell');
     expect(useTerminalStore.getState().tabs[0].title).toBe('$ shell');
-    expect(useTerminalStore.getState().activeTabId).toBe(tabId);
+    expect(useTerminalStore.getState().activeTabId).toBe(tab.id);
   });
 });
 

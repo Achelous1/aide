@@ -26,8 +26,9 @@ export function getOrCreate(sessionId: string, theme: ITheme): CachedTerminal {
 
   const term = new Terminal({
     theme,
-    fontFamily: "'JetBrains Mono', 'IBM Plex Mono', Menlo, Monaco, monospace",
+    fontFamily: "'JetBrainsMono Nerd Font Mono', 'JetBrainsMono NF', 'MesloLGS NF', 'JetBrains Mono', 'IBM Plex Mono', Menlo, Monaco, 'Symbols Nerd Font Mono', monospace",
     fontSize: 13,
+    unicodeVersion: '11',
     cursorBlink: true,
     cursorStyle: 'block',
     allowTransparency: false,

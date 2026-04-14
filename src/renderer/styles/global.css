@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Symbols Nerd Font Mono';
+  src: url('../assets/fonts/SymbolsNerdFontMono-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 :root {
   --background: #131519;
   --surface: #1A1C23;

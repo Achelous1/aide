@@ -101,7 +101,7 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
       key={iframeKey}
       ref={iframeRef}
       src={`aide-plugin://${pluginId}/index.html`}
-      sandbox="allow-scripts"
+      sandbox="allow-scripts allow-same-origin"
       className="w-full h-full border-0"
       title={pluginName}
       onLoad={handleLoad}

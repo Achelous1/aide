@@ -6,6 +6,7 @@ import { useLayoutStore } from '../../stores/layout-store';
 import { isSplitLayout, type AgentStatus, type LayoutNode, type TerminalTab } from '../../../types/ipc';
 import { StatusDot, StatusBadge } from './StatusIndicator';
 import { UpdateNotice } from '../updater/UpdateNotice';
+import { AgentDropdown } from '../terminal/AgentDropdown';
 
 /** Recursively collect all tabs from a layout tree (source of truth for visible tabs). */
 function collectPaneTabs(node: LayoutNode): TerminalTab[] {
@@ -23,6 +24,7 @@ export function WorkspaceNav() {
   const layout = useLayoutStore((s) => s.layout);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [dropdownWorkspaceId, setDropdownWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!window.aide?.agent?.onStatus) return;
@@ -90,9 +92,9 @@ export function WorkspaceNav() {
     }
   };
 
-  const handleAddAgentTab = (workspaceId: string) => {
-    setActive(workspaceId);
-    useTerminalStore.getState().createDefaultTab();
+  const handleAddAgentTab = async (workspaceId: string) => {
+    await setActive(workspaceId);
+    setDropdownWorkspaceId(workspaceId);
   };
 
   const handleSelectTab = (workspaceId: string, tabId: string) => {
@@ -147,7 +149,7 @@ export function WorkspaceNav() {
               <div key={ws.id}>
                 {/* Project row */}
                 <div
-                  className={`group flex items-center gap-1 px-1 py-1.5 rounded transition-colors ${
+                  className={`relative group flex items-center gap-1 px-1 py-1.5 rounded transition-colors ${
                     isActive ? 'bg-aide-surface-elevated' : 'hover:bg-aide-surface-elevated'
                   }`}
                 >
@@ -192,6 +194,11 @@ export function WorkspaceNav() {
                   >
                     +
                   </button>
+
+                  {/* Agent dropdown — shown when + is clicked for this workspace */}
+                  {dropdownWorkspaceId === ws.id && (
+                    <AgentDropdown onClose={() => setDropdownWorkspaceId(null)} />
+                  )}
 
                   {/* Delete workspace button — only shown when multiple workspaces exist */}
                   {workspaces.length > 1 && (

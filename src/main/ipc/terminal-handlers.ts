@@ -127,7 +127,8 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
     IPC_CHANNELS.TERMINAL_SPAWN,
     (event, options?: { shell?: string; cwd?: string; agentType?: AgentType; resumeSessionId?: string; continueSession?: boolean }) => {
       const defaultShell = getDefaultShell();
-      const cwd = options?.cwd || os.homedir();
+      const rawCwd = options?.cwd || os.homedir();
+      const cwd = fs.existsSync(rawCwd) ? rawCwd : os.homedir();
       const sessionId = `term-${++sessionCounter}`;
 
       const mcpConfig = getMcpConfigPath();
@@ -140,10 +141,37 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
       const allowedKeys = [
         'PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'LC_ALL', 'LC_CTYPE',
         'SHELL', 'TERM', 'TMPDIR', 'XDG_RUNTIME_DIR',
+        'NVM_DIR',  // needed for shell tabs to initialize nvm via .zshrc
         'AIDE_PLUGINS_DIR', 'AIDE_WORKSPACE',
       ];
       for (const key of allowedKeys) {
         if (process.env[key]) safeBaseEnv[key] = process.env[key] as string;
+      }
+
+      // If PATH doesn't already include an nvm node binary, try to inject one.
+      // This covers agent tabs (claude/gemini/codex) which run directly without
+      // a shell, so .zshrc / nvm init is never executed inside the PTY.
+      if (safeBaseEnv.PATH && !safeBaseEnv.PATH.includes('/.nvm/versions/node/')) {
+        try {
+          const nvmDir = process.env.NVM_DIR || path.join(os.homedir(), '.nvm');
+          const versionsDir = path.join(nvmDir, 'versions', 'node');
+          if (fs.existsSync(versionsDir)) {
+            const highest = fs.readdirSync(versionsDir)
+              .filter((v) => /^v\d+/.test(v))
+              .sort((a, b) => {
+                const parse = (s: string) => s.slice(1).split('.').map(Number);
+                const [ma, mi, mp] = parse(a);
+                const [mb, mib, mpb] = parse(b);
+                return (mb - ma) || (mib - mi) || (mpb - mp);
+              })[0];
+            if (highest) {
+              const nvmBin = path.join(versionsDir, highest, 'bin');
+              if (fs.existsSync(nvmBin)) {
+                safeBaseEnv.PATH = `${nvmBin}:${safeBaseEnv.PATH}`;
+              }
+            }
+          }
+        } catch { /* ignore */ }
       }
 
       let spawnArgs = [...agentConfig.args];
