@@ -15,6 +15,7 @@ interface TreeNodeProps {
 
 function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }: TreeNodeProps) {
   const [expanded, setExpanded] = useState(false);
+  const [fetchedChildren, setFetchedChildren] = useState<FileTreeNode[] | undefined>(node.children);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,6 +24,14 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }:
     }
     return () => { nodeRefs.current.delete(node.path); };
   }, [node.path, nodeRefs]);
+
+  // Lazy-fetch children when a directory is expanded for the first time
+  useEffect(() => {
+    if (!expanded || node.type !== 'directory') return;
+    window.aide.fs.readTree(node.path)
+      .then(setFetchedChildren)
+      .catch(() => {});
+  }, [expanded, node.path, node.type]);
 
   // Auto-expand ancestor when a child is being revealed
   useEffect(() => {
@@ -53,8 +62,8 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }:
   const isSelected = selectedPath === node.path;
 
   if (node.type === 'directory') {
-    const sortedChildren = node.children
-      ? [...node.children].sort((a, b) => {
+    const sortedChildren = fetchedChildren
+      ? [...fetchedChildren].sort((a, b) => {
           if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
           return a.name.localeCompare(b.name);
         })
