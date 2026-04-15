@@ -5,11 +5,9 @@ import chokidar from 'chokidar';
 import { IPC_CHANNELS } from './channels';
 import type { FileTreeNode } from '../../types/ipc';
 
-const MAX_DEPTH = 10;
-
-function readTree(dirPath: string, depth = 0): FileTreeNode[] {
-  if (depth >= MAX_DEPTH) return [];
-
+/** Returns immediate children only — no recursion. Directories have no children
+ *  populated; the renderer fetches them lazily on expand. */
+function readTree(dirPath: string): FileTreeNode[] {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -21,18 +19,9 @@ function readTree(dirPath: string, depth = 0): FileTreeNode[] {
   for (const entry of entries) {
     const fullPath = path.join(dirPath, entry.name);
     if (entry.isDirectory()) {
-      nodes.push({
-        name: entry.name,
-        path: fullPath,
-        type: 'directory',
-        children: readTree(fullPath, depth + 1),
-      });
+      nodes.push({ name: entry.name, path: fullPath, type: 'directory' });
     } else {
-      nodes.push({
-        name: entry.name,
-        path: fullPath,
-        type: 'file',
-      });
+      nodes.push({ name: entry.name, path: fullPath, type: 'file' });
     }
   }
   return nodes;
