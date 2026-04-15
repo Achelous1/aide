@@ -482,10 +482,16 @@ interface AideAPI {
   // File System
   fs: {
     readTree(path: string): Promise<FileTreeNode>;
+    readTreeWithError(path: string): Promise<{ nodes: FileTreeNode[]; error?: FsReadTreeError }>;
     readFile(path: string): Promise<string>;
     writeFile(path: string, content: string): Promise<void>;
     delete(path: string): Promise<void>;
     onChanged(callback: (event: FSEvent) => void): void;
+  };
+
+  // System (OS 레벨 연동)
+  system: {
+    openPrivacySettings(): void;  // macOS Privacy & Security → Files and Folders 패널 열기
   };
 
   // Git
@@ -637,6 +643,141 @@ aide/
 ### Agent Process
 - 에이전트 프로세스는 사용자 권한으로 실행 (별도 권한 상승 없음)
 - 에이전트별 OAuth 인증은 각 CLI가 자체 관리
+
+---
+
+## IPC Channels (파일시스템 / 시스템 연동 추가)
+
+기존 `FS_READ_TREE`는 하위 호환을 위해 유지하며, Permission Banner를 지원하기 위해 신규 채널을 추가한다. 신규 UI는 `WITH_ERROR` 변형을 사용한다.
+
+| 채널 상수 | 시그니처 | 설명 |
+|-----------|---------|------|
+| `FS_READ_TREE` | `(dirPath: string) => Promise<FileTreeNode[]>` | 기존 — 에러 시 throw (하위 호환) |
+| `FS_READ_TREE_WITH_ERROR` | `(dirPath: string) => Promise<{ nodes: FileTreeNode[]; error?: FsReadTreeError }>` | 신규 — EPERM 등 에러를 구조화해 반환 |
+| `OPEN_PRIVACY_SETTINGS` | `() => void` | macOS System Settings의 Privacy & Security → Files and Folders 패널 열기. macOS 버전에 따라 deep link URL 분기 내장 |
+
+**타입 정의**:
+
+```typescript
+type FsReadTreeError = {
+  code: 'EPERM' | 'ENOENT' | 'ENOTDIR' | 'UNKNOWN';
+  path: string;
+  message: string;
+};
+```
+
+**구현 규칙**:
+- `FS_READ_TREE_WITH_ERROR`는 루트 조회 실패 시 `nodes: []` + `error` 필드를 반환한다(throw 금지)
+- 하위 디렉토리 lazy-fetch가 실패한 경우도 동일한 구조로 반환하여 렌더러가 partial-failure 노드 표시를 결정한다
+- `OPEN_PRIVACY_SETTINGS`는 main process에서 `shell.openExternal()`로 deep link URL을 호출한다
+
+---
+
+## macOS TCC (Transparency Consent and Control) 대응
+
+### 배경
+
+패키지 앱(DMG 설치)은 Finder에서 실행될 때 macOS TCC 정책에 의해 다음 폴더 접근이 OS 레벨에서 차단된다:
+
+- `~/Documents`, `~/Desktop`, `~/Downloads`
+- 외장 볼륨(`/Volumes/...`), 네트워크 볼륨
+
+접근 시 `fs.readdirSync`가 `EPERM`으로 실패한다. dev 모드(`pnpm start`)는 터미널 프로세스의 권한을 상속하므로 이 이슈는 **DMG로 패키징된 앱에서만 재현된다.**
+
+### 2단 방어 전략
+
+#### 1단 — Info.plist usage descriptions (OS 자동 프롬프트)
+
+`forge.config.ts`의 `packagerConfig.extendInfo`에 다음 키를 포함한다. 패키지 앱이 해당 폴더에 처음 접근하는 순간 OS가 네이티브 허용 다이얼로그를 자동으로 표시한다:
+
+| 키 | 커버 범위 |
+|----|----------|
+| `NSDocumentsFolderUsageDescription` | `~/Documents` |
+| `NSDesktopFolderUsageDescription` | `~/Desktop` |
+| `NSDownloadsFolderUsageDescription` | `~/Downloads` |
+| `NSRemovableVolumesUsageDescription` | USB / 외장 디스크 |
+| `NSNetworkVolumesUsageDescription` | SMB/AFP 등 네트워크 볼륨 |
+
+사용자가 프롬프트에서 `Don't Allow`를 선택하면 프롬프트는 다시 표시되지 않는다 — 이 경우 2단 복구 경로가 필요하다.
+
+#### 2단 — 런타임 에러 감지 + 복구 UI
+
+- `fs.readdirSync`가 `EPERM`으로 throw하면 `FS_READ_TREE_WITH_ERROR`가 `error: { code: 'EPERM', ... }`을 반환
+- 렌더러는 Permission Banner(UI-SPEC 3.6.2)를 표시하여 사용자에게 원인 설명 + `Open Settings` / `Retry` 액션을 제공
+- Window `focus` 이벤트 기반 자동 재시도로 권한 부여 후 즉시 복구
+- 2단 배너의 역할은 **Full Disk Access 요청이 아니라**, 사용자가 1단(Info.plist 자동 프롬프트)에서 `Don't Allow`를 선택한 뒤 System Settings의 **Files and Folders** 섹션에서 폴더별 권한 토글을 **재활성화**할 수 있는 복구 경로를 제공하는 것이다.
+
+### 권한 범위: Files and Folders (Full Disk Access 불필요)
+
+AIDE 워크스페이스 파일트리는 **Files and Folders** 섹션의 per-folder 권한(Documents / Desktop / Downloads / 외장 볼륨 등 개별 토글)으로 충분히 동작한다. Full Disk Access는 시스템 전역 권한(Library, Trash, 다른 사용자 홈 등 포함)으로, 백업/안티바이러스 계열 앱에 적합하며 VS Code·Cursor 등 표준 IDE도 요구하지 않는다. AIDE도 동일한 최소 권한 정책을 따른다.
+
+이 경우 Permission Banner의 `Open Settings` 버튼은 System Settings의 **Files and Folders 패널을 바로 연다.**
+
+### Deep link URL 버전 분기
+
+macOS 버전에 따라 Privacy & Security URL 스킴이 다르다. `OPEN_PRIVACY_SETTINGS` 핸들러는 `os.release()` 기반으로 분기한다:
+
+| macOS 버전 | URL |
+|-----------|-----|
+| macOS 13+ (Darwin 22+) | `x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_FilesAndFolders` |
+| macOS 12 이하 | `x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders` |
+
+---
+
+## 파일 감시 성능 (File Watcher Performance)
+
+### 배경
+
+AIDE 메인 프로세스가 idle 상태에서 CPU 100%+를 소모하는 이슈가 발견되었다. 원인은 `src/main/ipc/fs-handlers.ts`의 `chokidar.watch(cwd, { depth: 3 })`가 workspace 전체를 감시하면서 `node_modules`, `.git`, `dist` 같은 대형 디렉토리의 파일 이벤트를 전부 수신하는 것이었다. `broadcastChanged()` 디바운스는 적용되어 있으나, 이벤트 발생량 자체가 너무 많아 디바운스만으로는 완화되지 않았다.
+
+### Stage 1 — 하드코딩 Exclusion (현재)
+
+VS Code `files.watcherExclude` 기본값을 벤치마크하여 고정 exclusion 리스트를 적용한다. 공용 상수는 `src/main/ipc/watcher-exclusions.ts`의 `WATCHER_EXCLUSIONS` 배열에 정의하고, `fs-handlers.ts`와 `plugin-handlers.ts`가 이를 공유한다.
+
+| 범주 | 패턴 |
+|------|------|
+| VCS | `.git`, `.hg`, `.svn` |
+| 의존성 | `node_modules` |
+| 빌드 산출물 | `dist`, `build`, `out`, `coverage`, `target` (Rust/Java) |
+| 프레임워크 캐시 | `.next`, `.nuxt`, `.turbo`, `.cache`, `.parcel-cache`, `.vite`, `.swc` |
+| 로그/락 파일 | `.log`, `.pid`, `.lock` |
+
+**중요**: watcher exclusion은 **감시 대상에서만 제외**하는 것이지, 파일트리 렌더링(`readTree`)과 무관하다. `node_modules`도 파일트리에서 정상적으로 **표시된다.**
+
+### Stage 2 — `.gitignore` 머지 (미래 작업)
+
+프로젝트별 `.gitignore`를 파싱해 exclusion에 자동 머지. `ignore` npm 패키지 사용 예정. 프로젝트 루트 및 서브 디렉토리의 `.gitignore`를 재귀적으로 적용하여 사용자가 이미 VCS에서 제외한 경로를 자동으로 감시 대상에서 배제한다.
+
+### Stage 3 — Lazy per-directory Watcher (미래 작업)
+
+루트는 `depth: 1`만 감시하고, 사용자가 FileExplorer에서 expand한 폴더에 대해서만 추가 watcher를 등록한다. FileExplorer lazy-load 구조(`86986a3`)와 짝을 이루어 대규모 workspace에서도 일정한 성능을 유지한다.
+
+### Phase 2 — Rust 네이티브 Watcher (장기)
+
+`@parcel/watcher` 수준 성능을 목표로, `napi-rs` + `notify` crate를 사용해 자체 네이티브 watcher를 구현하는 것을 고려한다. Electron + napi-rs prebuild 파이프라인(멀티 플랫폼) 추가가 필요하다.
+
+### Workspace-scoped Watcher (현재)
+
+watcher는 **workspace 활성화 시점에만 생성**된다. 부팅 시 `registerFsHandlers`는 IPC 핸들러만 등록하고, chokidar watcher는 만들지 않는다. `WORKSPACE_OPEN` 핸들러가 `setWorkspaceWatcher(path)`를 호출할 때 비로소 watcher가 생성된다.
+
+`setWorkspaceWatcher(workspacePath: string | null): void`
+- `workspacePath: string` — 기존 watcher를 close하고 새 경로로 chokidar watcher를 재생성한다. workspace 전환 시 호출.
+- `workspacePath: null` — watcher를 완전히 해제한다. `before-quit` 등 cleanup 시점에 호출.
+
+이 원칙으로 (1) workspace 미선택 상태에서는 watcher 비용이 0이고, (2) workspace 전환 시 자동 교체되며, (3) HOME 같은 fallback 경로가 절대 감시 대상이 되지 않는다. 자세한 사고 사례 및 진단 과정은 wiki의 `main-process-cpu-home-watcher-bugfix` 참조.
+
+---
+
+## Known Pitfalls
+
+### Fallback cwd로 HOME 감시 시 macOS 시스템 활동에 의한 CPU 폭주
+패키지 앱(Finder 실행) 환경에서 fallback cwd(`getHome()` 등)로 chokidar watcher를 생성하면, macOS Spotlight 인덱싱·TCC mediator·Time Machine·iCloud sync 등이 HOME 하위에 끊임없이 만드는 파일 이벤트를 모두 처리하게 되어 메인 프로세스 CPU가 100%+로 폭주한다. **watcher는 반드시 사용자가 명시적으로 연 workspace 경로에 한정**해야 하며, 부팅 시점·fallback 경로 기반 자동 watcher 생성을 금지한다. exclusion 패턴은 프로젝트 산출물(`node_modules` 등) 필터링용이지 HOME 자체를 보호하지 못한다.
+
+### dev vs DMG 권한 차이
+dev 모드(`pnpm start`)에서는 재현되지 않는 EPERM 이슈가 DMG 패키지에서만 발생한다. 원인은 터미널 프로세스의 권한 상속 vs. Finder 실행 시의 TCC 제약 차이. **파일시스템 접근 관련 변경은 반드시 DMG 빌드로 검증**해야 하며, dev 모드만으로 OK 판단 금지.
+
+### "Don't Allow" 이후 재프롬프트 불가
+사용자가 OS 허용 프롬프트에서 `Don't Allow`를 한 번 선택하면, 앱은 프로그래밍적으로 프롬프트를 다시 띄울 수 없다(OS 정책). 따라서 반드시 **System Settings deep link로 복구 경로를 UI에 제공**해야 한다 — `Open Settings` 버튼이 필수이며 단순 에러 메시지만 표시하면 사용자가 복구 방법이 없다.
 
 ---
 
