@@ -15,21 +15,34 @@ interface TreeNodeProps {
 
 function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }: TreeNodeProps) {
   const [expanded, setExpanded] = useState(false);
+  const [children, setChildren] = useState<FileTreeNode[] | null>(null); // null = not yet loaded
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (ref.current) {
-      nodeRefs.current.set(node.path, ref.current);
-    }
+    if (ref.current) nodeRefs.current.set(node.path, ref.current);
     return () => { nodeRefs.current.delete(node.path); };
   }, [node.path, nodeRefs]);
 
-  // Auto-expand ancestor when a child is being revealed
+  // Auto-expand ancestor directories when a child path is being revealed
   useEffect(() => {
     if (revealPath && node.type === 'directory' && revealPath.startsWith(node.path + '/')) {
       setExpanded(true);
     }
   }, [revealPath, node.path, node.type]);
+
+  // Lazy-load children when a directory is expanded for the first time
+  useEffect(() => {
+    if (!expanded || node.type !== 'directory' || children !== null) return;
+    window.aide.fs.readTree(node.path)
+      .then((nodes) => {
+        const sorted = [...nodes].sort((a, b) => {
+          if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+        setChildren(sorted);
+      })
+      .catch(() => setChildren([]));
+  }, [expanded, children, node.path, node.type]);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -53,13 +66,6 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }:
   const isSelected = selectedPath === node.path;
 
   if (node.type === 'directory') {
-    const sortedChildren = node.children
-      ? [...node.children].sort((a, b) => {
-          if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
-          return a.name.localeCompare(b.name);
-        })
-      : [];
-
     return (
       <div>
         <div
@@ -74,7 +80,7 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }:
           </span>
           <span className="truncate">{node.name}</span>
         </div>
-        {expanded && sortedChildren.map((child) => (
+        {expanded && (children ?? []).map((child) => (
           <TreeNode
             key={child.path}
             node={child}
@@ -154,7 +160,6 @@ export function FileExplorer({ cwd }: FileExplorerProps) {
     const unsubReveal = window.aide.files.onReveal((filePath) => {
       setRevealPath(filePath);
       handleFileSelect(filePath);
-      // Scroll into view after tree re-renders with expanded state
       requestAnimationFrame(() => {
         nodeRefs.current.get(filePath)?.scrollIntoView({ block: 'nearest' });
       });
