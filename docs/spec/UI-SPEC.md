@@ -333,6 +333,69 @@ PRD F7 자동 업데이트 알림 컴포넌트. **WorkspaceNav 가장 하단 —
 - IPC: `readTree(cwd)`, `readFile(path)`, `writeFile(path, content)`, `delete(path)`, `onChanged(callback)`
 - 워크스페이스 경로를 `cwd` prop으로 전달받음
 
+### 3.6.1 Files Panel (구성)
+
+| Element | Spec | 동작 |
+|---------|------|------|
+| Container | 사이드 패널 최상단, 폭 240px | Files 탭 선택 시 표시 |
+| Header | `Files` 레이블(10px, uppercase) + ↻ 새로고침 버튼 | 새로고침 클릭 → 현재 워크스페이스 루트 re-fetch |
+| Body | 지연 로딩(lazy-load) 파일트리 | 첫 렌더 시 워크스페이스 루트의 immediate children만 조회 |
+| Directory Expand | 디렉토리 노드 클릭 | 해당 디렉토리의 children을 그 시점에 fetch (pre-fetch 없음) |
+
+**렌더링 규칙**:
+- 워크스페이스 열기/전환 시 루트 레벨만 조회 — 하위 디렉토리는 사용자가 펼칠 때까지 IPC 호출 없음
+- 이미 fetch된 디렉토리는 재전개 시 캐시 사용, ↻ 또는 `fs:changed` 이벤트 발생 시에만 refetch
+
+### 3.6.2 Permission Banner
+
+**트리거 조건**: `FS_READ_TREE_WITH_ERROR` IPC가 `error` 필드와 함께 응답할 때(code: `EPERM` / `ENOENT` / `ENOTDIR` / `UNKNOWN`).
+
+**표시 위치**: Files 헤더와 트리 노드 사이, 전체 폭, 높이 ~72px, amber 계열 배경(surface-warning) + 좌측 3px accent border.
+
+**구성 요소**:
+
+| Element | Spec | 동작 |
+|---------|------|------|
+| Warning Icon | ⚠️ (amber, 11px) | 좌측 정렬 |
+| Title | `Permission Required` (11px, weight 600) | — |
+| Description | 10px, text-secondary — 에러 코드별 상이 (아래 표 참조) | — |
+| `Open Settings` 버튼 | accent 배경, 10px | macOS + `EPERM`에서만 표시. 클릭 시 `OPEN_PRIVACY_SETTINGS` IPC 호출 |
+| `Retry` 버튼 | ghost, 10px | 항상 표시. 클릭 시 동일 경로로 `readTree` 재시도 |
+| Dismiss `×` | 우상단 10px | 세션 한정 닫기. 워크스페이스 전환 시 초기화 |
+
+**에러 코드별 설명 텍스트**:
+
+| Code | Description |
+|------|-------------|
+| `EPERM` | `AIDE needs permission to read this folder. Open Settings to grant access.` |
+| `ENOENT` | `Folder no longer exists: {path basename}` |
+| `ENOTDIR` | `Path is not a directory: {path basename}` |
+| `UNKNOWN` | `Failed to read folder: {message}` |
+
+**자동 재시도**:
+- 에러 코드가 `EPERM`일 때, window `focus` 이벤트 수신 시 자동으로 `loadTree`를 재호출한다
+- 사용자가 System Settings에서 권한을 부여하고 AIDE로 돌아오면 즉시 트리가 복구된다
+
+**플랫폼 가드**:
+- Linux/Windows에서는 `Open Settings` 버튼 비표시, `Retry`만 노출
+- macOS 외 플랫폼의 EPERM은 실제 파일 권한 문제이므로 안내 문구(예: Files and Folders 섹션에서의 폴더별 접근 권한 부여)도 OS별 분기 가능
+
+### 3.6.3 Partial-failure 노드 표시
+
+**트리거**: 하위 디렉토리 lazy-fetch 시 EPERM이 발생한 경우(루트는 성공했지만 특정 하위만 실패).
+
+| Element | Spec | 동작 |
+|---------|------|------|
+| Node Icon | 기존 폴더 아이콘 옆 ⚠️ (amber, 10px) | 에러 상태 시각화 |
+| Node Text | dim 처리(text-tertiary) | 비활성 느낌 |
+| Tooltip | hover 시 `Access denied — click to retry` | — |
+| Click 동작 | 해당 디렉토리 re-fetch 시도 | 성공 시 ⚠️ 제거 + 하위 전개 |
+
+### 3.6.4 Empty State
+
+- **조건**: 에러 없음 + `nodes.length === 0`
+- **표시**: 트리 영역 중앙, folder-open 아이콘(회색 24px) + `Folder is empty` 텍스트(text-tertiary, 11px)
+
 ### 3.6.5 Side Panel Tab Bar
 
 사이드 패널(220px) 상단에 위치한 탭 바로 Files와 Plugins 뷰를 전환.
@@ -715,4 +778,8 @@ spawn → Processing
 // agent status channels
 'agent:status'          // 에이전트 상태 변경 이벤트
 'agent:detect'          // 설치된 에이전트 탐지
+
+// filesystem channels (Permission Banner 지원)
+'fs:readTreeWithError'  // 에러 정보 포함 트리 조회 — { nodes, error? }
+'system:openPrivacySettings' // macOS Privacy & Security 패널 열기 (deep link)
 ```

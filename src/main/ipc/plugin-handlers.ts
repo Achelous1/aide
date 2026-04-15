@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import chokidar from 'chokidar';
 import { IPC_CHANNELS } from './channels';
+import { WATCHER_EXCLUSIONS } from './watcher-exclusions';
 import { generatePluginSpec } from '../plugin/spec-generator';
 import type { PluginSpec } from '../plugin/spec-generator';
 import { generatePluginCode } from '../plugin/code-generator';
@@ -32,7 +33,16 @@ function readPluginSpec(pluginDir: string): PluginSpec | null {
 
 function loadDirIntoRegistry(dir: string, scope: 'local' | 'global'): void {
   if (!fs.existsSync(dir)) return;
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (err) {
+    // EPERM on macOS when the workspace path is in a TCC-restricted location
+    // (e.g. Documents without Full Disk Access). Treat as "no plugins" so the
+    // PLUGIN_LIST IPC doesn't fail and abort the renderer's workspace flow.
+    console.warn('[AIDE] Could not scan plugins dir', dir, ':', (err as Error).message);
+    return;
+  }
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const pluginDir = path.join(dir, entry.name);
@@ -130,7 +140,7 @@ function refreshLocalPlugins(cwd: string): void {
   // plugins whose spec no longer exists.
   localPluginsWatcher?.close();
   localPluginsWatcher = chokidar
-    .watch(localDir, { ignoreInitial: true, depth: 2, ignored: /\/dev\/fd\// })
+    .watch(localDir, { ignoreInitial: true, depth: 2, ignored: WATCHER_EXCLUSIONS })
     .on('all', () => {
       rescanPluginsDir(localDir, 'local');
       broadcastPluginsChanged();
@@ -138,7 +148,7 @@ function refreshLocalPlugins(cwd: string): void {
   // Re-watch local plugins dir for index.html changes (debounced 300ms)
   localHtmlWatcher?.close();
   localHtmlWatcher = chokidar
-    .watch(path.join(localDir, '**/index.html'), { ignoreInitial: true, ignored: /\/dev\/fd\// })
+    .watch(path.join(localDir, '**/index.html'), { ignoreInitial: true, ignored: WATCHER_EXCLUSIONS })
     .on('change', (filePath: string) => {
       const pluginName = path.basename(path.dirname(filePath));
       const existing = localHtmlDebounceTimers.get(pluginName);
@@ -152,7 +162,7 @@ function refreshLocalPlugins(cwd: string): void {
   dataWatcher?.close();
   const aideDir = path.join(cwd, '.aide');
   dataWatcher = chokidar
-    .watch(aideDir, { ignoreInitial: true, depth: 0, ignored: /\/dev\/fd\// })
+    .watch(aideDir, { ignoreInitial: true, depth: 0, ignored: WATCHER_EXCLUSIONS })
     .on('change', (filePath: string) => {
       if (filePath.endsWith('.json') && !filePath.endsWith('settings.json')) {
         broadcastDataChanged();
@@ -197,7 +207,7 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
   // Rescan on any event so runtime-added plugins become visible without restart.
   const globalDir = getGlobalPluginsDir();
   chokidar
-    .watch(globalDir, { ignoreInitial: true, depth: 2, ignored: /\/dev\/fd\// })
+    .watch(globalDir, { ignoreInitial: true, depth: 2, ignored: WATCHER_EXCLUSIONS })
     .on('all', () => {
       rescanPluginsDir(globalDir, 'global');
       broadcastPluginsChanged();
@@ -206,7 +216,7 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
   // Watch global plugins dir for index.html changes (debounced 300ms)
   const htmlDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
   chokidar
-    .watch(path.join(globalDir, '**/index.html'), { ignoreInitial: true, ignored: /\/dev\/fd\// })
+    .watch(path.join(globalDir, '**/index.html'), { ignoreInitial: true, ignored: WATCHER_EXCLUSIONS })
     .on('change', (filePath: string) => {
       const pluginName = path.basename(path.dirname(filePath));
       const existing = htmlDebounceTimers.get(pluginName);

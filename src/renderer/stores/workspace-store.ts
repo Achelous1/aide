@@ -33,7 +33,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   navExpanded: true,
   sidePanelTab: 'files',
   selectedFilePath: null,
-  setSidePanelTab: (tab) => set({ sidePanelTab: tab }),
+  setSidePanelTab: (tab) => set({ sidePanelTab: tab ?? 'files' }),
   setSelectedFilePath: (path) => set({ selectedFilePath: path }),
   addWorkspace: (workspace) =>
     set((state) => ({ workspaces: [...state.workspaces, workspace] })),

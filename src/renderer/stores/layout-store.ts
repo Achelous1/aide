@@ -154,7 +154,7 @@ interface LayoutState {
 }
 
 // Per-workspace layout cache (in-memory, survives workspace switches)
-const workspaceLayouts = new Map<string, { layout: LayoutNode; focusedPaneId: string | null }>();
+const workspaceLayouts = new Map<string, { layout: LayoutNode; focusedPaneId: string | null; sidePanelTab?: string }>();
 
 function collectPanes(node: LayoutNode): Pane[] {
   if (isSplitLayout(node)) {
@@ -529,13 +529,15 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
 
   saveLayoutToCache: (workspaceId) => {
     const { layout, focusedPaneId } = get();
-    workspaceLayouts.set(workspaceId, { layout: cloneNode(layout), focusedPaneId });
+    const sidePanelTab = useWorkspaceStore.getState().sidePanelTab;
+    workspaceLayouts.set(workspaceId, { layout: cloneNode(layout), focusedPaneId, sidePanelTab });
   },
 
   loadLayoutFromCache: (workspaceId) => {
     const cached = workspaceLayouts.get(workspaceId);
     if (!cached) return false;
     set({ layout: cloneNode(cached.layout), focusedPaneId: cached.focusedPaneId });
+    useWorkspaceStore.getState().setSidePanelTab(cached.sidePanelTab ?? 'files');
     return true;
   },
 
@@ -720,7 +722,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
     }
 
     // Restore side panel tab
-    useWorkspaceStore.getState().setSidePanelTab(session.sidePanelTab);
+    useWorkspaceStore.getState().setSidePanelTab(session.sidePanelTab ?? 'files');
   },
 
   getAllPanes: () => collectPanes(get().layout),

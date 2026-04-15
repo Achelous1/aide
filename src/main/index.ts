@@ -5,7 +5,7 @@ import path from 'path';
 import { fixPackagedEnv } from './fix-env';
 import { registerIpcHandlers } from './ipc/handlers';
 import { registerWorkspaceHandlers } from './ipc/workspace-handlers';
-import { registerFsHandlers } from './ipc/fs-handlers';
+import { registerFsHandlers, setWorkspaceWatcher } from './ipc/fs-handlers';
 import { registerAgentHandlers } from './ipc/agent-handlers';
 import { registerGitHandlers } from './ipc/git-handlers';
 import { registerGithubHandlers } from './ipc/github-handlers';
@@ -89,7 +89,7 @@ app.on('ready', () => {
   registerIpcHandlers();
   registerWorkspaceHandlers(ipcMain);
   const fallbackCwd = getHome();
-  registerFsHandlers(ipcMain, fallbackCwd);
+  registerFsHandlers(ipcMain);
   registerAgentHandlers(ipcMain);
   registerGitHandlers(ipcMain);
   registerGithubHandlers(ipcMain);
@@ -111,6 +111,7 @@ app.on('ready', () => {
 });
 
 app.on('before-quit', () => {
+  setWorkspaceWatcher(null);
   killAllSessions();
 });
 

@@ -12,10 +12,14 @@ export const IPC_CHANNELS = {
 
   // File System
   FS_READ_TREE: 'fs:read-tree',
+  FS_READ_TREE_WITH_ERROR: 'fs:read-tree-with-error',
   FS_READ_FILE: 'fs:read-file',
   FS_WRITE_FILE: 'fs:write-file',
   FS_DELETE: 'fs:delete',
   FS_CHANGED: 'fs:changed',
+
+  // System
+  OPEN_PRIVACY_SETTINGS: 'system:open-privacy-settings',
 
   // Git
   GIT_STATUS: 'git:status',

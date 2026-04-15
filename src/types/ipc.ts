@@ -7,6 +7,13 @@ export interface TerminalSpawnOptions {
   continueSession?: boolean; // Resume most recent session (--continue / --resume bare)
 }
 
+/** Error info returned when reading a directory fails */
+export type FsReadTreeError = {
+  code: 'EPERM' | 'ENOENT' | 'ENOTDIR' | 'UNKNOWN';
+  path: string;
+  message: string;
+};
+
 /** File tree node */
 export interface FileTreeNode {
   name: string;
@@ -236,10 +243,15 @@ export interface UpdateInfo {
 export interface AideAPI {
   fs: {
     readTree(dirPath: string): Promise<FileTreeNode[]>;
+    readTreeWithError(dirPath: string): Promise<{ nodes: FileTreeNode[]; error?: FsReadTreeError }>;
     readFile(filePath: string): Promise<string>;
     writeFile(filePath: string, content: string): Promise<void>;
     delete(filePath: string): Promise<void>;
     onChanged(callback: () => void): () => void;
+  };
+  system: {
+    openPrivacySettings(): Promise<void>;
+    isDarwin(): boolean;
   };
   git: {
     status(cwd: string): Promise<GitStatus>;

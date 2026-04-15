@@ -84,13 +84,20 @@ function registerJsonMcpConfig(configPath: string, nodePath: string, serverPath:
 }
 
 /**
- * Removes the [mcp_servers.aide] section from a TOML string (line-by-line, safe for array values).
+ * Removes the [mcp_servers.aide] section AND any sub-sections (e.g. [mcp_servers.aide.env])
+ * from a TOML string (line-by-line, safe for array values).
+ * Handles sub-sections that appear before or after the parent section header.
  */
 function removeTomlSection(content: string, sectionHeader: string): string {
   const lines = content.split('\n');
+  const sectionName = sectionHeader.slice(1, -1); // e.g. "mcp_servers.aide"
+  const isInSectionGroup = (line: string): boolean => {
+    const trimmed = line.trimEnd();
+    return trimmed === sectionHeader || trimmed.startsWith(`[${sectionName}.`);
+  };
   let inSection = false;
   return lines.filter((line) => {
-    if (line.trimEnd() === sectionHeader) { inSection = true; return false; }
+    if (isInSectionGroup(line)) { inSection = true; return false; }
     if (inSection && line.startsWith('[')) inSection = false;
     return !inSection;
   }).join('\n');
@@ -103,8 +110,15 @@ export function writeMcpConfig(workspacePath: string): string {
   const nodePath = resolveNodePath();
   const serverPath = getMcpServerPath();
 
-  fs.mkdirSync(globalPluginsDir, { recursive: true });
-  fs.mkdirSync(localPluginsDir, { recursive: true });
+  // Global dir is under HOME — always writable. Local dir lives inside the
+  // workspace and may be permission-restricted (macOS TCC). Isolate failures
+  // so a restricted workspace doesn't skip global MCP registration.
+  try { fs.mkdirSync(globalPluginsDir, { recursive: true }); } catch (err) {
+    console.warn('[AIDE] Could not create global plugins dir:', (err as Error).message);
+  }
+  try { fs.mkdirSync(localPluginsDir, { recursive: true }); } catch (err) {
+    console.warn('[AIDE] Could not create local plugins dir:', (err as Error).message);
+  }
 
   writeMcpServerScript();
 

@@ -5,6 +5,11 @@
 
 ## Debugging
 - [[eperm-uv-cwd-bugfix]] — pty 스폰/plugin:list EPERM 에러, process.cwd() 미검증 원인 및 수정
+- [[main-process-cpu-home-watcher-bugfix]] — DMG idle CPU 127% 이슈, fallback cwd로 HOME 전체를 감시하던 chokidar watcher 라이프사이클 재설계
 
 ## Environment
 - [[xterm-font-nerd-font]] — xterm.js Nerd Font 글리프 렌더링, Symbols Nerd Font 번들링
+- [[macos-tcc-file-permissions]] — macOS TCC Files and Folders 권한, 2단 방어(Info.plist + Permission Banner), Full Disk Access 불필요 근거
+
+## Performance
+- [[watcher-performance]] — chokidar watcher exclusion (VS Code 방식), Stage 1 하드코딩 + Stage 2/3/Phase 2 로드맵

@@ -30,7 +30,13 @@ function findPluginHtml(pluginId: string, fallbackCwd: string): string | null {
 
   for (const dir of dirs) {
     if (!fs.existsSync(dir)) continue;
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue; // EPERM — skip unreadable dir rather than aborting protocol handler
+    }
+    for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const pluginDir = path.join(dir, entry.name);
       const specPath = path.join(pluginDir, 'plugin.spec.json');

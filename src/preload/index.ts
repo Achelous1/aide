@@ -1,11 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../main/ipc/channels';
-import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions, PluginSpec, McpStatus, PluginTool, WorkspaceSettings, SavedSession, UpdateInfo } from '../types/ipc';
+import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions, PluginSpec, McpStatus, PluginTool, WorkspaceSettings, SavedSession, UpdateInfo, FsReadTreeError, FileTreeNode } from '../types/ipc';
 
 const aideAPI: AideAPI = {
   fs: {
     readTree: (dirPath: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.FS_READ_TREE, dirPath),
+
+    readTreeWithError: (dirPath: string): Promise<{ nodes: FileTreeNode[]; error?: FsReadTreeError }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.FS_READ_TREE_WITH_ERROR, dirPath),
 
     readFile: (filePath: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.FS_READ_FILE, filePath),
@@ -200,6 +203,12 @@ const aideAPI: AideAPI = {
       ipcRenderer.on(IPC_CHANNELS.UPDATER_INFO_CHANGED, listener);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.UPDATER_INFO_CHANGED, listener);
     },
+  },
+
+  system: {
+    openPrivacySettings: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.OPEN_PRIVACY_SETTINGS),
+    isDarwin: (): boolean => process.platform === 'darwin',
   },
 };
 

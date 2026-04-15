@@ -2,11 +2,11 @@ import { type IpcMain, BrowserWindow } from 'electron';
 import * as pty from 'node-pty';
 import * as fs from 'fs';
 import * as path from 'path';
-import os from 'os';
 import { IPC_CHANNELS } from './channels';
 import { AgentStatusDetector } from '../agent/status-detector';
 import { getAgentSpawnConfig, COMMON_ENV, type AgentType } from '../agent/agent-config';
 import { getMcpConfigPath } from '../mcp/config-writer';
+import { getHome } from '../utils/home';
 import type { AgentStatus } from '../../types/ipc';
 
 function getResumeArgs(agentType: string, sessionId: string): string[] {
@@ -38,7 +38,7 @@ function getContinueArgs(agentType: string): string[] {
  * Gemini uses an unknown project hash — relies on --resume (bare) instead.
  */
 function detectSessionIdFromFs(agentType: string, cwd: string): string | null {
-  const home = process.env.HOME || os.homedir();
+  const home = getHome();
   try {
     switch (agentType) {
       case 'claude': {
@@ -127,8 +127,9 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
     IPC_CHANNELS.TERMINAL_SPAWN,
     (event, options?: { shell?: string; cwd?: string; agentType?: AgentType; resumeSessionId?: string; continueSession?: boolean }) => {
       const defaultShell = getDefaultShell();
-      const rawCwd = options?.cwd || os.homedir();
-      const cwd = fs.existsSync(rawCwd) ? rawCwd : os.homedir();
+      const home = getHome();
+      const rawCwd = options?.cwd || home;
+      const cwd = fs.existsSync(rawCwd) ? rawCwd : home;
       const sessionId = `term-${++sessionCounter}`;
 
       const mcpConfig = getMcpConfigPath();
@@ -153,7 +154,7 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
       // a shell, so .zshrc / nvm init is never executed inside the PTY.
       if (safeBaseEnv.PATH && !safeBaseEnv.PATH.includes('/.nvm/versions/node/')) {
         try {
-          const nvmDir = process.env.NVM_DIR || path.join(os.homedir(), '.nvm');
+          const nvmDir = process.env.NVM_DIR || path.join(getHome(), '.nvm');
           const versionsDir = path.join(nvmDir, 'versions', 'node');
           if (fs.existsSync(versionsDir)) {
             const highest = fs.readdirSync(versionsDir)

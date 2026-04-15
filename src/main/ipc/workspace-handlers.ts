@@ -5,6 +5,7 @@ import Store from 'electron-store';
 import { IPC_CHANNELS } from './channels';
 import type { WorkspaceInfo } from '../../types/ipc';
 import { writeMcpConfig } from '../mcp/config-writer';
+import { setWorkspaceWatcher } from './fs-handlers';
 
 const store = new Store({ name: 'aide-workspaces' });
 
@@ -66,10 +67,9 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
     const workspaces = getWorkspaces();
     workspaces.push(workspace);
     setWorkspaces(workspaces);
-    const aideDirPath = nodePath.join(path, '.aide', 'plugins');
-    if (!fs.existsSync(aideDirPath)) {
-      fs.mkdirSync(aideDirPath, { recursive: true });
-    }
+    // .aide/plugins creation is delegated to plugin-handlers (ensurePluginsDirs)
+    // and config-writer (writeMcpConfig). No eager mkdir here — prevents EPERM
+    // from aborting the IPC handler when the workspace path is permission-restricted.
     try { writeMcpConfig(path); } catch (err) {
       console.warn('[AIDE] Failed to write workspace MCP config:', (err as Error).message);
     }
@@ -84,12 +84,12 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
       workspace.lastOpened = Date.now();
       setWorkspaces(workspaces);
     }
-    const aideDirPath = nodePath.join(path, '.aide', 'plugins');
-    if (!fs.existsSync(aideDirPath)) {
-      fs.mkdirSync(aideDirPath, { recursive: true });
-    }
+    // .aide/plugins creation is delegated (see WORKSPACE_CREATE comment).
     try { writeMcpConfig(path); } catch (err) {
       console.warn('[AIDE] Failed to write workspace MCP config:', (err as Error).message);
+    }
+    try { setWorkspaceWatcher(path); } catch (err) {
+      console.warn('[AIDE] Failed to set workspace watcher:', (err as Error).message);
     }
     return activeWorkspacePath;
   });

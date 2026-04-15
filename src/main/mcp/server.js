@@ -6,8 +6,16 @@ const vm = require("vm");
 const crypto = require("crypto");
 
 const GLOBAL_PLUGINS_DIR = process.env.AIDE_GLOBAL_PLUGINS_DIR || "";
-const PLUGINS_DIR = process.env.AIDE_PLUGINS_DIR || path.join(process.cwd(), ".aide", "plugins");
-const WORKSPACE = process.env.AIDE_WORKSPACE || process.cwd();
+function safeCwd() {
+  // process.cwd() throws EPERM in packaged Electron apps when launched from Finder
+  // (HOME=/ or unmounted cwd). Fall back to HOME / getpwuid / /tmp.
+  try { return process.cwd(); } catch { /* EPERM uv_cwd */ }
+  if (process.env.HOME && process.env.HOME !== "/") return process.env.HOME;
+  try { return require("os").userInfo().homedir; } catch { /* ignore */ }
+  return "/tmp";
+}
+const PLUGINS_DIR = process.env.AIDE_PLUGINS_DIR || path.join(safeCwd(), ".aide", "plugins");
+const WORKSPACE = process.env.AIDE_WORKSPACE || safeCwd();
 
 function send(msg) {
   process.stdout.write(JSON.stringify(msg) + "\n");
