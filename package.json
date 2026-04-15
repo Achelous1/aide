@@ -1,7 +1,7 @@
 {
   "name": "aide",
   "productName": "AIDE",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "AI-Driven IDE - Create n Play plugins with natural language",
   "main": ".vite/build/index.js",
   "private": true,
