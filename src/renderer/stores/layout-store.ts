@@ -716,10 +716,10 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
     const restoredLayout = await rebuildNode(session.layout);
     set({ layout: restoredLayout, focusedPaneId: session.focusedPaneId });
 
-    // Restore active plugins
-    for (const pluginId of session.activePlugins) {
-      window.aide.plugin.activate(pluginId).catch(() => {});
-    }
+    // Restore active plugins — await so registry is settled before loadPlugins() runs
+    await Promise.allSettled(
+      session.activePlugins.map((pluginId) => window.aide.plugin.activate(pluginId))
+    );
 
     // Restore side panel tab
     useWorkspaceStore.getState().setSidePanelTab(session.sidePanelTab ?? 'files');

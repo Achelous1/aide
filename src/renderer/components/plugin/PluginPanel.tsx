@@ -13,9 +13,6 @@ export function PluginPanel() {
     deletePlugin,
   } = usePluginStore();
 
-  const focusedPaneId = useLayoutStore((s) => s.focusedPaneId);
-  const addTabToPane = useLayoutStore((s) => s.addTabToPane);
-
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
@@ -24,15 +21,19 @@ export function PluginPanel() {
     return unsub;
   }, [loadPlugins]);
 
-  const handleOpenTab = (plugin: typeof plugins[number]) => {
-    const paneId = focusedPaneId ?? useLayoutStore.getState().focusedPaneId;
-    if (!paneId) return;
-    addTabToPane(paneId, {
-      id: `plugin-${plugin.id}-${Date.now()}`,
-      type: 'plugin',
-      pluginId: plugin.id,
-      title: plugin.name,
-    });
+  const handleOpenTab = async (plugin: typeof plugins[number]) => {
+    // Focus existing tab if already open
+    const allPanes = useLayoutStore.getState().getAllPanes();
+    const existing = allPanes
+      .flatMap((pane) => pane.tabs.map((tab) => ({ paneId: pane.id, tab })))
+      .find(({ tab }) => tab.type === 'plugin' && tab.pluginId === plugin.id);
+    if (existing) {
+      useLayoutStore.getState().setActiveTab(existing.paneId, existing.tab.id);
+      return;
+    }
+    // Smart Open: activate (also adds tab via plugin-store.activate) regardless of current state.
+    // activate() is idempotent on already-active plugins and skips tab creation if tab exists.
+    await activate(plugin.id);
   };
 
   const handleDeleteClick = (name: string) => {
@@ -91,7 +92,7 @@ export function PluginPanel() {
         <button
           onClick={() => handleOpenTab(plugin)}
           className="px-1.5 py-0.5 rounded text-[10px] font-mono text-aide-text-tertiary hover:text-aide-text-primary hover:bg-aide-surface-hover transition-colors"
-          title="Open as tab"
+          title="Open plugin (will activate if off)"
         >
           ↗
         </button>

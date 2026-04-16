@@ -58,6 +58,12 @@ export const usePluginStore = create<PluginState>((set, get) => ({
           }
         }
       }
+      // Persist plugin active state immediately — don't rely on beforeunload
+      const { useWorkspaceStore } = await import('./workspace-store');
+      const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+      if (wsId) {
+        await useLayoutStore.getState().saveSession(wsId);
+      }
     } catch (e) {
       set({ error: e instanceof Error ? e.message : 'Failed to activate plugin' });
     }
@@ -77,6 +83,12 @@ export const usePluginStore = create<PluginState>((set, get) => ({
           layout.removeTabFromPane(pane.id, pluginTab.id);
           useTerminalStore.getState().removeTab(pluginTab.id);
         }
+      }
+      // Persist plugin active state immediately — don't rely on beforeunload
+      const { useWorkspaceStore } = await import('./workspace-store');
+      const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+      if (wsId) {
+        await useLayoutStore.getState().saveSession(wsId);
       }
     } catch (e) {
       set({ error: e instanceof Error ? e.message : 'Failed to deactivate plugin' });

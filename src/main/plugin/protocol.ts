@@ -72,6 +72,14 @@ export function registerCustomSchemes(): void {
 }
 
 /**
+ * Default theme CSS variables injected into every plugin iframe.
+ * Provides dark (default), .light class override, and prefers-color-scheme
+ * media query fallback. Plugins can override these with higher specificity
+ * if intentional custom theming is needed.
+ */
+const AIDE_STYLE_SHIM = `<style>:root{--background:#131519;--surface:#1A1C23;--surface-elevated:#24262E;--border:#2E3140;--text-primary:#E8E9ED;--text-secondary:#8B8D98;--text-tertiary:#5C5E6A;--accent:#10B981;--accent-warning:#F59E0B;--accent-info:#06B6D4;--scrollbar-thumb:rgba(255,255,255,0.08);--scrollbar-thumb-hover:rgba(255,255,255,0.16);--agent-claude:#D97706;--agent-gemini:#3B82F6;--agent-codex:#10B981}.light{--background:#F5F5F0;--surface:#FAFAF7;--surface-elevated:#EBEBE6;--border:#E0E3E8;--text-primary:#0D0D0D;--text-secondary:#6B7280;--text-tertiary:#9CA3AF;--accent:#059669;--scrollbar-thumb:rgba(0,0,0,0.12);--scrollbar-thumb-hover:rgba(0,0,0,0.22)}@media(prefers-color-scheme:light){:root:not(.dark){--background:#F5F5F0;--surface:#FAFAF7;--surface-elevated:#EBEBE6;--border:#E0E3E8;--text-primary:#0D0D0D;--text-secondary:#6B7280;--text-tertiary:#9CA3AF;--accent:#059669;--scrollbar-thumb:rgba(0,0,0,0.12);--scrollbar-thumb-hover:rgba(0,0,0,0.22)}}body{background:var(--background);color:var(--text-primary)}</style>`;
+
+/**
  * window.aide shim injected into every plugin iframe.
  * Provides on(), invoke(), emit(), and theme listener.
  * Injected by the protocol handler so ALL plugins get it automatically —
@@ -84,11 +92,13 @@ const AIDE_SHIM = `<script>window.aide=(function(){var _cid=0,_cbs={};window.add
  * If no </head> tag, prepend to the HTML.
  */
 function injectShim(html: string): string {
+  const injection = AIDE_STYLE_SHIM + AIDE_SHIM;
   const headClose = html.indexOf('</head>');
   if (headClose !== -1) {
-    return html.slice(0, headClose) + AIDE_SHIM + html.slice(headClose);
+    return html.slice(0, headClose) + injection + html.slice(headClose);
   }
-  return AIDE_SHIM + html;
+  // No </head> — prepend so style takes effect before body renders
+  return injection + html;
 }
 
 /**

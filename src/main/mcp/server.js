@@ -249,6 +249,13 @@ Available iframe APIs:
 window.aide shim:
 AIDE automatically injects the window.aide shim into all plugin iframes — both auto-generated and custom HTML. You do NOT need to include the shim manually in custom HTML.
 
+Theme sync API:
+  window.aide is automatically notified of theme changes via postMessage. Additionally you can listen:
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.theme) { /* e.data.theme === 'dark' | 'light' */ }
+    });
+  In most cases you don't need this — the CSS variables handle it.
+
 Events fire on every file click — eventBindings are NOT required for iframe postMessage:
   window.aide.on('file:clicked', function(data) { /* data.filePath — absolute path */ })
   window.aide.on('file:right-clicked', function(data) { /* data.filePath */ })
@@ -262,6 +269,24 @@ Invoking backend tools from iframe:
 
 eventBindings (.aide/settings.json): controls backend tool invocation on file events only — separate from iframe postMessage.
   Example: { "eventBindings": { "file:clicked": [{ "plugin": "my-plugin", "tool": "on-file-clicked", "args": {} }] } }
+
+Theme Support (REQUIRED):
+AIDE runs in both dark and light themes. Your plugin MUST work in both.
+
+CSS variables are AUTO-INJECTED into every plugin iframe by AIDE — you do NOT need to define :root, .light, or @media(prefers-color-scheme) blocks yourself. Just reference the variables:
+
+  background: var(--background);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  color: var(--accent);
+
+Runtime theme switching:
+AIDE sends postMessage({theme: 'dark'|'light'}) to the plugin iframe whenever the user toggles theme. The injected shim automatically updates document.documentElement.className, which triggers the .light class variables. Your CSS will re-render without any code on your side — provided you used var() references, not hardcoded colors.
+
+Detecting current theme from JS:
+  const isLight = document.documentElement.classList.contains('light');
+
+NEVER hardcode colors like #000, #fff, black, white, or any hex literal for UI surfaces. Always use the CSS variables below. Hardcoding will break one of the two themes.
 
 IMPORTANT — AIDE Design System Rules:
 If the plugin produces UI output (HTML/CSS), it MUST use these CSS custom properties (not hardcoded colors):
@@ -288,6 +313,7 @@ Style rules:
 - Spacing: 4px/8px/12px increments (Tailwind-compatible)
 - Never use hardcoded hex colors — always reference CSS variables
 - Element visibility: always set explicit display values (e.g. style.display = 'block', 'flex', 'grid') when showing hidden elements — never use style.display = '' because a CSS stylesheet display:none will persist
+- Dark/light parity: test both themes mentally before finalizing. If a color looks good on dark but unreadable on light (or vice versa), you've used the wrong variable. Example: buttons use var(--accent) for bg + #000 for text — this works because --accent differs per theme but black text stays readable on emerald in both.
 
 CDN Libraries (OFFLINE-CAPABLE):
 Plugins can load external libraries via the aide-cdn:// protocol, which caches files locally for offline use.

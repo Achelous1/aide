@@ -79,7 +79,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       if (workspace) {
         await window.aide.workspace.open(workspace.path);
       }
-      usePluginStore.getState().loadPlugins();
+      await usePluginStore.getState().loadPlugins();
       invalidateSettingsCache();
     }
     set({ activeWorkspaceId: id });
