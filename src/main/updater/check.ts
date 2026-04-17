@@ -171,6 +171,35 @@ export async function downloadUpdate(): Promise<{ ok: boolean; path?: string; er
 }
 
 /**
+ * Build the bash update script as a string. Exported for unit testing.
+ */
+export function buildUpdateScript(params: {
+  appPath: string;
+  newAppPath: string;
+  tmpDir: string;
+}): string {
+  const { appPath, newAppPath, tmpDir } = params;
+  return [
+    '#!/bin/bash',
+    'sleep 3',
+    // Remove quarantine on extracted app (legacy defense)
+    `xattr -rd com.apple.quarantine "${newAppPath}" 2>/dev/null || true`,
+    // Try direct replacement first; escalate to admin dialog if needed
+    `if rm -rf "${appPath}" 2>/dev/null && cp -R "${newAppPath}" "${appPath}" 2>/dev/null; then`,
+    '  echo "Replaced directly"',
+    'else',
+    `  osascript -e "do shell script \\"rm -rf '${appPath}' && cp -R '${newAppPath}' '${appPath}'\\" with administrator privileges" 2>/dev/null`,
+    'fi',
+    // Clear ALL extended attributes on the installed app — defends against
+    // quarantine/provenance/other xattrs interfering with hardened runtime.
+    `xattr -cr "${appPath}" 2>/dev/null || true`,
+    // Clean up temp directory and relaunch
+    `rm -rf "${tmpDir}"`,
+    `open "${appPath}"`,
+  ].join('\n');
+}
+
+/**
  * Download .app.zip, extract it, spawn a detached shell script that waits for
  * the app to quit then replaces the .app bundle and relaunches.
  * Falls back to downloadUpdate() if no zip asset is present.
@@ -216,21 +245,7 @@ export async function installUpdate(): Promise<{ ok: boolean; error?: string }> 
 
     // 4. Write the update shell script
     const scriptPath = path.join(tmpDir, 'update.sh');
-    const script = [
-      '#!/bin/bash',
-      'sleep 3',
-      // Remove quarantine so macOS Gatekeeper doesn't block the replaced app
-      `xattr -rd com.apple.quarantine "${newAppPath}" 2>/dev/null || true`,
-      // Try direct replacement first; escalate to admin dialog if needed
-      `if rm -rf "${appPath}" 2>/dev/null && cp -R "${newAppPath}" "${appPath}" 2>/dev/null; then`,
-      '  echo "Replaced directly"',
-      'else',
-      `  osascript -e "do shell script \\"rm -rf '${appPath}' && cp -R '${newAppPath}' '${appPath}'\\" with administrator privileges" 2>/dev/null`,
-      'fi',
-      // Clean up temp directory and relaunch
-      `rm -rf "${tmpDir}"`,
-      `open "${appPath}"`,
-    ].join('\n');
+    const script = buildUpdateScript({ appPath, newAppPath, tmpDir });
 
     fs.writeFileSync(scriptPath, script, { mode: 0o755 });
 
