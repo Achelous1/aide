@@ -7,6 +7,11 @@ export interface TerminalSpawnOptions {
   continueSession?: boolean; // Resume most recent session (--continue / --resume bare)
 }
 
+/** Structured result returned by terminal.spawn() — never rejects */
+export type TerminalSpawnResult =
+  | { ok: true; sessionId: string }
+  | { ok: false; error: string; code: string; diagnostic: { path?: string; home?: string; shell?: string } };
+
 /** Error info returned when reading a directory fails */
 export type FsReadTreeError = {
   code: 'EPERM' | 'ENOENT' | 'ENOTDIR' | 'UNKNOWN';
@@ -264,7 +269,7 @@ export interface AideAPI {
     remoteUrl(cwd: string): Promise<{ owner: string; repo: string } | null>;
   };
   terminal: {
-    spawn(options?: TerminalSpawnOptions): Promise<string>;
+    spawn(options?: TerminalSpawnOptions): Promise<TerminalSpawnResult>;
     write(sessionId: string, data: string): Promise<void>;
     resize(sessionId: string, cols: number, rows: number): Promise<void>;
     kill(sessionId: string): Promise<void>;

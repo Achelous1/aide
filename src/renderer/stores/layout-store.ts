@@ -4,6 +4,7 @@ import { isSplitLayout } from '../../types/ipc';
 import { useTerminalStore } from './terminal-store';
 import { useWorkspaceStore } from './workspace-store';
 import { usePluginStore } from './plugin-store';
+import { useToastStore } from './toast-store';
 
 let paneCounter = 0;
 let splitCounter = 0;
@@ -605,6 +606,8 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       return;
     }
 
+    let restoreFailCount = 0;
+
     // Update counters to avoid ID collisions
     function updateCounters(node: SerializableLayoutNode): void {
       if ('direction' in node && 'children' in node) {
@@ -654,21 +657,25 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
         } else {
           // shell or agent — spawn new PTY
           let sessionId: string | null = null;
-          try {
-            const isAgent = savedTab.type === 'agent';
-            sessionId = await window.aide.terminal.spawn({
-              shell: savedTab.agentId || undefined,
-              cwd: wsPath,
-              agentType: isAgent ? (savedTab.agentId as 'claude' | 'gemini' | 'codex' | undefined) : undefined,
-              resumeSessionId: savedTab.agentSessionId,
-              continueSession: isAgent && !savedTab.agentSessionId,
-            });
-          } catch {
-            // agent not installed — fall back to plain shell
-            try {
-              sessionId = await window.aide.terminal.spawn({ cwd: wsPath });
-            } catch {
-              // spawn failed entirely, skip tab
+          const isAgent = savedTab.type === 'agent';
+          const agentResult = await window.aide.terminal.spawn({
+            shell: savedTab.agentId || undefined,
+            cwd: wsPath,
+            agentType: isAgent ? (savedTab.agentId as 'claude' | 'gemini' | 'codex' | undefined) : undefined,
+            resumeSessionId: savedTab.agentSessionId,
+            continueSession: isAgent && !savedTab.agentSessionId,
+          });
+          if (agentResult.ok) {
+            sessionId = agentResult.sessionId;
+          } else {
+            // agent not installed or spawn failed — fall back to plain shell
+            console.warn('[AIDE] Session restore: agent spawn failed, falling back to shell', agentResult.error);
+            const shellResult = await window.aide.terminal.spawn({ cwd: wsPath });
+            if (shellResult.ok) {
+              sessionId = shellResult.sessionId;
+            } else {
+              console.warn('[AIDE] Session restore: shell spawn also failed, skipping tab', shellResult.error);
+              restoreFailCount++;
             }
           }
 
@@ -690,19 +697,20 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
 
       // Fallback: ensure pane has at least one tab
       if (tabs.length === 0) {
-        try {
-          const sessionId = await window.aide.terminal.spawn({ cwd: wsPath });
+        const fallbackResult = await window.aide.terminal.spawn({ cwd: wsPath });
+        if (fallbackResult.ok) {
           const tab: TerminalTab = {
             id: crypto.randomUUID(),
             type: 'shell',
-            sessionId,
+            sessionId: fallbackResult.sessionId,
             title: '$ shell',
           };
           tabs.push(tab);
           useTerminalStore.getState().addTab(tab);
           activeTabId = tab.id;
-        } catch {
-          // ignore
+        } else {
+          console.warn('[AIDE] Session restore: fallback shell spawn failed', fallbackResult.error);
+          restoreFailCount++;
         }
       }
 
@@ -723,6 +731,14 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
 
     // Restore side panel tab
     useWorkspaceStore.getState().setSidePanelTab(session.sidePanelTab ?? 'files');
+
+    if (restoreFailCount > 0) {
+      useToastStore.getState().push({
+        kind: 'warning',
+        title: 'Some tabs could not be restored',
+        detail: `${restoreFailCount} tab${restoreFailCount > 1 ? 's' : ''} failed to open`,
+      });
+    }
   },
 
   getAllPanes: () => collectPanes(get().layout),

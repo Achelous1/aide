@@ -3,6 +3,7 @@ import { useTerminalStore } from '../../stores/terminal-store';
 import { useAgentStore } from '../../stores/agent-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useLayoutStore } from '../../stores/layout-store';
+import { useToastStore } from '../../stores/toast-store';
 
 interface AgentButton {
   id: string;
@@ -69,26 +70,31 @@ export function EmptyState({ paneId }: EmptyStateProps) {
   const handleSelect = async (btn: AgentButton) => {
     if (!isInstalled(btn.id)) return;
 
-    try {
-      const ws = workspaces.find((w) => w.id === activeWorkspaceId);
-      const sessionId = await window.aide.terminal.spawn(
-        btn.command ? { shell: btn.command, cwd: ws?.path } : { cwd: ws?.path }
-      );
+    const ws = workspaces.find((w) => w.id === activeWorkspaceId);
+    const result = await window.aide.terminal.spawn(
+      btn.command ? { shell: btn.command, cwd: ws?.path } : { cwd: ws?.path }
+    );
 
-      const tab = {
-        id: crypto.randomUUID(),
-        type: btn.type,
-        agentId: btn.type === 'agent' ? btn.id : undefined,
-        sessionId,
-        title: btn.type === 'agent' ? btn.id : '$ shell',
-      };
-
-      addTab(tab);
-      setActiveTab(tab.id);
-      useLayoutStore.getState().addTabToPane(paneId, tab);
-    } catch {
-      // ignore spawn errors
+    if (!result.ok) {
+      useToastStore.getState().push({
+        kind: 'error',
+        title: `Failed to open terminal (${result.code ?? 'unknown'})`,
+        detail: result.error,
+      });
+      return;
     }
+
+    const tab = {
+      id: crypto.randomUUID(),
+      type: btn.type,
+      agentId: btn.type === 'agent' ? btn.id : undefined,
+      sessionId: result.sessionId,
+      title: btn.type === 'agent' ? btn.id : '$ shell',
+    };
+
+    addTab(tab);
+    setActiveTab(tab.id);
+    useLayoutStore.getState().addTabToPane(paneId, tab);
   };
 
   return (
