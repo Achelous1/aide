@@ -6,6 +6,7 @@ interface ThemeState {
   theme: Theme;
   toggleTheme: () => void;
   setTheme: (theme: Theme) => void;
+  loadSavedTheme: () => Promise<void>;
 }
 
 export const useThemeStore = create<ThemeState>((set) => ({
@@ -14,11 +15,24 @@ export const useThemeStore = create<ThemeState>((set) => ({
     set((state) => {
       const next = state.theme === 'dark' ? 'light' : 'dark';
       applyTheme(next);
+      window.aide.appSettings.set('theme', next);
       return { theme: next };
     }),
   setTheme: (theme) => {
     applyTheme(theme);
+    window.aide.appSettings.set('theme', theme);
     set({ theme });
+  },
+  loadSavedTheme: async () => {
+    try {
+      const settings = await window.aide.appSettings.get();
+      if (settings.theme && settings.theme !== 'dark') {
+        applyTheme(settings.theme);
+        set({ theme: settings.theme });
+      }
+    } catch {
+      // First launch or unavailable — keep default dark
+    }
   },
 }));
 

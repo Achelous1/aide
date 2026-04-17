@@ -309,6 +309,10 @@ export interface AideAPI {
     read(): Promise<WorkspaceSettings>;
     write(settings: WorkspaceSettings): Promise<void>;
   };
+  appSettings: {
+    get(): Promise<{ theme: 'dark' | 'light'; windowBounds: { x: number; y: number; width: number; height: number } | null }>;
+    set(key: string, value: unknown): Promise<void>;
+  };
   files: {
     onReveal(callback: (filePath: string) => void): () => void;
     onSelect(callback: (filePath: string) => void): () => void;

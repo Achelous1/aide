@@ -161,6 +161,13 @@ const aideAPI: AideAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_WRITE, settings),
   },
 
+  appSettings: {
+    get: (): Promise<{ theme: 'dark' | 'light'; windowBounds: { x: number; y: number; width: number; height: number } | null }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_SETTINGS_GET),
+    set: (key: string, value: unknown): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_SETTINGS_SET, key, value),
+  },
+
   session: {
     save: (session: SavedSession): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.SESSION_SAVE, session),

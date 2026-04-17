@@ -25,6 +25,10 @@ export function App() {
   const theme = useThemeStore((s) => s.theme);
 
   useEffect(() => {
+    useThemeStore.getState().loadSavedTheme();
+  }, []);
+
+  useEffect(() => {
     loadWorkspaces();
   }, [loadWorkspaces]);
 
