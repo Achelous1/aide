@@ -197,17 +197,32 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
         }
       }
 
-      const ptyProcess = pty.spawn(shell, spawnArgs, {
-        name: 'xterm-256color',
-        cols: 80,
-        rows: 24,
-        cwd,
-        env: {
-          ...safeBaseEnv,
-          ...COMMON_ENV,
-          ...agentConfig.extraEnv,
-        },
-      });
+      let ptyProcess: ReturnType<typeof pty.spawn>;
+      try {
+        ptyProcess = pty.spawn(shell, spawnArgs, {
+          name: 'xterm-256color',
+          cols: 80,
+          rows: 24,
+          cwd,
+          env: {
+            ...safeBaseEnv,
+            ...COMMON_ENV,
+            ...agentConfig.extraEnv,
+          },
+        });
+      } catch (spawnErr) {
+        const err = spawnErr as NodeJS.ErrnoException;
+        return {
+          ok: false as const,
+          error: err.message ?? String(spawnErr),
+          code: err.code ?? 'UNKNOWN',
+          diagnostic: {
+            path: safeBaseEnv.PATH ?? process.env.PATH ?? '',
+            home: safeBaseEnv.HOME ?? process.env.HOME ?? '',
+            shell,
+          },
+        };
+      }
 
       const session: PtySession = {
         pty: ptyProcess,
@@ -259,7 +274,7 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
         }, 1000);
       }
 
-      return sessionId;
+      return { ok: true as const, sessionId };
     }
   );
 

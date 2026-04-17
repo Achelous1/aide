@@ -3,6 +3,7 @@ import { useTerminalStore } from '../../stores/terminal-store';
 import { useAgentStore } from '../../stores/agent-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useLayoutStore } from '../../stores/layout-store';
+import { useToastStore } from '../../stores/toast-store';
 
 interface AgentOption {
   id: string;
@@ -91,30 +92,35 @@ export function AgentDropdown({ paneId, onClose }: AgentDropdownProps) {
     if (!isInstalled(option.id)) return;
     close();
 
-    try {
-      const ws = workspaces.find((w) => w.id === activeWorkspaceId);
-      const sessionId = await window.aide.terminal.spawn(
-        option.command ? { shell: option.command, cwd: ws?.path } : { cwd: ws?.path }
-      );
+    const ws = workspaces.find((w) => w.id === activeWorkspaceId);
+    const result = await window.aide.terminal.spawn(
+      option.command ? { shell: option.command, cwd: ws?.path } : { cwd: ws?.path }
+    );
 
-      const tab = {
-        id: crypto.randomUUID(),
-        type: option.type as 'agent' | 'shell',
-        agentId: option.type === 'agent' ? option.id : undefined,
-        sessionId,
-        title: option.label,
-      };
+    if (!result.ok) {
+      useToastStore.getState().push({
+        kind: 'error',
+        title: `Failed to open terminal (${result.code ?? 'unknown'})`,
+        detail: result.error,
+      });
+      return;
+    }
 
-      // Add to both stores with real sessionId
-      addTab(tab);
-      setActiveTab(tab.id);
+    const tab = {
+      id: crypto.randomUUID(),
+      type: option.type as 'agent' | 'shell',
+      agentId: option.type === 'agent' ? option.id : undefined,
+      sessionId: result.sessionId,
+      title: option.label,
+    };
 
-      const targetPaneId = paneId ?? useLayoutStore.getState().getFocusedPane()?.id;
-      if (targetPaneId) {
-        useLayoutStore.getState().addTabToPane(targetPaneId, tab);
-      }
-    } catch {
-      // ignore spawn errors
+    // Add to both stores with real sessionId
+    addTab(tab);
+    setActiveTab(tab.id);
+
+    const targetPaneId = paneId ?? useLayoutStore.getState().getFocusedPane()?.id;
+    if (targetPaneId) {
+      useLayoutStore.getState().addTabToPane(targetPaneId, tab);
     }
   };
 
