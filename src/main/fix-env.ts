@@ -5,6 +5,44 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
+ * Minimum PATH segments guaranteed for pty.spawn to find CLI tools.
+ * Covers Homebrew (Apple Silicon + Intel) and standard system paths.
+ */
+export const FALLBACK_PATH = '/bin:/usr/bin:/usr/local/bin:/opt/homebrew/bin';
+
+/**
+ * Ensures process.env.PATH contains at least the fallback segments.
+ * Returns currentPath unchanged if it already has any of the well-known
+ * fallback directories; otherwise prepends FALLBACK_PATH.
+ * This prevents pty.spawn failures even when the login shell returns a
+ * truncated PATH (e.g. auto-update `open` re-launch inherits Finder env).
+ */
+export function ensureMinimumPath(currentPath: string | undefined): string {
+  if (!currentPath) return FALLBACK_PATH;
+  const segments = FALLBACK_PATH.split(':');
+  const hasAny = segments.some((seg) => currentPath.split(':').includes(seg));
+  if (hasAny) return currentPath;
+  return `${FALLBACK_PATH}:${currentPath}`;
+}
+
+/**
+ * Resolves a reliable home directory, rejecting '/' (Finder launch artifact).
+ * Falls back to os.userInfo().homedir (getpwuid-based), then '/tmp' as
+ * last resort if userInfo throws.
+ */
+export function resolveHomeDir(
+  envHome: string | undefined,
+  getUserInfoHomedir: () => string,
+): string {
+  if (envHome && envHome !== '/') return envHome;
+  try {
+    return getUserInfoHomedir();
+  } catch {
+    return '/tmp';
+  }
+}
+
+/**
  * Packaged Electron apps on macOS launched from Finder don't inherit
  * the user's shell environment (PATH, SHELL, etc.).
  * This loads the login shell env so CLI tools (claude, zsh, etc.) are found.
@@ -32,6 +70,7 @@ export function fixPackagedEnv(): void {
     }
   } catch {
     // Fallback: ensure minimal PATH + try to detect nvm's default node
+    process.env._AIDE_ENV_FIX_FAILED = '1';
     const homedir = (() => { try { return userInfo().homedir; } catch { return process.env.HOME || '/'; } })();
     let extraPaths = '/usr/local/bin:/opt/homebrew/bin';
 
@@ -95,16 +134,14 @@ export function fixPackagedEnv(): void {
       }
     } catch { /* ignore nvm detection errors */ }
 
-    if (!process.env.PATH?.includes('/usr/local/bin')) {
-      process.env.PATH = `${extraPaths}:${process.env.PATH || '/usr/bin:/bin'}`;
-    }
+    process.env.PATH = `${extraPaths}:${process.env.PATH || '/usr/bin:/bin'}`;
   }
 
+  // Always guarantee minimum PATH — covers both the happy path (login shell
+  // returned a truncated PATH) and the catch path above.
+  process.env.PATH = ensureMinimumPath(process.env.PATH);
+
   // Final safety net: Finder may set HOME=/ and the shell may not correct it.
-  // os.userInfo().homedir uses getpwuid() which is always reliable.
-  if (!process.env.HOME || process.env.HOME === '/') {
-    try {
-      process.env.HOME = userInfo().homedir;
-    } catch { /* ignore */ }
-  }
+  // resolveHomeDir uses getpwuid() which is always reliable.
+  process.env.HOME = resolveHomeDir(process.env.HOME, () => userInfo().homedir);
 }

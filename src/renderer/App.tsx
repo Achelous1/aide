@@ -7,6 +7,7 @@ import { WorkspaceNav } from './components/workspace/WorkspaceNav';
 import { WelcomePage } from './components/welcome/WelcomePage';
 import { FileExplorer } from './components/file-explorer/FileExplorer';
 import { PluginPanel } from './components/plugin/PluginPanel';
+import { ToastContainer } from './components/common/ToastContainer';
 import { useWorkspaceStore } from './stores/workspace-store';
 import { useTerminalStore } from './stores/terminal-store';
 import { useLayoutStore } from './stores/layout-store';
@@ -293,6 +294,7 @@ export function App() {
       </div>
 
       <StatusBar />
+      <ToastContainer />
     </div>
   );
 }
