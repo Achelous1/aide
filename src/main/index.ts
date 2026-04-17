@@ -12,6 +12,7 @@ import { registerGithubHandlers } from './ipc/github-handlers';
 import { registerPluginHandlers } from './ipc/plugin-handlers';
 import { registerSettingsHandlers } from './ipc/settings-handlers';
 import { registerSessionHandlers } from './ipc/session-handlers';
+import { registerAppSettingsHandlers, getAppSettings, setAppSetting } from './ipc/app-settings-handlers';
 import { registerUpdaterHandlers } from './ipc/updater-handlers';
 import { startUpdatePolling } from './updater/check';
 import { killAllSessions } from './ipc/terminal-handlers';
@@ -47,9 +48,13 @@ if (process.platform === 'win32') {
 }
 
 const createWindow = (): void => {
+  const { windowBounds } = getAppSettings();
+
   const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: windowBounds?.width ?? 1200,
+    height: windowBounds?.height ?? 800,
+    x: windowBounds?.x,
+    y: windowBounds?.y,
     minWidth: 800,
     minHeight: 600,
     title: 'AIDE',
@@ -61,6 +66,19 @@ const createWindow = (): void => {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
+
+  // Save window bounds on resize/move (debounced)
+  let boundsTimer: ReturnType<typeof setTimeout> | null = null;
+  const saveBounds = () => {
+    if (boundsTimer) clearTimeout(boundsTimer);
+    boundsTimer = setTimeout(() => {
+      if (!mainWindow.isDestroyed()) {
+        setAppSetting('windowBounds', mainWindow.getBounds());
+      }
+    }, 500);
+  };
+  mainWindow.on('resize', saveBounds);
+  mainWindow.on('move', saveBounds);
 
   // Load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -78,6 +96,7 @@ const createWindow = (): void => {
 
 app.on('ready', () => {
   registerIpcHandlers();
+  registerAppSettingsHandlers(ipcMain);
   registerWorkspaceHandlers(ipcMain);
   const fallbackCwd = getHome();
   registerFsHandlers(ipcMain);
