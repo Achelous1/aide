@@ -50,7 +50,7 @@ function nextColor(counter: number): string {
  * Migration: remove AIDE-generated entries from {workspace}/.mcp.json.
  * If only AIDE entries remain, delete the file entirely.
  */
-function migrateProjectMcpJson(workspacePath: string): void {
+export function migrateProjectMcpJson(workspacePath: string): void {
   const mcpPath = nodePath.join(workspacePath, '.mcp.json');
   if (!fs.existsSync(mcpPath)) return;
   try {
