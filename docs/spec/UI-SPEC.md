@@ -11,6 +11,8 @@
 |------|-------------|---------------|
 | Welcome | 앱 최초 실행 / 프로젝트 미선택 시 | Welcome (Dark/Light) |
 | Terminal | 프로젝트 작업 화면 (메인) | Dark/Light Theme, Nav Expanded |
+
+> **Theme & Window Persistence**: 테마 선택값과 메인 윈도우의 bounds(x/y/width/height)는 `aide-app-settings` electron-store에 저장되어 다음 실행 시 복원된다. 최초 실행 시 기본값은 Dark 테마 + 1200×800 (중앙 배치).
 | Empty State | 모든 탭이 닫힌 상태 (에이전트 미선택) | Empty State (Dark/Light) |
 
 ---
@@ -447,14 +449,12 @@ PRD F7 자동 업데이트 알림 컴포넌트. **WorkspaceNav 가장 하단 —
 
 Plugins 탭 선택 시 사이드 패널에 표시되는 플러그인 관리 UI. 플러그인 생성은 AI 에이전트 터미널을 통해 이루어지며, 이 패널은 설치된 플러그인의 관리(활성화/비활성화/삭제)만 담당한다.
 
-#### 플러그인 리스트 (Local / Global)
+#### 플러그인 리스트
 
-플러그인은 범위(scope)에 따라 두 그룹으로 구분 표시된다.
+현재 워크스페이스에 설치된 플러그인을 단일 플랫 리스트로 표시한다 (범위 구분 없음).
 
 | Element | Spec | 동작 |
 |---------|------|------|
-| Section Header (`LOCAL`) | `LOCAL` (10px, uppercase, tertiary, 600 weight) | 현재 프로젝트에 종속된 플러그인 섹션 |
-| Section Header (`GLOBAL`) | `GLOBAL` (10px, uppercase, tertiary, 600 weight) | 모든 프로젝트에서 사용 가능한 플러그인 섹션 |
 | Plugin Item | 높이 36px, padding [0,12], gap 8 | 개별 플러그인 행 |
 | Plugin Name | 13px, text-primary | 플러그인 식별 |
 | Toggle Switch | 32×18px, cornerRadius 9 | ON: accent 배경 / OFF: surface 배경, border |

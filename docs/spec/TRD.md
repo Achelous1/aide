@@ -16,7 +16,7 @@ AIDE는 CLI 기반 AI 코드 에이전트(Claude Code, Gemini CLI, Codex CLI)를
 | Terminal | xterm.js + node-pty | 멀티플랫폼 터미널 에뮬레이션 (macOS, Windows) |
 | State | Zustand | 경량, 보일러플레이트 최소 |
 | Styling | Tailwind CSS | 유틸리티 기반, 빠른 UI 구성 |
-| Data Storage | JSON (electron-store) | 설정/플러그인 스펙 로컬 저장 |
+| Data Storage | JSON (electron-store) | 워크스페이스 목록(`aide-workspaces`), 세션 레이아웃(`aide-sessions`), 앱 전역 설정(`aide-app-settings`: 테마·윈도우 bounds), 플러그인 스펙 저장 |
 | Test | Vitest + Playwright | Vitest(유닛), Playwright(E2E) - Electron 커뮤니티 주류 |
 | CI/CD | GitHub Actions | 표준 CI/CD, 멀티플랫폼 빌드 |
 | Package Manager | pnpm (`node-linker=hoisted`) | electron-forge 호환 필수, `.npmrc` 설정 |
@@ -204,14 +204,9 @@ interface ToolRegistry {
 
 에이전트가 tool을 호출하면 AIDE가 중간에서 해당 플러그인의 샌드박스 함수를 실행하고 결과를 반환한다.
 
-#### 2.5 Plugin Scope & Workspace Isolation
+#### 2.5 Plugin Workspace Isolation
 
-플러그인은 두 가지 스코프로 관리된다.
-
-| 스코프 | 저장 위치 | 가시성 |
-|--------|-----------|--------|
-| `local` | `{workspace}/.aide/plugins/` | 해당 워크스페이스에서만 표시 |
-| `global` | `~/.aide/plugins/` | 모든 워크스페이스에서 표시 |
+플러그인은 **워크스페이스 단위로만** 관리된다. 글로벌 플러그인 개념은 없으며, 모든 플러그인은 `{workspace}/.aide/plugins/`에 저장된다. AIDE는 프로젝트 루트에 어떠한 파일도 생성하지 않는다 (예: `.mcp.json` 미생성 — MCP 서버는 spawn 시점의 cwd에서 플러그인 경로를 유도).
 
 **워크스페이스 전환 시 플러그인 갱신 흐름**:
 
@@ -228,18 +223,19 @@ window.aide.workspace.open(ws-b.path)   ← Main: activeWorkspacePath = ws-b
 usePluginStore.loadPlugins()            ← IPC: PLUGIN_LIST
     │
     ▼
-Main: refreshLocalPlugins(ws-b)
+Main: refreshPlugins(ws-b)
     │  if (lastLocalDir !== ws-b local dir)
-    │    registry.clearLocalPlugins()   ← ws-a 로컬 플러그인 제거
-    │    loadDirIntoRegistry(ws-b, 'local')
+    │    registry.clearPlugins()        ← 이전 워크스페이스 플러그인 제거
+    │    loadDirIntoRegistry(ws-b)
     ▼
-렌더러: 플러그인 목록 갱신 (ws-b 로컬 + 글로벌)
+렌더러: 플러그인 목록 갱신 (ws-b 플러그인)
 ```
 
 **구현 규칙**:
 - `window.aide.workspace.open()` IPC가 완료된 후에 `loadPlugins()`를 호출해야 한다 — 순서가 바뀌면 메인 프로세스가 구 경로를 기준으로 플러그인을 반환한다.
-- `PluginRegistry.clearLocalPlugins()`는 scope가 `local`인 플러그인만 제거하며, `global` 플러그인과 활성 sandbox는 유지된다.
+- `PluginRegistry.clearPlugins()`는 레지스트리의 모든 플러그인을 제거하고 활성 sandbox를 stop한다.
 - 동일 워크스페이스로 재전환 시 (`lastLocalDir` 동일) 불필요한 스캔을 생략한다.
+- 기존 워크스페이스에 `.mcp.json`이 남아있으면 `WORKSPACE_OPEN` 시점에 `migrateProjectMcpJson`이 AIDE 엔트리만 제거한다 (사용자 정의 서버는 보존).
 
 #### 2.6 Plugin ↔ Plugin 이벤트 브릿지
 
