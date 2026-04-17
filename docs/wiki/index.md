@@ -2,6 +2,10 @@
 
 ## Architecture
 - [[workspace-context-menu]] — 워크스페이스 rename/경로 표시/Show in Finder, IPC 구조 및 컨텍스트 메뉴 구현
+- [[app-settings-persistence]] — aide-app-settings electron-store로 테마/윈도우 bounds 전역 영속화
+
+## Decisions
+- [[plugin-scope-local-only]] — 글로벌 플러그인 스코프 제거, .mcp.json 생성 중단 + 자동 마이그레이션
 
 ## Debugging
 - [[eperm-uv-cwd-bugfix]] — pty 스폰/plugin:list EPERM 에러, process.cwd() 미검증 원인 및 수정
