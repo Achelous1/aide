@@ -130,14 +130,23 @@ export function writeMcpConfig(workspacePath: string): string {
 
   writeMcpServerScript();
 
-  // Claude is launched with --mcp-config <path>, so a global entry in
-  // ~/.claude.json would cause Claude to spawn the AIDE MCP server twice
-  // (once per config source). Strip any legacy entry older versions of AIDE
-  // wrote there. Idempotent — safe to run on every workspace change.
+  // Claude is launched with --mcp-config <path>, so ANY other config source
+  // that lists "aide" causes Claude to spawn the MCP server once per source.
+  // Strip legacy entries older versions of AIDE wrote:
+  //   1. ~/.claude.json (global Claude config)
+  //   2. ~/.mcp.json    (HOME-level .mcp.json; Claude auto-discovers it by
+  //                      walking up from cwd, and every workspace is under HOME,
+  //                      so it's always picked up alongside --mcp-config)
+  // Idempotent — safe to run on every workspace change.
   try {
     unregisterAideFromJsonConfig(path.join(home, '.claude.json'));
   } catch (err) {
     console.warn('[AIDE] Failed to clean legacy Claude MCP entry:', (err as Error).message);
+  }
+  try {
+    unregisterAideFromJsonConfig(path.join(home, '.mcp.json'));
+  } catch (err) {
+    console.warn('[AIDE] Failed to clean legacy ~/.mcp.json entry:', (err as Error).message);
   }
 
   // Register in ~/.gemini/settings.json (Gemini has no --mcp-config flag)
