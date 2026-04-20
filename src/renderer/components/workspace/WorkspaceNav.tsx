@@ -5,6 +5,7 @@ import { useTerminalStore } from '../../stores/terminal-store';
 import { useLayoutStore } from '../../stores/layout-store';
 import { isSplitLayout, type AgentStatus, type LayoutNode, type TerminalTab } from '../../../types/ipc';
 import { StatusDot, StatusBadge } from './StatusIndicator';
+import { Tooltip } from '../ui/Tooltip';
 import { UpdateNotice } from '../updater/UpdateNotice';
 import { AgentDropdown } from '../terminal/AgentDropdown';
 
@@ -222,6 +223,7 @@ export function WorkspaceNav() {
                     >
                       {ws.name[0]?.toUpperCase() ?? '?'}
                     </span>
+                    <Tooltip content={`${ws.name}\n${ws.path}`} placement="right" className="flex-1 min-w-0">
                     <div className="flex flex-col flex-1 min-w-0">
                       {editingWorkspaceId === ws.id ? (
                         <input
@@ -239,8 +241,12 @@ export function WorkspaceNav() {
                       ) : (
                         <span className="text-xs font-mono text-aide-text-primary truncate">{ws.name}</span>
                       )}
-                      <span className="text-[10px] font-mono text-aide-text-tertiary truncate">{ws.path}</span>
+                      {/* dir="rtl" + inner dir="ltr" front-truncates long paths so the tail (last segment) stays visible */}
+                      <span dir="rtl" className="text-[10px] font-mono text-aide-text-tertiary truncate inline-block w-full text-left">
+                        <span dir="ltr">{ws.path}</span>
+                      </span>
                     </div>
+                    </Tooltip>
                     {/* Tab count */}
                     <span className="text-[10px] font-mono text-aide-text-tertiary shrink-0">
                       ({wsTabs.length})
