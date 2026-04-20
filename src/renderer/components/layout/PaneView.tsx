@@ -22,16 +22,16 @@ const AGENT_COLORS: Record<string, string> = {
 
 interface DraggableTabProps {
   tab: TerminalTab;
-  paneId: string;
+  paneId?: string;
   isActive: boolean;
   onActivate: () => void;
   onClose: (e: React.MouseEvent) => void;
   onContextMenu: (e: React.MouseEvent) => void;
-  onRename: (title: string) => void;
+  onRename?: (title: string) => void;
   canClose: boolean;
 }
 
-function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMenu, onRename, canClose }: DraggableTabProps) {
+export function DraggableTab({ tab, paneId = '', isActive, onActivate, onClose, onContextMenu, onRename = () => {}, canClose }: DraggableTabProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tab.id,
     data: { tab, paneId },
@@ -72,7 +72,7 @@ function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMen
         onClick={isEditing ? undefined : onActivate}
         onDoubleClick={(e) => { if (isPlugin) return; e.stopPropagation(); setIsEditing(true); }}
         onContextMenu={onContextMenu}
-        className={`group relative flex items-center gap-1.5 px-3 h-full text-[12px] font-mono transition-colors ${
+        className={`group relative flex items-center gap-1.5 px-3 h-full text-[12px] font-mono transition-colors min-w-[80px] max-w-[200px] min-w-0 ${
           isActive
             ? 'bg-aide-tab-active-bg text-aide-text-primary'
             : 'bg-aide-tab-inactive-bg text-aide-text-secondary hover:text-aide-text-primary'
@@ -102,7 +102,7 @@ function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMen
             className="bg-transparent outline-none border-b border-aide-accent text-[12px] font-mono min-w-0 w-24"
           />
         ) : (
-          <span>{tab.title}</span>
+          <span className="truncate">{tab.title}</span>
         )}
         {canClose && !isEditing && (
           <span
@@ -112,7 +112,7 @@ function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMen
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') onClose(e as unknown as React.MouseEvent);
             }}
-            className="ml-1 opacity-0 group-hover:opacity-100 text-[10px] text-aide-text-tertiary hover:text-aide-text-primary transition-opacity leading-none"
+            className="ml-1 shrink-0 opacity-0 group-hover:opacity-100 text-[10px] text-aide-text-tertiary hover:text-aide-text-primary transition-opacity leading-none"
           >
             ×
           </span>

@@ -287,7 +287,7 @@ export function WorkspaceNav() {
                     <button
                       key={tab.id}
                       onClick={() => handleSelectTab(ws.id, tab.id)}
-                      className={`flex items-center gap-1.5 w-full pl-6 pr-2 py-1 rounded text-left transition-colors ${
+                      className={`flex items-center gap-1.5 w-full pl-6 pr-2 py-1 rounded text-left transition-colors min-w-0 ${
                         isTabActive ? 'bg-aide-surface-elevated' : 'hover:bg-aide-surface-elevated'
                       }`}
                     >
