@@ -27,6 +27,18 @@ DMG_TMP_PATH="out/AIDE-tmp.dmg"
 echo "[1/4] Installing dependencies..."
 pnpm install
 
+# Force-run native module install scripts. pnpm+cached store on CI has skipped
+# node-pty's prebuild/gyp step silently, leaving build/Release/pty.node absent.
+echo "      Rebuilding native modules..."
+pnpm rebuild node-pty
+
+# Sanity check: pty.node must exist before we try to package it.
+if [ ! -f "node_modules/node-pty/build/Release/pty.node" ]; then
+  echo "::error::pty.node missing from node_modules after rebuild. Aborting."
+  exit 1
+fi
+echo "      pty.node present ($(stat -f%z node_modules/node-pty/build/Release/pty.node) bytes)"
+
 # Lint
 echo "[2/4] Running lint..."
 pnpm run lint
