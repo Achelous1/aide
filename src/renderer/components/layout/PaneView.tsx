@@ -10,6 +10,7 @@ import { useLayoutStore } from '../../stores/layout-store';
 import { useTerminalStore } from '../../stores/terminal-store';
 import * as xtermCache from '../../lib/xterm-cache';
 import type { Pane, TerminalTab } from '../../../types/ipc';
+import { Tooltip } from '../ui/Tooltip';
 
 const AGENT_COLORS: Record<string, string> = {
   claude: 'var(--agent-claude)',
@@ -103,7 +104,9 @@ function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMen
             className="bg-transparent outline-none border-b border-aide-accent text-[12px] font-mono min-w-0 w-24"
           />
         ) : (
-          <span className="truncate min-w-0 flex-1" title={tab.title}>{tab.title}</span>
+          <Tooltip content={tab.title} placement="bottom" className="min-w-0 flex-1">
+            <span className="truncate block w-full text-left">{tab.title}</span>
+          </Tooltip>
         )}
         {canClose && !isEditing && (
           <span

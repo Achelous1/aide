@@ -1,5 +1,6 @@
 import { useTerminalStore } from '../../stores/terminal-store';
 import { AgentDropdown } from './AgentDropdown';
+import { Tooltip } from '../ui/Tooltip';
 
 const AGENT_COLORS: Record<string, string> = {
   claude: 'var(--agent-claude)',
@@ -45,7 +46,9 @@ export function TabBar() {
               className="w-1.5 h-1.5 rounded-full shrink-0"
               style={{ backgroundColor: dotColor }}
             />
-            <span className="truncate min-w-0 flex-1" title={tab.title}>{tab.title}</span>
+            <Tooltip content={tab.title} placement="bottom" className="min-w-0 flex-1">
+              <span className="truncate block w-full text-left">{tab.title}</span>
+            </Tooltip>
             {/* Close button on hover */}
             {tabs.length > 1 && (
               <span
