@@ -241,6 +241,7 @@ export function WorkspaceNav() {
                       ) : (
                         <span className="text-xs font-mono text-aide-text-primary truncate">{ws.name}</span>
                       )}
+                      {/* dir="rtl" + inner dir="ltr" front-truncates long paths so the tail (last segment) stays visible */}
                       <span dir="rtl" className="text-[10px] font-mono text-aide-text-tertiary truncate inline-block w-full text-left">
                         <span dir="ltr">{ws.path}</span>
                       </span>

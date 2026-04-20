@@ -1,4 +1,16 @@
+/**
+ * Tooltip — renders via ReactDOM.createPortal into document.body to escape
+ * overflow:hidden / overflow:auto ancestors (e.g. the scrollable workspace list).
+ *
+ * Positioning uses position:fixed with coordinates read from
+ * wrapperRef.getBoundingClientRect() at the moment of show.
+ *
+ * Known limitation: tooltip width is assumed to fit within max-w-xs (20rem).
+ * No dimension measurement is performed — centering is best-effort.
+ * Viewport edge clamping is not implemented.
+ */
 import { useEffect, useRef, useState, useId } from 'react';
+import { createPortal } from 'react-dom';
 
 interface TooltipProps {
   content: React.ReactNode;
@@ -7,14 +19,47 @@ interface TooltipProps {
   className?: string;
 }
 
+const GAP = 6; // px between wrapper and tooltip
+
 export function Tooltip({ content, children, placement = 'top', className }: TooltipProps) {
   const [visible, setVisible] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const tooltipId = useId();
+
+  function computeCoords(): { top: number; left: number } {
+    if (!wrapperRef.current) return { top: 0, left: 0 };
+    const rect = wrapperRef.current.getBoundingClientRect();
+    // Assume max-w-xs = 320px, height ~28px for centering purposes
+    const assumedWidth = 320;
+    const assumedHeight = 28;
+    switch (placement) {
+      case 'bottom':
+        return {
+          top: rect.bottom + GAP,
+          left: rect.left + rect.width / 2 - assumedWidth / 2,
+        };
+      case 'right':
+        return {
+          top: rect.top + rect.height / 2 - assumedHeight / 2,
+          left: rect.right + GAP,
+        };
+      case 'top':
+      default:
+        return {
+          top: rect.top - assumedHeight - GAP,
+          left: rect.left + rect.width / 2 - assumedWidth / 2,
+        };
+    }
+  }
 
   function show() {
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setVisible(true), 200);
+    timerRef.current = setTimeout(() => {
+      setCoords(computeCoords());
+      setVisible(true);
+    }, 200);
   }
 
   function hide() {
@@ -29,34 +74,38 @@ export function Tooltip({ content, children, placement = 'top', className }: Too
     };
   }, []);
 
-  const placementClasses: Record<NonNullable<TooltipProps['placement']>, string> = {
-    top: 'bottom-full left-1/2 -translate-x-1/2 mb-1',
-    bottom: 'top-full left-1/2 -translate-x-1/2 mt-1',
-    right: 'left-full top-1/2 -translate-y-1/2 ml-1',
-  };
+  const tooltip = visible
+    ? createPortal(
+        <div
+          id={tooltipId}
+          role="tooltip"
+          style={{ top: coords.top, left: coords.left }}
+          className="fixed z-[9999] max-w-xs whitespace-pre-wrap rounded px-2 py-1 text-[10px] font-mono
+            bg-aide-surface-elevated border border-aide-border text-aide-text-primary shadow-md
+            pointer-events-none"
+        >
+          {content}
+        </div>,
+        document.body,
+      )
+    : null;
 
   return (
     <div
+      ref={wrapperRef}
       data-tooltip-wrapper
       className={`relative inline-flex${className ? ` ${className}` : ''}`}
       onMouseEnter={show}
       onMouseLeave={hide}
       onFocus={show}
       onBlur={hide}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') hide();
+      }}
       aria-describedby={visible ? tooltipId : undefined}
     >
       {children}
-      {visible && (
-        <div
-          id={tooltipId}
-          role="tooltip"
-          className={`absolute z-50 whitespace-pre-wrap rounded px-2 py-1 text-[10px] font-mono
-            bg-aide-surface-elevated border border-aide-border text-aide-text-primary shadow-md
-            pointer-events-none ${placementClasses[placement]}`}
-        >
-          {content}
-        </div>
-      )}
+      {tooltip}
     </div>
   );
 }

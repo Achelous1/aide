@@ -89,7 +89,7 @@ describe('Tooltip', () => {
   });
 
   it('sets aria-describedby on wrapper pointing to tooltip when open', () => {
-    const { getByText } = render(
+    const { getByText, queryByRole } = render(
       <Tooltip content="aria tip">
         <button>child</button>
       </Tooltip>
@@ -97,8 +97,41 @@ describe('Tooltip', () => {
     const wrapper = getByText('child').closest('[data-tooltip-wrapper]') as HTMLElement;
     fireEvent.mouseEnter(wrapper);
     act(() => { vi.advanceTimersByTime(250); });
-    const tooltipEl = wrapper.querySelector('[role="tooltip"]') as HTMLElement;
+    // Tooltip is portal-rendered into document.body — use queryByRole which searches full document
+    const tooltipEl = queryByRole('tooltip') as HTMLElement;
     expect(tooltipEl).toBeTruthy();
     expect(wrapper.getAttribute('aria-describedby')).toBe(tooltipEl.id);
+  });
+
+  it('cancels pending show when mouse leaves before delay', () => {
+    const { getByText, queryByRole } = render(
+      <Tooltip content="hi"><button>x</button></Tooltip>
+    );
+    const trigger = getByText('x').closest('[data-tooltip-wrapper]') as HTMLElement;
+    fireEvent.mouseEnter(trigger);
+    fireEvent.mouseLeave(trigger);
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(queryByRole('tooltip')).toBeNull();
+  });
+
+  it('clears pending timer on unmount', () => {
+    const { getByText, unmount } = render(
+      <Tooltip content="hi"><button>x</button></Tooltip>
+    );
+    fireEvent.mouseEnter(getByText('x').closest('[data-tooltip-wrapper]') as HTMLElement);
+    unmount();
+    expect(() => { act(() => { vi.advanceTimersByTime(500); }); }).not.toThrow();
+  });
+
+  it('dismisses tooltip on ESC keydown', () => {
+    const { getByText, queryByRole } = render(
+      <Tooltip content="hi"><button>x</button></Tooltip>
+    );
+    const wrapper = getByText('x').closest('[data-tooltip-wrapper]') as HTMLElement;
+    fireEvent.mouseEnter(wrapper);
+    act(() => { vi.advanceTimersByTime(250); });
+    expect(queryByRole('tooltip')).not.toBeNull();
+    fireEvent.keyDown(wrapper, { key: 'Escape' });
+    expect(queryByRole('tooltip')).toBeNull();
   });
 });
