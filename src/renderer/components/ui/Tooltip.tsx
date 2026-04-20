@@ -3,11 +3,12 @@
  * overflow:hidden / overflow:auto ancestors (e.g. the scrollable workspace list).
  *
  * Positioning uses position:fixed with coordinates read from
- * wrapperRef.getBoundingClientRect() at the moment of show.
+ * wrapperRef.getBoundingClientRect() at the moment of show. Centering is
+ * done via CSS transform translate(-50%, ...), so actual tooltip dimensions
+ * do not need to be measured.
  *
- * Known limitation: tooltip width is assumed to fit within max-w-xs (20rem).
- * No dimension measurement is performed — centering is best-effort.
- * Viewport edge clamping is not implemented.
+ * Known limitation: Viewport edge clamping is not implemented — tooltips
+ * near the viewport edge may overflow horizontally.
  */
 import { useEffect, useRef, useState, useId } from 'react';
 import { createPortal } from 'react-dom';
@@ -28,31 +29,26 @@ export function Tooltip({ content, children, placement = 'top', className }: Too
   const wrapperRef = useRef<HTMLDivElement>(null);
   const tooltipId = useId();
 
+  // Anchor point — actual centering is done via CSS transform in the tooltip div
   function computeCoords(): { top: number; left: number } {
     if (!wrapperRef.current) return { top: 0, left: 0 };
     const rect = wrapperRef.current.getBoundingClientRect();
-    // Assume max-w-xs = 320px, height ~28px for centering purposes
-    const assumedWidth = 320;
-    const assumedHeight = 28;
     switch (placement) {
       case 'bottom':
-        return {
-          top: rect.bottom + GAP,
-          left: rect.left + rect.width / 2 - assumedWidth / 2,
-        };
+        return { top: rect.bottom + GAP, left: rect.left + rect.width / 2 };
       case 'right':
-        return {
-          top: rect.top + rect.height / 2 - assumedHeight / 2,
-          left: rect.right + GAP,
-        };
+        return { top: rect.top + rect.height / 2, left: rect.right + GAP };
       case 'top':
       default:
-        return {
-          top: rect.top - assumedHeight - GAP,
-          left: rect.left + rect.width / 2 - assumedWidth / 2,
-        };
+        return { top: rect.top - GAP, left: rect.left + rect.width / 2 };
     }
   }
+
+  const transformByPlacement: Record<NonNullable<TooltipProps['placement']>, string> = {
+    top: 'translate(-50%, -100%)',
+    bottom: 'translate(-50%, 0)',
+    right: 'translate(0, -50%)',
+  };
 
   function show() {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -79,7 +75,7 @@ export function Tooltip({ content, children, placement = 'top', className }: Too
         <div
           id={tooltipId}
           role="tooltip"
-          style={{ top: coords.top, left: coords.left }}
+          style={{ top: coords.top, left: coords.left, transform: transformByPlacement[placement] }}
           className="fixed z-[9999] max-w-xs whitespace-pre-wrap rounded px-2 py-1 text-[10px] font-mono
             bg-aide-surface-elevated border border-aide-border text-aide-text-primary shadow-md
             pointer-events-none"
