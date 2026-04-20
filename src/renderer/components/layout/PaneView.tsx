@@ -103,7 +103,7 @@ function DraggableTab({ tab, paneId, isActive, onActivate, onClose, onContextMen
             className="bg-transparent outline-none border-b border-aide-accent text-[12px] font-mono min-w-0 w-24"
           />
         ) : (
-          <span className="truncate min-w-0 flex-1">{tab.title}</span>
+          <span className="truncate min-w-0 flex-1" title={tab.title}>{tab.title}</span>
         )}
         {canClose && !isEditing && (
           <span

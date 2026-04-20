@@ -45,7 +45,7 @@ export function TabBar() {
               className="w-1.5 h-1.5 rounded-full shrink-0"
               style={{ backgroundColor: dotColor }}
             />
-            <span className="truncate min-w-0 flex-1">{tab.title}</span>
+            <span className="truncate min-w-0 flex-1" title={tab.title}>{tab.title}</span>
             {/* Close button on hover */}
             {tabs.length > 1 && (
               <span
