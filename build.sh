@@ -27,17 +27,25 @@ DMG_TMP_PATH="out/AIDE-tmp.dmg"
 echo "[1/4] Installing dependencies..."
 pnpm install
 
-# Force-run native module install scripts. pnpm+cached store on CI has skipped
-# node-pty's prebuild/gyp step silently, leaving build/Release/pty.node absent.
+# Force-run native module install scripts so node-pty's prebuild download is
+# triggered even when pnpm restores from cache.
 echo "      Rebuilding native modules..."
 pnpm rebuild node-pty
 
-# Sanity check: pty.node must exist before we try to package it.
-if [ ! -f "node_modules/node-pty/build/Release/pty.node" ]; then
-  echo "::error::pty.node missing from node_modules after rebuild. Aborting."
+# node-pty's loader (lib/utils.js) resolves the native binary from either
+# build/Release, build/Debug, or prebuilds/<platform>-<arch>. Accept any of
+# these; only fail if none exist.
+PTY_BUILT="node_modules/node-pty/build/Release/pty.node"
+PTY_PREBUILD_DIR="node_modules/node-pty/prebuilds/$(uname -s | tr 'A-Z' 'a-z')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
+PTY_PREBUILD="$PTY_PREBUILD_DIR/pty.node"
+if [ -f "$PTY_BUILT" ]; then
+  echo "      pty.node (built) present ($(stat -f%z "$PTY_BUILT") bytes)"
+elif [ -f "$PTY_PREBUILD" ]; then
+  echo "      pty.node (prebuild) present at $PTY_PREBUILD ($(stat -f%z "$PTY_PREBUILD") bytes)"
+else
+  echo "::error::pty.node missing: neither $PTY_BUILT nor $PTY_PREBUILD exists."
   exit 1
 fi
-echo "      pty.node present ($(stat -f%z node_modules/node-pty/build/Release/pty.node) bytes)"
 
 # Lint
 echo "[2/4] Running lint..."
