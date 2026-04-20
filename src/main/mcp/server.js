@@ -428,4 +428,10 @@ function processBuffer() {
 }
 process.stdin.setEncoding("utf-8");
 process.stdin.on("data", function(chunk) { buffer += chunk; processBuffer(); });
-process.stdin.on("end", function() { process.exit(0); });
+process.stdin.on("end", function() {
+  // process.exit(0) truncates piped stdout when the kernel pipe buffer is still
+  // draining (observed at ~8KB on CI). End stdout explicitly and let Node exit
+  // naturally once the write stream has flushed.
+  if (process.stdout.writableEnded) return;
+  process.stdout.end();
+});
