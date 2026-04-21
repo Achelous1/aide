@@ -141,24 +141,21 @@ describe('workspace-store.setActive — activation ordering', () => {
   });
 
   it('cache-hit path still calls plugin.list so the renderer store reflects current main-side plugin state', async () => {
-    // Pre-seed the layout cache so loadLayoutFromCache returns true.
-    useLayoutStore.setState({
-      layout: createPane(),
-      focusedPaneId: null,
-      layoutCache: {
-        'ws-1': {
-          layout: createPane(),
-          focusedPaneId: null,
-          sidePanelTab: 'files',
-        },
-      } as unknown as Parameters<typeof useLayoutStore.setState>[0] extends infer S ? S : never,
-    } as Parameters<typeof useLayoutStore.setState>[0]);
+    // Seed the module-level layout cache via the public API, then clear the
+    // recorded calls so we only observe the second setActive.
+    useWorkspaceStore.setState({
+      workspaces: [
+        { id: 'ws-1', name: 'ws', path: '/tmp/ws' },
+        { id: 'ws-2', name: 'ws2', path: '/tmp/ws2' },
+      ],
+    } as Parameters<typeof useWorkspaceStore.setState>[0]);
+    await useWorkspaceStore.getState().setActive('ws-1');
+    await useWorkspaceStore.getState().setActive('ws-2');
+    calls.length = 0;
 
     await useWorkspaceStore.getState().setActive('ws-1');
 
-    // Even on a cache hit, plugin.list must fire at least once so the
-    // renderer picks up any main-side plugin changes (file watcher events,
-    // etc.) since the previous visit.
+    expect(useLayoutStore.getState().loadLayoutFromCache).toBeTypeOf('function');
     expect(calls.filter((c) => c === 'plugin.list').length).toBeGreaterThanOrEqual(1);
   });
 });
