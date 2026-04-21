@@ -34,22 +34,31 @@ jobs:
           ARCH=$(uname -m)
           if [ "$ARCH" = "arm64" ]; then
             APP_DIR="out/AIDE-darwin-arm64/AIDE.app"
+            PREBUILD_ARCH="arm64"
           else
             APP_DIR="out/AIDE-darwin-x64/AIDE.app"
+            PREBUILD_ARCH="x64"
           fi
-          PTY_PATH="$APP_DIR/Contents/Resources/app.asar.unpacked/node_modules/node-pty/build/Release/pty.node"
+          UNPACKED="$APP_DIR/Contents/Resources/app.asar.unpacked/node_modules/node-pty"
+          PTY_BUILT="$UNPACKED/build/Release/pty.node"
+          PTY_PREBUILD="$UNPACKED/prebuilds/darwin-$PREBUILD_ARCH/pty.node"
 
           echo "--- app.asar.unpacked contents ---"
           ls -la "$APP_DIR/Contents/Resources/app.asar.unpacked/" || true
 
-          if [ ! -f "$PTY_PATH" ]; then
-            echo "::error::Missing native module at $PTY_PATH"
+          # node-pty loads from build/Release, build/Debug, or prebuilds/<p>-<a>.
+          # Accept any of these paths; only fail when none exist.
+          if [ -f "$PTY_BUILT" ]; then
+            echo "pty.node verified (built): $PTY_BUILT ($(stat -f%z "$PTY_BUILT") bytes)"
+          elif [ -f "$PTY_PREBUILD" ]; then
+            echo "pty.node verified (prebuild): $PTY_PREBUILD ($(stat -f%z "$PTY_PREBUILD") bytes)"
+          else
+            echo "::error::Missing native module. Checked $PTY_BUILT and $PTY_PREBUILD."
             echo "This would ship a broken app that cannot spawn terminals."
             exit 1
           fi
-          echo "pty.node verified: $PTY_PATH ($(stat -f%z "$PTY_PATH") bytes)"
 
-          if ! unzip -l out/AIDE.app.zip | grep -q "node-pty/build/Release/pty.node"; then
+          if ! unzip -l out/AIDE.app.zip | grep -qE "node-pty/(build/Release|prebuilds/darwin-$PREBUILD_ARCH)/pty.node"; then
             echo "::error::pty.node missing from out/AIDE.app.zip"
             exit 1
           fi
