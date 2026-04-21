@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { TitleBar } from './components/layout/TitleBar';
 import { StatusBar } from './components/layout/StatusBar';
 import { SplitContainer } from './components/layout/SplitContainer';
@@ -52,13 +52,10 @@ export function App() {
     }
   }, [theme]);
 
-  // Restore session on initial workspace load (workspace switches handled by setActive)
-  const initialRestoreDone = useRef(false);
-  useEffect(() => {
-    if (!activeWorkspaceId || initialRestoreDone.current) return;
-    initialRestoreDone.current = true;
-    useLayoutStore.getState().restoreSession(activeWorkspaceId);
-  }, [activeWorkspaceId]);
+  // Session restoration is owned by workspace-store.setActive(), which runs
+  // restoreSession() on first visit to each workspace. A duplicate call here
+  // would spawn every saved PTY twice — every tab would get an orphaned
+  // second claude/shell process running in the background.
 
   // Save session on app quit — use sendSync to guarantee write before window closes
   useEffect(() => {

@@ -5,6 +5,7 @@ import { useTerminalStore } from './terminal-store';
 import { useWorkspaceStore } from './workspace-store';
 import { usePluginStore } from './plugin-store';
 import { useToastStore } from './toast-store';
+import { deactivatingPluginIds } from './plugin-deactivate-guard';
 
 let paneCounter = 0;
 let splitCounter = 0;
@@ -377,6 +378,8 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   },
 
   removeTabFromPane: (paneId, tabId) => {
+    let removedPluginId: string | null = null;
+
     set((state) => {
       const layout = cloneNode(state.layout);
       const pane = findPane(layout, paneId);
@@ -384,6 +387,11 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
 
       const index = pane.tabs.findIndex((t) => t.id === tabId);
       if (index < 0) return state;
+
+      const removed = pane.tabs[index];
+      if (removed.type === 'plugin' && removed.pluginId) {
+        removedPluginId = removed.pluginId;
+      }
 
       pane.tabs.splice(index, 1);
 
@@ -403,6 +411,25 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
 
       return { layout };
     });
+
+    // Fix A: closing a plugin tab must also deactivate the plugin so the
+    // main-side sandbox stops and plugin.active reflects reality.
+    // plugin-store.deactivate sets the guard before calling removeTabFromPane
+    // to prevent infinite recursion here.
+    if (removedPluginId && !deactivatingPluginIds.has(removedPluginId)) {
+      const pluginId: string = removedPluginId;
+      void (async () => {
+        deactivatingPluginIds.add(pluginId);
+        try {
+          await window.aide.plugin.deactivate(pluginId);
+          await usePluginStore.getState().loadPlugins();
+          const wsId = useWorkspaceStore.getState().activeWorkspaceId;
+          if (wsId) await get().saveSession(wsId);
+        } finally {
+          deactivatingPluginIds.delete(pluginId);
+        }
+      })();
+    }
   },
 
   setActiveTab: (paneId, tabId) => {
@@ -550,6 +577,10 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   buildSavedSession: (workspaceId) => {
     const { layout, focusedPaneId } = get();
 
+    const activePluginIds = new Set(
+      usePluginStore.getState().plugins.filter((p) => p.active).map((p) => p.id),
+    );
+
     function serializeNode(node: LayoutNode): SerializableLayoutNode {
       if (isSplitLayout(node)) {
         const split = node as SplitLayout;
@@ -561,15 +592,17 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
         } as SerializableSplitLayout;
       }
       const pane = node as Pane;
-      const tabs: SavedTab[] = pane.tabs.map((tab) => ({
-        id: tab.id,
-        type: tab.type,
-        title: tab.title,
-        isActive: tab.id === pane.activeTabId,
-        agentId: tab.agentId,
-        pluginId: tab.pluginId,
-        agentSessionId: tab.agentSessionId,
-      }));
+      const tabs: SavedTab[] = pane.tabs
+        .filter((tab) => tab.type !== 'plugin' || activePluginIds.has(tab.pluginId ?? ''))
+        .map((tab) => ({
+          id: tab.id,
+          type: tab.type,
+          title: tab.title,
+          isActive: tab.id === pane.activeTabId,
+          agentId: tab.agentId,
+          pluginId: tab.pluginId,
+          agentSessionId: tab.agentSessionId,
+        }));
       return {
         id: pane.id,
         tabs,
@@ -577,9 +610,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       } as SerializablePane;
     }
 
-    const activePlugins = usePluginStore.getState().plugins
-      .filter((p) => p.active)
-      .map((p) => p.id);
+    const activePlugins = [...activePluginIds];
     const sidePanelTab = useWorkspaceStore.getState().sidePanelTab;
 
     return {
@@ -627,6 +658,11 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       (w) => w.id === workspaceId,
     )?.path;
 
+    // Fix B: plugin tabs are only restored when their pluginId appears in
+    // session.activePlugins. Prevents stale/ghost plugin tabs from a
+    // previous session where layout and activePlugins drifted apart.
+    const activePluginSet = new Set(session.activePlugins ?? []);
+
     async function rebuildNode(node: SerializableLayoutNode): Promise<LayoutNode> {
       if ('direction' in node && 'children' in node) {
         const split = node as SerializableSplitLayout;
@@ -645,6 +681,13 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
 
       for (const savedTab of savedPane.tabs) {
         if (savedTab.type === 'plugin') {
+          // Fix B: skip plugin tabs whose pluginId is not in activePlugins.
+          // Older saved sessions (or any inconsistency between layout and
+          // activePlugins) would otherwise restore a tab for a disabled
+          // plugin, producing the "tab visible but plugin off" state.
+          if (!savedTab.pluginId || !activePluginSet.has(savedTab.pluginId)) {
+            continue;
+          }
           const tab: TerminalTab = {
             id: savedTab.id,
             type: 'plugin',

@@ -81,6 +81,29 @@ function registerJsonMcpConfig(configPath: string, nodePath: string, serverPath:
 }
 
 /**
+ * Removes the mcpServers.aide entry from a JSON MCP config file.
+ * Preserves other mcpServers and top-level keys. If mcpServers becomes
+ * empty after removal, the key is dropped. If the file does not exist
+ * or contains no aide entry, this is a no-op.
+ */
+export function unregisterAideFromJsonConfig(configPath: string): void {
+  if (!fs.existsSync(configPath)) return;
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch {
+    return; // corrupt — leave untouched
+  }
+  const servers = config.mcpServers as Record<string, unknown> | undefined;
+  if (!servers || typeof servers !== 'object' || !('aide' in servers)) return;
+  delete servers['aide'];
+  if (Object.keys(servers).length === 0) {
+    delete config.mcpServers;
+  }
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+}
+
+/**
  * Removes the [mcp_servers.aide] section AND any sub-sections (e.g. [mcp_servers.aide.env])
  * from a TOML string (line-by-line, safe for array values).
  * Handles sub-sections that appear before or after the parent section header.
@@ -107,11 +130,23 @@ export function writeMcpConfig(workspacePath: string): string {
 
   writeMcpServerScript();
 
-  // Register in ~/.claude.json (Claude uses --mcp-config per-workspace; this is a fallback)
+  // Claude is launched with --mcp-config <path>, so ANY other config source
+  // that lists "aide" causes Claude to spawn the MCP server once per source.
+  // Strip legacy entries older versions of AIDE wrote:
+  //   1. ~/.claude.json (global Claude config)
+  //   2. ~/.mcp.json    (HOME-level .mcp.json; Claude auto-discovers it by
+  //                      walking up from cwd, and every workspace is under HOME,
+  //                      so it's always picked up alongside --mcp-config)
+  // Idempotent — safe to run on every workspace change.
   try {
-    registerJsonMcpConfig(path.join(home, '.claude.json'), nodePath, serverPath);
+    unregisterAideFromJsonConfig(path.join(home, '.claude.json'));
   } catch (err) {
-    console.warn('[AIDE] Failed to register Claude MCP config:', (err as Error).message);
+    console.warn('[AIDE] Failed to clean legacy Claude MCP entry:', (err as Error).message);
+  }
+  try {
+    unregisterAideFromJsonConfig(path.join(home, '.mcp.json'));
+  } catch (err) {
+    console.warn('[AIDE] Failed to clean legacy ~/.mcp.json entry:', (err as Error).message);
   }
 
   // Register in ~/.gemini/settings.json (Gemini has no --mcp-config flag)

@@ -3,7 +3,40 @@ import type { FileTreeNode, FsReadTreeError } from '../../../types/ipc';
 import { emitFileEvent } from '../../lib/event-bus';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { usePluginStore } from '../../stores/plugin-store';
+import { getFileIcon, getFolderIcon, getIconPath } from '../../utils/file-icon';
 import { PermissionBanner } from './PermissionBanner';
+
+// Chevron paths (not in ICON_PATHS to keep file-icon.ts focused on file types)
+const CHEVRON_PATHS: Record<string, string> = {
+  chevron_right: 'M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z',
+  chevron_down: 'M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z',
+};
+
+interface FileIconProps {
+  iconName: string;
+  color: string;
+  size?: number;
+  'aria-hidden'?: boolean | 'true' | 'false';
+  className?: string;
+}
+
+function FileIcon({ iconName, color, size = 14, className = '', ...rest }: FileIconProps) {
+  const d = CHEVRON_PATHS[iconName] ?? getIconPath(iconName);
+  const ariaHidden = rest['aria-hidden'];
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={color}
+      aria-hidden={ariaHidden === true || ariaHidden === 'true' ? 'true' : undefined}
+      className={className}
+      style={{ flexShrink: 0 }}
+    >
+      <path d={d} />
+    </svg>
+  );
+}
 
 interface TreeNodeProps {
   node: FileTreeNode;
@@ -12,10 +45,12 @@ interface TreeNodeProps {
   onSelect: (path: string) => void;
   revealPath: string | null;
   nodeRefs: React.MutableRefObject<Map<string, HTMLDivElement>>;
+  forceExpanded?: boolean;
 }
 
-function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }: TreeNodeProps) {
+function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs, forceExpanded = false }: TreeNodeProps) {
   const [expanded, setExpanded] = useState(false);
+  const effectiveExpanded = expanded || forceExpanded;
   const [fetchedChildren, setFetchedChildren] = useState<FileTreeNode[] | undefined>(node.children);
   const [childError, setChildError] = useState<FsReadTreeError | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -27,16 +62,19 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }:
     return () => { nodeRefs.current.delete(node.path); };
   }, [node.path, nodeRefs]);
 
-  // Lazy-fetch children when a directory is expanded for the first time
+  // Lazy-fetch children when a directory is expanded for the first time.
+  // When `node.children` is already populated (search-mode tree from the
+  // backend index), skip the fetch so we don't clobber the filtered subtree.
   useEffect(() => {
-    if (!expanded || node.type !== 'directory') return;
+    if (!effectiveExpanded || node.type !== 'directory') return;
+    if (node.children) return;
     window.aide.fs.readTreeWithError(node.path)
       .then(({ nodes: children, error }) => {
         setFetchedChildren(children);
         setChildError(error ?? null);
       })
       .catch(() => {});
-  }, [expanded, node.path, node.type]);
+  }, [effectiveExpanded, node.path, node.type, node.children]);
 
   // Auto-expand ancestor when a child is being revealed
   useEffect(() => {
@@ -93,9 +131,20 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }:
           onContextMenu={handleContextMenu}
           title={hasChildError ? 'Access denied — click to retry' : undefined}
         >
-          <span className="text-[10px] text-aide-text-tertiary w-3 shrink-0">
-            {expanded ? '▼' : '▶'}
-          </span>
+          <FileIcon
+            iconName={effectiveExpanded ? 'chevron_down' : 'chevron_right'}
+            color="var(--text-tertiary)"
+            size={10}
+            aria-hidden
+            className="shrink-0"
+          />
+          <FileIcon
+            iconName={getFolderIcon(effectiveExpanded, node.name).iconName}
+            color={getFolderIcon(effectiveExpanded, node.name).color}
+            size={14}
+            aria-hidden
+            className="shrink-0"
+          />
           <span className={`truncate ${hasChildError ? 'text-[#5C5E6A]' : ''}`}>{node.name}</span>
           {hasChildError && (
             <span
@@ -106,7 +155,7 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }:
             </span>
           )}
         </div>
-        {expanded && sortedChildren.map((child) => (
+        {effectiveExpanded && sortedChildren.map((child) => (
           <TreeNode
             key={child.path}
             node={child}
@@ -115,6 +164,7 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }:
             onSelect={onSelect}
             revealPath={revealPath}
             nodeRefs={nodeRefs}
+            forceExpanded={forceExpanded}
           />
         ))}
       </div>
@@ -133,6 +183,13 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }:
       onClick={handleClick}
       onContextMenu={handleContextMenu}
     >
+      <FileIcon
+        iconName={getFileIcon(node.name).iconName}
+        color={getFileIcon(node.name).color}
+        size={14}
+        aria-hidden
+        className="shrink-0"
+      />
       <span className="truncate">{node.name}</span>
     </div>
   );
@@ -151,7 +208,40 @@ export function FileExplorer({ cwd }: FileExplorerProps) {
   const [revealPath, setRevealPath] = useState<string | null>(null);
   const [error, setError] = useState<FsReadTreeError | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [query, setQuery] = useState('');
   const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const trimmedQuery = query.trim();
+  const isSearching = trimmedQuery.length > 0;
+  const [searchResults, setSearchResults] = useState<FileTreeNode[] | null>(null);
+  const [searchPending, setSearchPending] = useState(false);
+
+  useEffect(() => {
+    if (!isSearching) {
+      setSearchResults(null);
+      setSearchPending(false);
+      return;
+    }
+    setSearchPending(true);
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      window.aide.fs
+        .searchFiles(trimmedQuery, 500)
+        .then((nodes) => {
+          if (cancelled) return;
+          setSearchResults(nodes);
+          setSearchPending(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setSearchResults([]);
+          setSearchPending(false);
+        });
+    }, 150);
+    return () => { cancelled = true; clearTimeout(handle); };
+  }, [trimmedQuery, isSearching]);
+
+  const displayTree: FileTreeNode[] = isSearching ? (searchResults ?? []) : tree;
+  const treeKey = isSearching ? 'search' : 'tree';
 
   const handleFileSelect = useCallback((filePath: string) => {
     setSelectedPath(filePath);
@@ -248,6 +338,26 @@ export function FileExplorer({ cwd }: FileExplorerProps) {
         />
       )}
 
+      {!error && tree.length > 0 && (
+        <div className="px-2 py-1.5 border-b border-aide-border shrink-0">
+          <input
+            type="text"
+            role="searchbox"
+            aria-label="Search files"
+            placeholder="Search files…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setQuery('');
+              }
+            }}
+            className="w-full h-[26px] px-2 rounded bg-aide-background border border-aide-border text-[11px] font-mono text-aide-text-primary placeholder:text-aide-text-tertiary focus:outline-none focus:border-aide-accent"
+          />
+        </div>
+      )}
+
       {!error && tree.length === 0 && (
         <div
           style={{
@@ -267,15 +377,28 @@ export function FileExplorer({ cwd }: FileExplorerProps) {
         </div>
       )}
 
-      {tree.map((node) => (
+      {isSearching && searchPending && searchResults === null && (
+        <div className="px-3 py-2 text-[11px] font-mono text-aide-text-tertiary">
+          Searching…
+        </div>
+      )}
+
+      {isSearching && !searchPending && searchResults !== null && searchResults.length === 0 && (
+        <div className="px-3 py-2 text-[11px] font-mono text-aide-text-tertiary">
+          No matches.
+        </div>
+      )}
+
+      {displayTree.map((node) => (
         <TreeNode
-          key={node.path}
+          key={`${treeKey}:${node.path}`}
           node={node}
           depth={0}
           selectedPath={selectedPath}
           onSelect={handleFileSelect}
           revealPath={revealPath}
           nodeRefs={nodeRefs}
+          forceExpanded={isSearching}
         />
       ))}
     </div>

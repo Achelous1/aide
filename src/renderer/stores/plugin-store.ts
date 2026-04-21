@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { PluginInfo, TerminalTab } from '../../types/ipc';
 import { useLayoutStore } from './layout-store';
 import { useTerminalStore } from './terminal-store';
+import { deactivatingPluginIds } from './plugin-deactivate-guard';
 
 interface PluginState {
   plugins: PluginInfo[];
@@ -70,6 +71,12 @@ export const usePluginStore = create<PluginState>((set, get) => ({
   },
 
   deactivate: async (id: string) => {
+    // Guard: layout-store.removeTabFromPane auto-deactivates plugin tabs when
+    // they are closed directly (× click, ⌘W). That path calls back into
+    // window.aide.plugin.deactivate, which would recurse here. By marking
+    // the id as in-flight, we tell the layout-store hook to skip its own
+    // deactivate side effect while this function owns the lifecycle.
+    deactivatingPluginIds.add(id);
     try {
       await window.aide.plugin.deactivate(id);
       const plugins = await window.aide.plugin.list();
@@ -92,6 +99,8 @@ export const usePluginStore = create<PluginState>((set, get) => ({
       }
     } catch (e) {
       set({ error: e instanceof Error ? e.message : 'Failed to deactivate plugin' });
+    } finally {
+      deactivatingPluginIds.delete(id);
     }
   },
 
