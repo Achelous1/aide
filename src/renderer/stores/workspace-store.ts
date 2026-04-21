@@ -54,7 +54,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         useTerminalStore.getState().switchWorkspace(prevId, id);
       }
 
-      // 2. Try in-memory layout cache first; fall back to disk restore on first visit.
+      // 2. Tell main about the new workspace and seed the plugin registry
+      //    BEFORE restoreSession runs. restoreSession calls
+      //    window.aide.plugin.activate(id) for every entry in
+      //    session.activePlugins, which needs registry.get(id) to succeed.
+      //    We call window.aide.plugin.list() directly (not via
+      //    usePluginStore.loadPlugins) so the renderer store does not flash
+      //    "0/N ACTIVE" between this seed call and the post-restore refresh.
+      const workspace = get().workspaces.find((w) => w.id === id);
+      if (workspace) {
+        await window.aide.workspace.open(workspace.path);
+      }
+      await window.aide.plugin.list();
+      invalidateSettingsCache();
+
+      // 3. Try in-memory layout cache first; fall back to disk restore on first visit.
       const loaded = useLayoutStore.getState().loadLayoutFromCache(id);
       if (!loaded) {
         // First visit to this workspace — spawn PTYs from disk session.
@@ -74,13 +88,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         }
       }
 
-      // 3. Notify main process so getActiveWorkspacePath() updates before loadPlugins().
-      const workspace = get().workspaces.find((w) => w.id === id);
-      if (workspace) {
-        await window.aide.workspace.open(workspace.path);
-      }
+      // 4. Single renderer-store refresh at the end so PluginPanel shows the
+      //    final active state in one commit. Covers both paths — the cache
+      //    branch also needs this because main-side plugin state may have
+      //    drifted (file watcher events, external toggles) since the last
+      //    time the renderer viewed this workspace.
       await usePluginStore.getState().loadPlugins();
-      invalidateSettingsCache();
     }
     set({ activeWorkspaceId: id });
   },
