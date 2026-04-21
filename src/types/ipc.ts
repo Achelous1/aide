@@ -254,6 +254,7 @@ export interface AideAPI {
     writeFile(filePath: string, content: string): Promise<void>;
     delete(filePath: string): Promise<void>;
     onChanged(callback: () => void): () => void;
+    searchFiles(query: string, limit?: number): Promise<FileTreeNode[]>;
   };
   system: {
     openPrivacySettings(): Promise<void>;

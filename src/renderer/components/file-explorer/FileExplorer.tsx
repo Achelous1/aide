@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FileTreeNode, FsReadTreeError } from '../../../types/ipc';
 import { emitFileEvent } from '../../lib/event-bus';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { usePluginStore } from '../../stores/plugin-store';
 import { getFileIcon, getFolderIcon, getIconPath } from '../../utils/file-icon';
-import { filterTree } from '../../utils/file-search';
 import { PermissionBanner } from './PermissionBanner';
 
 // Chevron paths (not in ICON_PATHS to keep file-icon.ts focused on file types)
@@ -63,16 +62,19 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs, f
     return () => { nodeRefs.current.delete(node.path); };
   }, [node.path, nodeRefs]);
 
-  // Lazy-fetch children when a directory is expanded for the first time
+  // Lazy-fetch children when a directory is expanded for the first time.
+  // When `node.children` is already populated (search-mode tree from the
+  // backend index), skip the fetch so we don't clobber the filtered subtree.
   useEffect(() => {
     if (!effectiveExpanded || node.type !== 'directory') return;
+    if (node.children) return;
     window.aide.fs.readTreeWithError(node.path)
       .then(({ nodes: children, error }) => {
         setFetchedChildren(children);
         setChildError(error ?? null);
       })
       .catch(() => {});
-  }, [effectiveExpanded, node.path, node.type]);
+  }, [effectiveExpanded, node.path, node.type, node.children]);
 
   // Auto-expand ancestor when a child is being revealed
   useEffect(() => {
@@ -209,8 +211,37 @@ export function FileExplorer({ cwd }: FileExplorerProps) {
   const [query, setQuery] = useState('');
   const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const trimmedQuery = query.trim();
-  const filteredTree = useMemo(() => filterTree(tree, trimmedQuery), [tree, trimmedQuery]);
   const isSearching = trimmedQuery.length > 0;
+  const [searchResults, setSearchResults] = useState<FileTreeNode[] | null>(null);
+  const [searchPending, setSearchPending] = useState(false);
+
+  useEffect(() => {
+    if (!isSearching) {
+      setSearchResults(null);
+      setSearchPending(false);
+      return;
+    }
+    setSearchPending(true);
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      window.aide.fs
+        .searchFiles(trimmedQuery, 500)
+        .then((nodes) => {
+          if (cancelled) return;
+          setSearchResults(nodes);
+          setSearchPending(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setSearchResults([]);
+          setSearchPending(false);
+        });
+    }, 150);
+    return () => { cancelled = true; clearTimeout(handle); };
+  }, [trimmedQuery, isSearching]);
+
+  const displayTree: FileTreeNode[] = isSearching ? (searchResults ?? []) : tree;
+  const treeKey = isSearching ? 'search' : 'tree';
 
   const handleFileSelect = useCallback((filePath: string) => {
     setSelectedPath(filePath);
@@ -346,15 +377,21 @@ export function FileExplorer({ cwd }: FileExplorerProps) {
         </div>
       )}
 
-      {isSearching && filteredTree.length === 0 && tree.length > 0 && (
+      {isSearching && searchPending && searchResults === null && (
         <div className="px-3 py-2 text-[11px] font-mono text-aide-text-tertiary">
-          No matches in loaded files.
+          Searching…
         </div>
       )}
 
-      {filteredTree.map((node) => (
+      {isSearching && !searchPending && searchResults !== null && searchResults.length === 0 && (
+        <div className="px-3 py-2 text-[11px] font-mono text-aide-text-tertiary">
+          No matches.
+        </div>
+      )}
+
+      {displayTree.map((node) => (
         <TreeNode
-          key={node.path}
+          key={`${treeKey}:${node.path}`}
           node={node}
           depth={0}
           selectedPath={selectedPath}

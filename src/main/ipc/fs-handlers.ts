@@ -5,7 +5,10 @@ import path from 'path';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { IPC_CHANNELS } from './channels';
 import { WATCHER_EXCLUSIONS } from './watcher-exclusions';
+import { FileIndex } from './file-index';
 import type { FileTreeNode, FsReadTreeError } from '../../types/ipc';
+
+const fileIndex = new FileIndex();
 
 /** Returns immediate children only — no recursion. Directories have no children
  *  populated; the renderer fetches them lazily on expand. */
@@ -73,7 +76,14 @@ export function setWorkspaceWatcher(workspacePath: string | null): void {
     clearTimeout(watcherDebounceTimer);
     watcherDebounceTimer = null;
   }
-  if (!workspacePath) return;
+  if (!workspacePath) {
+    fileIndex.clear();
+    return;
+  }
+
+  // Kick off the async index build; search queries arriving before it resolves
+  // simply return an empty tree until the walk completes.
+  void fileIndex.initialize(workspacePath);
 
   activeWatcher = chokidar
     .watch(workspacePath, {
@@ -81,6 +91,10 @@ export function setWorkspaceWatcher(workspacePath: string | null): void {
       depth: 3,
       ignored: WATCHER_EXCLUSIONS,
     })
+    .on('add', (p) => fileIndex.addPath(p, 'file'))
+    .on('addDir', (p) => fileIndex.addPath(p, 'directory'))
+    .on('unlink', (p) => fileIndex.removePath(p))
+    .on('unlinkDir', (p) => fileIndex.removeDir(p))
     .on('all', () => {
       if (watcherDebounceTimer) clearTimeout(watcherDebounceTimer);
       watcherDebounceTimer = setTimeout(() => {
@@ -118,5 +132,9 @@ export function registerFsHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle(IPC_CHANNELS.FS_DELETE, (_event, filePath: string) => {
     fs.rmSync(filePath, { recursive: true });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.FS_SEARCH_FILES, (_event, query: string, limit?: number) => {
+    return fileIndex.search(query, limit);
   });
 }
