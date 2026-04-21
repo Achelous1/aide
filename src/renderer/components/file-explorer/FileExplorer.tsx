@@ -3,7 +3,40 @@ import type { FileTreeNode, FsReadTreeError } from '../../../types/ipc';
 import { emitFileEvent } from '../../lib/event-bus';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { usePluginStore } from '../../stores/plugin-store';
+import { getFileIcon, getFolderIcon, getIconPath } from '../../utils/file-icon';
 import { PermissionBanner } from './PermissionBanner';
+
+// Chevron paths (not in ICON_PATHS to keep file-icon.ts focused on file types)
+const CHEVRON_PATHS: Record<string, string> = {
+  chevron_right: 'M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z',
+  chevron_down: 'M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z',
+};
+
+interface FileIconProps {
+  iconName: string;
+  color: string;
+  size?: number;
+  'aria-hidden'?: boolean | 'true' | 'false';
+  className?: string;
+}
+
+function FileIcon({ iconName, color, size = 14, className = '', ...rest }: FileIconProps) {
+  const d = CHEVRON_PATHS[iconName] ?? getIconPath(iconName);
+  const ariaHidden = rest['aria-hidden'];
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={color}
+      aria-hidden={ariaHidden === true || ariaHidden === 'true' ? 'true' : undefined}
+      className={className}
+      style={{ flexShrink: 0 }}
+    >
+      <path d={d} />
+    </svg>
+  );
+}
 
 interface TreeNodeProps {
   node: FileTreeNode;
@@ -93,9 +126,20 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }:
           onContextMenu={handleContextMenu}
           title={hasChildError ? 'Access denied — click to retry' : undefined}
         >
-          <span className="text-[10px] text-aide-text-tertiary w-3 shrink-0">
-            {expanded ? '▼' : '▶'}
-          </span>
+          <FileIcon
+            iconName={expanded ? 'chevron_down' : 'chevron_right'}
+            color="var(--text-tertiary)"
+            size={10}
+            aria-hidden
+            className="shrink-0"
+          />
+          <FileIcon
+            iconName={getFolderIcon(expanded, node.name).iconName}
+            color={getFolderIcon(expanded, node.name).color}
+            size={14}
+            aria-hidden
+            className="shrink-0"
+          />
           <span className={`truncate ${hasChildError ? 'text-[#5C5E6A]' : ''}`}>{node.name}</span>
           {hasChildError && (
             <span
@@ -133,6 +177,13 @@ function TreeNode({ node, depth, selectedPath, onSelect, revealPath, nodeRefs }:
       onClick={handleClick}
       onContextMenu={handleContextMenu}
     >
+      <FileIcon
+        iconName={getFileIcon(node.name).iconName}
+        color={getFileIcon(node.name).color}
+        size={14}
+        aria-hidden
+        className="shrink-0"
+      />
       <span className="truncate">{node.name}</span>
     </div>
   );
