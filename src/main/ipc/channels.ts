@@ -17,6 +17,7 @@ export const IPC_CHANNELS = {
   FS_WRITE_FILE: 'fs:write-file',
   FS_DELETE: 'fs:delete',
   FS_CHANGED: 'fs:changed',
+  FS_SEARCH_FILES: 'fs:search-files',
 
   // System
   OPEN_PRIVACY_SETTINGS: 'system:open-privacy-settings',

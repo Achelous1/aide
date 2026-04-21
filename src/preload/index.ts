@@ -26,6 +26,9 @@ const aideAPI: AideAPI = {
         ipcRenderer.removeListener(IPC_CHANNELS.FS_CHANGED, listener);
       };
     },
+
+    searchFiles: (query: string, limit?: number): Promise<FileTreeNode[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.FS_SEARCH_FILES, query, limit),
   },
 
   git: {
