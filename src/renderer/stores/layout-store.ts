@@ -550,6 +550,10 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   buildSavedSession: (workspaceId) => {
     const { layout, focusedPaneId } = get();
 
+    const activePluginIds = new Set(
+      usePluginStore.getState().plugins.filter((p) => p.active).map((p) => p.id),
+    );
+
     function serializeNode(node: LayoutNode): SerializableLayoutNode {
       if (isSplitLayout(node)) {
         const split = node as SplitLayout;
@@ -561,15 +565,17 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
         } as SerializableSplitLayout;
       }
       const pane = node as Pane;
-      const tabs: SavedTab[] = pane.tabs.map((tab) => ({
-        id: tab.id,
-        type: tab.type,
-        title: tab.title,
-        isActive: tab.id === pane.activeTabId,
-        agentId: tab.agentId,
-        pluginId: tab.pluginId,
-        agentSessionId: tab.agentSessionId,
-      }));
+      const tabs: SavedTab[] = pane.tabs
+        .filter((tab) => tab.type !== 'plugin' || activePluginIds.has(tab.pluginId ?? ''))
+        .map((tab) => ({
+          id: tab.id,
+          type: tab.type,
+          title: tab.title,
+          isActive: tab.id === pane.activeTabId,
+          agentId: tab.agentId,
+          pluginId: tab.pluginId,
+          agentSessionId: tab.agentSessionId,
+        }));
       return {
         id: pane.id,
         tabs,
@@ -577,9 +583,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       } as SerializablePane;
     }
 
-    const activePlugins = usePluginStore.getState().plugins
-      .filter((p) => p.active)
-      .map((p) => p.id);
+    const activePlugins = [...activePluginIds];
     const sidePanelTab = useWorkspaceStore.getState().sidePanelTab;
 
     return {
