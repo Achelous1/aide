@@ -15,10 +15,9 @@ let _nativeMod: { readTree: (dir: string) => FileTreeNode[] } | null = null;
 function getNativeMod(): { readTree: (dir: string) => FileTreeNode[] } | null {
   if (_nativeMod !== null) return _nativeMod;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    // __dirname in both dev and packaged points to .vite/build (or equivalent)
-    // The vite copy plugin places .node in .vite/build/native/
-    // The forge afterCopy hook places it at buildPath/native/ which ends up in app.asar.unpacked/native/
+    // __dirname in both dev and packaged points to .vite/build (or equivalent).
+    // The vite copy plugin places .node in .vite/build/native/;
+    // the forge afterCopy hook places it at buildPath/native/ which ends up in app.asar.unpacked/native/.
     const nativeDir = path.resolve(__dirname, 'native');
     if (!fs.existsSync(nativeDir)) return null;
     // Arch-aware: only load the binary matching this platform+arch to avoid
@@ -27,6 +26,7 @@ function getNativeMod(): { readTree: (dir: string) => FileTreeNode[] } | null {
     const files = fs.readdirSync(nativeDir);
     const match = files.find((f) => f === expected);
     if (!match) return null;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     _nativeMod = require(path.join(nativeDir, match));
     return _nativeMod;
   } catch {
