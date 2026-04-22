@@ -21,9 +21,13 @@ function getNativeMod(): { readTree: (dir: string) => FileTreeNode[] } | null {
     // The forge afterCopy hook places it at buildPath/native/ which ends up in app.asar.unpacked/native/
     const nativeDir = path.resolve(__dirname, 'native');
     if (!fs.existsSync(nativeDir)) return null;
-    const files = fs.readdirSync(nativeDir).filter((f) => f.endsWith('.node'));
-    if (files.length === 0) return null;
-    _nativeMod = require(path.join(nativeDir, files[0]));
+    // Arch-aware: only load the binary matching this platform+arch to avoid
+    // require()-ing a wrong-arch binary in multi-platform checkouts.
+    const expected = `index.${process.platform}-${process.arch}.node`;
+    const files = fs.readdirSync(nativeDir);
+    const match = files.find((f) => f === expected);
+    if (!match) return null;
+    _nativeMod = require(path.join(nativeDir, match));
     return _nativeMod;
   } catch {
     return null;

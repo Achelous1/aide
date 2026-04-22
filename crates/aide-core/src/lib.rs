@@ -29,6 +29,9 @@ pub fn read_tree(dir_path: &str) -> Vec<FileNode> {
         let full_path = Path::new(dir_path).join(&name);
         let path_str = full_path.to_string_lossy().into_owned();
 
+        // NOTE: symlinks are classified as 'file' to match Node.js Dirent.isDirectory()
+        // semantics: isDirectory() returns false for symlinks by default (does not follow).
+        // Symlink-to-dir, symlink-to-file, and broken symlinks all map to NodeType::File.
         let node_type = match entry.file_type() {
             Ok(ft) if ft.is_dir() => NodeType::Directory,
             Ok(_) => NodeType::File,
@@ -76,5 +79,53 @@ mod tests {
     fn test_read_tree_nonexistent_returns_empty() {
         let result = read_tree("/nonexistent/path/that/does/not/exist/abc123");
         assert!(result.is_empty(), "expected empty vec for nonexistent path");
+    }
+
+    /// Symlink parity test: verifies Rust classifies symlinks identically to
+    /// Node.js Dirent.isDirectory() — all symlinks (to file, to dir, broken)
+    /// are classified as NodeType::File, matching JS semantics.
+    #[test]
+    #[cfg(unix)]
+    fn test_symlink_classification_matches_js_semantics() {
+        use std::os::unix::fs as unix_fs;
+
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+
+        // regular file
+        let regular_file = root.join("regular.txt");
+        stdfs::write(&regular_file, b"hello").unwrap();
+
+        // subdir
+        let subdir = root.join("subdir");
+        stdfs::create_dir(&subdir).unwrap();
+
+        // symlink → file
+        let sym_to_file = root.join("sym_to_file");
+        unix_fs::symlink(&regular_file, &sym_to_file).unwrap();
+
+        // symlink → dir
+        let sym_to_dir = root.join("sym_to_dir");
+        unix_fs::symlink(&subdir, &sym_to_dir).unwrap();
+
+        // broken symlink (target does not exist)
+        let broken_sym = root.join("broken_sym");
+        unix_fs::symlink(root.join("does_not_exist"), &broken_sym).unwrap();
+
+        let mut result = read_tree(root.to_str().unwrap());
+        result.sort_by(|a, b| a.name.cmp(&b.name));
+
+        // Locate each entry by name
+        let find = |name: &str| result.iter().find(|n| n.name == name).unwrap();
+
+        assert_eq!(find("regular.txt").node_type, NodeType::File);
+        assert_eq!(find("subdir").node_type, NodeType::Directory);
+        // All symlinks → File (mirrors Dirent.isDirectory() = false for symlinks)
+        assert_eq!(find("sym_to_file").node_type, NodeType::File,
+            "symlink-to-file must be classified as File");
+        assert_eq!(find("sym_to_dir").node_type, NodeType::File,
+            "symlink-to-dir must be classified as File (matches JS Dirent.isDirectory()=false)");
+        assert_eq!(find("broken_sym").node_type, NodeType::File,
+            "broken symlink must be classified as File");
     }
 }
