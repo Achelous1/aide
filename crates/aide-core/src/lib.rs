@@ -1,3 +1,4 @@
+pub mod pty;
 pub mod watcher;
 
 use std::fs;
