@@ -368,3 +368,89 @@ extern "C" {
 unsafe fn libc_getuid() -> u32 {
     getuid()
 }
+
+// ── Phase 1 PR-B: failing tests for read_file / write_file / delete_path ─────
+// These tests are written BEFORE the implementation (TDD). They will fail until
+// the three functions are added to this module.
+#[cfg(test)]
+mod fs_ops_tests {
+    use super::*;
+    use std::fs as stdfs;
+    use tempfile::TempDir;
+
+    // ── read_file ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_read_file_returns_content() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("hello.txt");
+        stdfs::write(&file, b"hello world").unwrap();
+        let content = read_file(file.to_str().unwrap()).unwrap();
+        assert_eq!(content, "hello world");
+    }
+
+    #[test]
+    fn test_read_file_nonexistent_returns_enoent() {
+        let err = read_file("/nonexistent/path/aide-pr-b-test/nope.txt").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    // ── write_file ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_write_file_creates_and_overwrites() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("out.txt");
+        // Create
+        write_file(file.to_str().unwrap(), "first").unwrap();
+        assert_eq!(stdfs::read_to_string(&file).unwrap(), "first");
+        // Overwrite
+        write_file(file.to_str().unwrap(), "second").unwrap();
+        assert_eq!(stdfs::read_to_string(&file).unwrap(), "second");
+    }
+
+    #[test]
+    fn test_write_file_missing_parent_returns_error() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("no_such_dir").join("out.txt");
+        let err = write_file(file.to_str().unwrap(), "data").unwrap_err();
+        // Parent doesn't exist → NotFound or PermissionDenied depending on OS
+        assert!(
+            err.kind() == std::io::ErrorKind::NotFound
+                || err.kind() == std::io::ErrorKind::PermissionDenied,
+            "expected NotFound or PermissionDenied, got {:?}",
+            err.kind()
+        );
+    }
+
+    // ── delete_path ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_delete_path_removes_file() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("to_delete.txt");
+        stdfs::write(&file, b"bye").unwrap();
+        assert!(file.exists());
+        delete_path(file.to_str().unwrap()).unwrap();
+        assert!(!file.exists());
+    }
+
+    #[test]
+    fn test_delete_path_removes_directory_recursively() {
+        let tmp = TempDir::new().unwrap();
+        let dir = tmp.path().join("to_delete_dir");
+        stdfs::create_dir(&dir).unwrap();
+        stdfs::write(dir.join("child.txt"), b"x").unwrap();
+        stdfs::create_dir(dir.join("nested")).unwrap();
+        assert!(dir.exists());
+        delete_path(dir.to_str().unwrap()).unwrap();
+        assert!(!dir.exists());
+    }
+
+    #[test]
+    fn test_delete_path_nonexistent_returns_error() {
+        // Mirrors JS fs.rmSync({recursive:true}) without force:true — throws on ENOENT.
+        let err = delete_path("/nonexistent/path/aide-pr-b-test/gone").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    }
+}
