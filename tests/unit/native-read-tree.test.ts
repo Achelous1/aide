@@ -62,8 +62,20 @@ if (process.env.CI === 'true' && process.platform === 'linux' && nativeModPath =
   );
 }
 
+// Check at module level whether the binary exports readTreeWithError.
+// Older binaries (compiled before the binding was added) only export readTree.
+// skipIf conditions are evaluated at describe-definition time, before beforeAll runs,
+// so we need the answer available synchronously here.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const hasReadTreeWithError: boolean = nativeModPath !== null &&
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  typeof (require(nativeModPath) as Record<string, unknown>).readTreeWithError === 'function';
+
 describe.skipIf(nativeModPath === null)('native read_tree (napi-rs)', () => {
-  let nativeMod: { readTree: (dir: string) => Array<{ name: string; path: string; type: string }> };
+  let nativeMod: {
+    readTree: (dir: string) => Array<{ name: string; path: string; type: string }>;
+    readTreeWithError: (dir: string) => { nodes: Array<{ name: string; path: string; type: string }>; error: { code: string; path: string; message: string } | null | undefined };
+  };
   let testDir: string;
 
   beforeAll(() => {
@@ -153,6 +165,45 @@ describe.skipIf(nativeModPath === null)('native read_tree (napi-rs)', () => {
       expect(jsWith[i].path).toBe(jsWithout[i].path, 'JS path must not have double-slash');
     }
   });
+
+  // ── Option<T> napi-rs serialization ────────────────────────────────────────
+  // Pins the actual wire format that napi-rs 2.x uses for Option<T> fields.
+  // napi-rs serializes None as `null` (not `undefined`).
+  //
+  // NOTE: The TS interface declares `error?: FsReadTreeError` (undefined-typed),
+  // but napi-rs actually serializes None as `null`. There is a divergence between
+  // the declared TS type and the runtime value. A follow-up subtask will decide
+  // whether to patch the TS type to `error?: FsReadTreeError | null` or to
+  // normalize the value to `undefined` in the IPC handler.
+  //
+  // Skipped when the binary predates the readTreeWithError export (local dev with
+  // older rustc). On Linux CI where build:native runs, this MUST execute.
+  describe.skipIf(!hasReadTreeWithError)(
+    'readTreeWithError Option<T> serialization (napi-rs null vs undefined)',
+    () => {
+      it('error field is null (not undefined) when read succeeds — pins napi-rs None serialization', () => {
+        const result = nativeMod.readTreeWithError(testDir);
+        expect(result).toHaveProperty('nodes');
+        // napi-rs 2.x serializes Option::None as null, NOT undefined.
+        // If this assertion fails after a napi-rs upgrade, the serialization
+        // contract changed and callers must be audited.
+        expect(result.error).toBeNull();
+      });
+
+      it('error field has {code, path, message} shape when path does not exist', () => {
+        const nonexistent = '/does-not-exist-aide-spike-xyz-99999';
+        const result = nativeMod.readTreeWithError(nonexistent);
+        expect(result.nodes).toHaveLength(0);
+        // error must be non-null with the expected shape
+        expect(result.error).not.toBeNull();
+        expect(result.error).not.toBeUndefined();
+        expect(result.error).toHaveProperty('code', 'ENOENT');
+        expect(result.error).toHaveProperty('path', nonexistent);
+        expect(result.error).toHaveProperty('message');
+        expect(typeof result.error!.message).toBe('string');
+      });
+    },
+  );
 
   // Non-UTF8 filename handling: Rust skips entries with non-UTF8 names while
   // Node.js (on Linux) can represent them. On macOS/APFS the OS rejects creation
