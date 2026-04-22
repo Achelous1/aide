@@ -1,4 +1,5 @@
 use std::fs;
+use std::io;
 use std::path::Path;
 
 /// Mirrors the TypeScript `FileTreeNode` type.
@@ -358,6 +359,40 @@ mod tests {
     }
 }
 
+/// Read the text content of `path`, replacing invalid UTF-8 sequences with U+FFFD.
+/// Matches Node.js `readFileSync(path, 'utf-8')` behavior which uses WTF-8 / lossy decode.
+/// Returns `io::Error` on I/O failures (ENOENT, EACCES, etc.).
+pub fn read_file(path: &str) -> Result<String, io::Error> {
+    let bytes = fs::read(path)?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// Write `content` to `path`, creating or overwriting the file.
+/// The parent directory must already exist; this function does NOT create it.
+pub fn write_file(path: &str, content: &str) -> Result<(), io::Error> {
+    fs::write(path, content)
+}
+
+/// Delete `path` — file, directory (recursive), or symlink.
+/// Mirrors `fs.rmSync(path, { recursive: true })` without `force: true`:
+/// throws `io::Error(NotFound)` if the path does not exist.
+///
+/// Uses `symlink_metadata` (does NOT follow symlinks) to prevent catastrophic
+/// data loss when `path` is a symlink to a directory — only the symlink itself
+/// is removed, never the target's contents.
+pub fn delete_path(path: &str) -> Result<(), io::Error> {
+    let meta = fs::symlink_metadata(path)?;
+    let file_type = meta.file_type();
+    if file_type.is_symlink() {
+        // Unlink the symlink itself, do NOT follow to target.
+        fs::remove_file(path)
+    } else if file_type.is_dir() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    }
+}
+
 // Minimal safe FFI shim — only used in the EPERM test to detect root.
 #[cfg(all(unix, test))]
 extern "C" {
@@ -367,4 +402,169 @@ extern "C" {
 #[cfg(all(unix, test))]
 unsafe fn libc_getuid() -> u32 {
     getuid()
+}
+
+// ── Phase 1 PR-B: failing tests for read_file / write_file / delete_path ─────
+// These tests are written BEFORE the implementation (TDD). They will fail until
+// the three functions are added to this module.
+#[cfg(test)]
+mod fs_ops_tests {
+    use super::*;
+    use std::fs as stdfs;
+    use tempfile::TempDir;
+
+    // ── read_file ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_read_file_returns_content() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("hello.txt");
+        stdfs::write(&file, b"hello world").unwrap();
+        let content = read_file(file.to_str().unwrap()).unwrap();
+        assert_eq!(content, "hello world");
+    }
+
+    #[test]
+    fn test_read_file_nonexistent_returns_enoent() {
+        let err = read_file("/nonexistent/path/aide-pr-b-test/nope.txt").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    // ── write_file ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_write_file_creates_and_overwrites() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("out.txt");
+        // Create
+        write_file(file.to_str().unwrap(), "first").unwrap();
+        assert_eq!(stdfs::read_to_string(&file).unwrap(), "first");
+        // Overwrite
+        write_file(file.to_str().unwrap(), "second").unwrap();
+        assert_eq!(stdfs::read_to_string(&file).unwrap(), "second");
+    }
+
+    #[test]
+    fn test_write_file_missing_parent_returns_error() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("no_such_dir").join("out.txt");
+        let err = write_file(file.to_str().unwrap(), "data").unwrap_err();
+        // Parent doesn't exist → NotFound or PermissionDenied depending on OS
+        assert!(
+            err.kind() == std::io::ErrorKind::NotFound
+                || err.kind() == std::io::ErrorKind::PermissionDenied,
+            "expected NotFound or PermissionDenied, got {:?}",
+            err.kind()
+        );
+    }
+
+    // ── delete_path ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_delete_path_removes_file() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("to_delete.txt");
+        stdfs::write(&file, b"bye").unwrap();
+        assert!(file.exists());
+        delete_path(file.to_str().unwrap()).unwrap();
+        assert!(!file.exists());
+    }
+
+    #[test]
+    fn test_delete_path_removes_directory_recursively() {
+        let tmp = TempDir::new().unwrap();
+        let dir = tmp.path().join("to_delete_dir");
+        stdfs::create_dir(&dir).unwrap();
+        stdfs::write(dir.join("child.txt"), b"x").unwrap();
+        stdfs::create_dir(dir.join("nested")).unwrap();
+        assert!(dir.exists());
+        delete_path(dir.to_str().unwrap()).unwrap();
+        assert!(!dir.exists());
+    }
+
+    #[test]
+    fn test_delete_path_nonexistent_returns_error() {
+        // Mirrors JS fs.rmSync({recursive:true}) without force:true — throws on ENOENT.
+        let err = delete_path("/nonexistent/path/aide-pr-b-test/gone").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    // ── delete_path symlink tests (#B1) ──────────────────────────────────────
+    // All gated on unix; Windows symlink semantics differ and are deferred.
+
+    /// delete_path on a symlink-to-dir must unlink the symlink only,
+    /// NOT recursively delete the target directory's contents.
+    #[test]
+    #[cfg(unix)]
+    fn test_delete_path_unlinks_symlink_to_dir_not_target() {
+        use std::os::unix::fs as unix_fs;
+        let tmp = TempDir::new().unwrap();
+        let inner_dir = tmp.path().join("inner-dir");
+        stdfs::create_dir(&inner_dir).unwrap();
+        stdfs::write(inner_dir.join("keep.txt"), b"precious").unwrap();
+        let link = tmp.path().join("link-to-dir");
+        unix_fs::symlink(&inner_dir, &link).unwrap();
+
+        delete_path(link.to_str().unwrap()).unwrap();
+
+        assert!(!link.exists(), "symlink must be gone");
+        assert!(!link.symlink_metadata().is_ok(), "symlink itself must not exist");
+        assert!(inner_dir.exists(), "target dir must still exist");
+        assert!(inner_dir.join("keep.txt").exists(), "target contents must be intact");
+    }
+
+    /// delete_path on a broken symlink (dangling pointer) must succeed,
+    /// removing the symlink even though the target doesn't exist.
+    #[test]
+    #[cfg(unix)]
+    fn test_delete_path_removes_broken_symlink() {
+        use std::os::unix::fs as unix_fs;
+        let tmp = TempDir::new().unwrap();
+        let link = tmp.path().join("broken-link");
+        unix_fs::symlink(tmp.path().join("nonexistent-target"), &link).unwrap();
+        // Confirm the symlink itself exists (even though target doesn't).
+        assert!(link.symlink_metadata().is_ok(), "broken symlink must exist before delete");
+
+        delete_path(link.to_str().unwrap()).unwrap();
+
+        assert!(link.symlink_metadata().is_err(), "broken symlink must be gone after delete");
+    }
+
+    /// delete_path on a symlink-to-file must unlink the symlink only,
+    /// leaving the real file intact.
+    #[test]
+    #[cfg(unix)]
+    fn test_delete_path_unlinks_symlink_to_file_not_target() {
+        use std::os::unix::fs as unix_fs;
+        let tmp = TempDir::new().unwrap();
+        let real_file = tmp.path().join("real.txt");
+        stdfs::write(&real_file, b"important").unwrap();
+        let link = tmp.path().join("link-to-file");
+        unix_fs::symlink(&real_file, &link).unwrap();
+
+        delete_path(link.to_str().unwrap()).unwrap();
+
+        assert!(link.symlink_metadata().is_err(), "symlink must be gone");
+        assert!(real_file.exists(), "real file must still exist");
+        assert_eq!(stdfs::read(&real_file).unwrap(), b"important");
+    }
+
+    // ── read_file non-UTF8 test (#B3) ─────────────────────────────────────────
+
+    /// read_file on a file containing non-UTF8 bytes must succeed and replace
+    /// invalid sequences with U+FFFD (matching Node.js readFileSync(p, 'utf-8') behavior).
+    #[test]
+    fn test_read_file_non_utf8_bytes_replaced_with_replacement_char() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("binary.bin");
+        // 0x66 'f', 0xFF (invalid UTF-8), 0x6F 'o' — yields "f\u{FFFD}o"
+        stdfs::write(&file, &[0x66u8, 0xFF, 0x6F]).unwrap();
+
+        let content = read_file(file.to_str().unwrap()).unwrap();
+
+        assert!(content.contains('\u{FFFD}'),
+            "expected U+FFFD replacement char, got: {:?}", content);
+        assert!(content.starts_with('f'), "first byte 'f' must be preserved");
+        assert!(content.ends_with('o'), "last byte 'o' must be preserved");
+    }
 }

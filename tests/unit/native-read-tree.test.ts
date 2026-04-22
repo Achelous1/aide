@@ -245,3 +245,56 @@ describe.skipIf(nativeModPath === null)('native read_tree (napi-rs)', () => {
     },
   );
 });
+
+// ── napi error-message format tests (#B2 / #B4) ────────────────────────────
+// Verify that io::Error from Rust is surfaced with a Node-style "ENOENT: ..."
+// prefix AND contains the path, so callers can pattern-match on err.message.
+// These tests run against the real .node binary.
+
+// Check whether the binary exports readFile (added in PR-B).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const hasReadFile: boolean = nativeModPath !== null &&
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  typeof (require(nativeModPath!) as Record<string, unknown>).readFile === 'function';
+
+describe.skipIf(!hasReadFile)('napi fs-op error message format (PR-B #B2/#B4)', () => {
+  type FsMod = {
+    readFile: (path: string) => string;
+    writeFile: (path: string, content: string) => void;
+    deletePath: (path: string) => void;
+  };
+
+  // nativeModPath may be null on platforms without a built .node (e.g. Windows
+  // CI where build:native is intentionally skipped). skipIf above prevents the
+  // it() blocks from running, but describe callbacks still execute at collect
+  // time — so guard the require to avoid `require(null)` throwing here.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fsMod = (nativeModPath !== null ? require(nativeModPath) : null) as FsMod;
+
+  it('readFile on nonexistent path rejects with ENOENT: prefix in message', () => {
+    const nonexistent = '/nonexistent-aide-test-b2/nope.txt';
+    expect(() => fsMod.readFile(nonexistent)).toThrow(/^ENOENT:/);
+  });
+
+  it('readFile error message contains the path', () => {
+    const nonexistent = '/nonexistent-aide-test-b4/nope.txt';
+    let caught: Error | undefined;
+    try {
+      fsMod.readFile(nonexistent);
+    } catch (e) {
+      caught = e as Error;
+    }
+    expect(caught).toBeDefined();
+    expect(caught!.message).toContain(nonexistent);
+  });
+
+  it('writeFile on path with missing parent rejects with ENOENT: prefix in message', () => {
+    const badPath = '/nonexistent-aide-test-b2-write/out.txt';
+    expect(() => fsMod.writeFile(badPath, 'data')).toThrow(/^ENOENT:/);
+  });
+
+  it('deletePath on nonexistent path rejects with ENOENT: prefix in message', () => {
+    const nonexistent = '/nonexistent-aide-test-b2-delete/gone';
+    expect(() => fsMod.deletePath(nonexistent)).toThrow(/^ENOENT:/);
+  });
+});

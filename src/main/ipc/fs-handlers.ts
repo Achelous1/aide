@@ -33,6 +33,9 @@ function candidateNativeFilenames(): string[] {
 interface NativeMod {
   readTree: (dir: string) => FileTreeNode[];
   readTreeWithError: (dir: string) => { nodes: FileTreeNode[]; error?: FsReadTreeError };
+  readFile: (path: string) => string;
+  writeFile: (path: string, content: string) => void;
+  deletePath: (path: string) => void;
 }
 
 let _nativeMod: NativeMod | null = null;
@@ -130,15 +133,15 @@ export function registerFsHandlers(ipcMain: IpcMain): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.FS_READ_FILE, (_event, filePath: string) => {
-    return fs.readFileSync(filePath, 'utf-8');
+    return getNativeMod().readFile(filePath);
   });
 
   ipcMain.handle(IPC_CHANNELS.FS_WRITE_FILE, (_event, filePath: string, content: string) => {
-    fs.writeFileSync(filePath, content);
+    getNativeMod().writeFile(filePath, content);
   });
 
   ipcMain.handle(IPC_CHANNELS.FS_DELETE, (_event, filePath: string) => {
-    fs.rmSync(filePath, { recursive: true });
+    getNativeMod().deletePath(filePath);
   });
 
   ipcMain.handle(IPC_CHANNELS.FS_SEARCH_FILES, (_event, query: string, limit?: number) => {

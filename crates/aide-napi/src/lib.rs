@@ -55,6 +55,37 @@ pub struct ExportedReadTreeResult {
     pub error: Option<ExportedReadTreeError>,
 }
 
+/// Converts an `io::Error` to a `napi::Error` with a Node.js-compatible error code
+/// prefix in the message (e.g. "ENOENT: No such file or directory '/path'").
+/// This mirrors the format Node.js uses for `fs` errors so callers can match on
+/// `err.message.startsWith('ENOENT')` etc.
+fn io_to_napi(path: &str, err: std::io::Error) -> napi::Error {
+    let code = match err.kind() {
+        std::io::ErrorKind::NotFound => "ENOENT",
+        std::io::ErrorKind::PermissionDenied => "EACCES",
+        std::io::ErrorKind::AlreadyExists => "EEXIST",
+        std::io::ErrorKind::InvalidInput => "EINVAL",
+        std::io::ErrorKind::InvalidData => "EINVAL",
+        _ => "EIO",
+    };
+    napi::Error::from_reason(format!("{}: {} '{}'", code, err, path))
+}
+
+#[napi]
+pub fn read_file(path: String) -> napi::Result<String> {
+    aide_core::read_file(&path).map_err(|e| io_to_napi(&path, e))
+}
+
+#[napi]
+pub fn write_file(path: String, content: String) -> napi::Result<()> {
+    aide_core::write_file(&path, &content).map_err(|e| io_to_napi(&path, e))
+}
+
+#[napi]
+pub fn delete_path(path: String) -> napi::Result<()> {
+    aide_core::delete_path(&path).map_err(|e| io_to_napi(&path, e))
+}
+
 #[napi]
 pub fn read_tree_with_error(dir_path: String) -> ExportedReadTreeResult {
     let result = aide_core::read_tree_with_error(&dir_path);

@@ -206,6 +206,9 @@ describe('FS_READ_TREE_NATIVE handler is NOT registered (coexistence removed)', 
       exports: {
         readTree: () => [],
         readTreeWithError: () => ({ nodes: [] }),
+        readFile: () => '',
+        writeFile: () => undefined,
+        deletePath: () => undefined,
       },
     };
 
@@ -218,5 +221,112 @@ describe('FS_READ_TREE_NATIVE handler is NOT registered (coexistence removed)', 
       delete requireCache[nodePath];
       vi.resetModules();
     }
+  });
+});
+
+// ── PR-B regression guards: FS_READ_FILE / FS_WRITE_FILE / FS_DELETE ─────────
+
+describe('FS_READ_FILE / FS_WRITE_FILE / FS_DELETE handlers use Rust module (PR-B)', () => {
+  let testDir: string;
+  let injectedNodePath: string;
+  const FAKE_NODE_FILENAME = `index.${process.platform}-${process.arch}.node`;
+
+  // Track calls to verify routing through the mock, not JS fallback.
+  let readFileCalled = false;
+  let writeFileCalled = false;
+  let deletePathCalled = false;
+
+  const mockNativeModB = {
+    readTree: () => [] as FileTreeNode[],
+    readTreeWithError: () => ({ nodes: [] as FileTreeNode[] }),
+    readFile: (p: string): string => {
+      readFileCalled = true;
+      return fs.readFileSync(p, 'utf-8');
+    },
+    writeFile: (p: string, content: string): void => {
+      writeFileCalled = true;
+      fs.writeFileSync(p, content);
+    },
+    deletePath: (p: string): void => {
+      deletePathCalled = true;
+      fs.rmSync(p, { recursive: true });
+    },
+  };
+
+  beforeEach(() => {
+    readFileCalled = false;
+    writeFileCalled = false;
+    deletePathCalled = false;
+
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aide-prb-test-'));
+    fs.writeFileSync(path.join(testDir, 'read-me.txt'), 'contents');
+
+    const fsHandlersDir = path.resolve(__dirname, '../../src/main/ipc');
+    const nativeDir = path.resolve(fsHandlersDir, 'native');
+    injectedNodePath = path.join(nativeDir, FAKE_NODE_FILENAME);
+
+    if (!fs.existsSync(nativeDir)) fs.mkdirSync(nativeDir, { recursive: true });
+    if (!fs.existsSync(injectedNodePath)) fs.writeFileSync(injectedNodePath, '');
+
+    const requireCache = require.cache as Record<string, { exports: unknown }>;
+    requireCache[injectedNodePath] = { exports: mockNativeModB };
+  });
+
+  afterEach(() => {
+    const requireCache = require.cache as Record<string, unknown>;
+    delete requireCache[injectedNodePath];
+    if (fs.existsSync(testDir)) fs.rmSync(testDir, { recursive: true, force: true });
+    vi.resetModules();
+  });
+
+  it('FS_READ_FILE routes through getNativeMod().readFile — not fs.readFileSync directly', async () => {
+    const { registerFsHandlers } = await import('../../src/main/ipc/fs-handlers.ts?prb1=' + Date.now());
+    const fakeIpc = makeFakeIpcMain();
+    registerFsHandlers(fakeIpc as Parameters<typeof registerFsHandlers>[0]);
+
+    const filePath = path.join(testDir, 'read-me.txt');
+    const result = fakeIpc.invoke(IPC_CHANNELS.FS_READ_FILE, filePath) as string;
+
+    expect(readFileCalled).toBe(true);
+    expect(result).toBe('contents');
+  });
+
+  it('FS_WRITE_FILE routes through getNativeMod().writeFile — not fs.writeFileSync directly', async () => {
+    const { registerFsHandlers } = await import('../../src/main/ipc/fs-handlers.ts?prb2=' + Date.now());
+    const fakeIpc = makeFakeIpcMain();
+    registerFsHandlers(fakeIpc as Parameters<typeof registerFsHandlers>[0]);
+
+    const filePath = path.join(testDir, 'written.txt');
+    fakeIpc.invoke(IPC_CHANNELS.FS_WRITE_FILE, filePath, 'written');
+
+    expect(writeFileCalled).toBe(true);
+    expect(fs.readFileSync(filePath, 'utf-8')).toBe('written');
+  });
+
+  it('FS_DELETE routes through getNativeMod().deletePath — not fs.rmSync directly', async () => {
+    const { registerFsHandlers } = await import('../../src/main/ipc/fs-handlers.ts?prb3=' + Date.now());
+    const fakeIpc = makeFakeIpcMain();
+    registerFsHandlers(fakeIpc as Parameters<typeof registerFsHandlers>[0]);
+
+    const filePath = path.join(testDir, 'read-me.txt');
+    expect(fs.existsSync(filePath)).toBe(true);
+    fakeIpc.invoke(IPC_CHANNELS.FS_DELETE, filePath);
+
+    expect(deletePathCalled).toBe(true);
+    expect(fs.existsSync(filePath)).toBe(false);
+  });
+
+  it('FS_DELETE recursive — directory with children is fully removed', async () => {
+    const { registerFsHandlers } = await import('../../src/main/ipc/fs-handlers.ts?prb4=' + Date.now());
+    const fakeIpc = makeFakeIpcMain();
+    registerFsHandlers(fakeIpc as Parameters<typeof registerFsHandlers>[0]);
+
+    const subDir = path.join(testDir, 'subdir');
+    fs.mkdirSync(subDir);
+    fs.writeFileSync(path.join(subDir, 'child.txt'), 'x');
+
+    fakeIpc.invoke(IPC_CHANNELS.FS_DELETE, subDir);
+    expect(deletePathCalled).toBe(true);
+    expect(fs.existsSync(subDir)).toBe(false);
   });
 });
