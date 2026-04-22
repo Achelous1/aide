@@ -6,6 +6,7 @@
 
 ## Decisions
 - [[plugin-scope-local-only]] — 글로벌 플러그인 스코프 제거, .mcp.json 생성 중단 + 자동 마이그레이션
+- [[rust-core-migration]] — Phase 0+1 완료: chokidar → Rust notify, fs ops → Rust aide-core+napi
 
 ## Debugging
 - [[eperm-uv-cwd-bugfix]] — pty 스폰/plugin:list EPERM 에러, process.cwd() 미검증 원인 및 수정
