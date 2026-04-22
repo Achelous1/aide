@@ -11,6 +11,25 @@ import type { FileTreeNode, FsReadTreeError } from '../../types/ipc';
 // Spike: lazy-load the Rust native module — optional so dev without build:native still works
 // In dev/package: __dirname = .vite/build/ → native/ is copied there by vite.main.config plugin
 // In packaged app: asar.unpack ensures .node is in app.asar.unpacked/native/
+// napi-rs appends a libc suffix on non-darwin platforms:
+//   Linux glibc → index.linux-x64-gnu.node
+//   Linux musl  → index.linux-x64-musl.node
+//   Windows     → index.win32-x64-msvc.node
+// Return candidates in priority order; the loader picks the first match.
+function candidateNativeFilenames(): string[] {
+  const base = `index.${process.platform}-${process.arch}`;
+  if (process.platform === 'darwin') {
+    return [`${base}.node`];
+  }
+  if (process.platform === 'linux') {
+    return [`${base}-gnu.node`, `${base}-musl.node`, `${base}.node`];
+  }
+  if (process.platform === 'win32') {
+    return [`${base}-msvc.node`, `${base}.node`];
+  }
+  return [`${base}.node`];
+}
+
 let _nativeMod: { readTree: (dir: string) => FileTreeNode[] } | null = null;
 function getNativeMod(): { readTree: (dir: string) => FileTreeNode[] } | null {
   if (_nativeMod !== null) return _nativeMod;
@@ -20,11 +39,10 @@ function getNativeMod(): { readTree: (dir: string) => FileTreeNode[] } | null {
     // the forge afterCopy hook places it at buildPath/native/ which ends up in app.asar.unpacked/native/.
     const nativeDir = path.resolve(__dirname, 'native');
     if (!fs.existsSync(nativeDir)) return null;
-    // Arch-aware: only load the binary matching this platform+arch to avoid
-    // require()-ing a wrong-arch binary in multi-platform checkouts.
-    const expected = `index.${process.platform}-${process.arch}.node`;
-    const files = fs.readdirSync(nativeDir);
-    const match = files.find((f) => f === expected);
+    // Arch-aware: try candidates in priority order to handle libc-suffixed napi-rs
+    // output on Linux/Windows without loading a wrong-arch binary.
+    const files = new Set(fs.readdirSync(nativeDir));
+    const match = candidateNativeFilenames().find((c) => files.has(c));
     if (!match) return null;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     _nativeMod = require(path.join(nativeDir, match));

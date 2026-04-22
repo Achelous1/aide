@@ -2,6 +2,25 @@ import { defineConfig } from 'vite';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'fs';
 import { resolve, join } from 'path';
 
+// napi-rs appends a libc suffix on non-darwin platforms:
+//   Linux glibc → index.linux-x64-gnu.node
+//   Linux musl  → index.linux-x64-musl.node
+//   Windows     → index.win32-x64-msvc.node
+// Return candidates in priority order; copy the first one found in srcDir.
+function candidateNativeFilenames(): string[] {
+  const base = `index.${process.platform}-${process.arch}`;
+  if (process.platform === 'darwin') {
+    return [`${base}.node`];
+  }
+  if (process.platform === 'linux') {
+    return [`${base}-gnu.node`, `${base}-musl.node`, `${base}.node`];
+  }
+  if (process.platform === 'win32') {
+    return [`${base}-msvc.node`, `${base}.node`];
+  }
+  return [`${base}.node`];
+}
+
 // Plugin that copies native .node binaries into the Vite build output
 // so the main process can require() them relative to __dirname at runtime.
 //
@@ -25,13 +44,13 @@ function copyNativePlugin() {
         return;
       }
 
-      // Only copy the arch-matching binary — matches the loader in fs-handlers.ts.
-      const expected = `index.${process.platform}-${process.arch}.node`;
-      const srcPath = join(srcDir, expected);
-      if (!existsSync(srcPath)) {
-        console.log(`[copy-native] ${expected} not found in src/main/native, skipping`);
+      // Pick the first candidate that exists in srcDir (handles libc suffix variants).
+      const candidate = candidateNativeFilenames().find((f) => existsSync(join(srcDir, f)));
+      if (!candidate) {
+        console.log(`[copy-native] no matching .node found in src/main/native, skipping`);
         return;
       }
+      const srcPath = join(srcDir, candidate);
 
       // Clear any stale *.node files in dest so old-arch binaries don't linger.
       if (existsSync(destDir)) {
@@ -41,7 +60,7 @@ function copyNativePlugin() {
       }
 
       mkdirSync(destDir, { recursive: true });
-      copyFileSync(srcPath, join(destDir, expected));
+      copyFileSync(srcPath, join(destDir, candidate));
     },
   };
 }

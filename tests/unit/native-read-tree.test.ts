@@ -26,14 +26,28 @@ function jsReadTree(dirPath: string): Array<{ name: string; path: string; type: 
   }));
 }
 
-// Resolve the built .node file using arch-aware matching.
-// Returns null if the arch-matching binary is absent — no fallback to wrong arch.
+// Resolve the built .node file using arch-aware candidate matching.
+// napi-rs appends a libc suffix on Linux (-gnu/-musl) and Windows (-msvc).
+// Returns null if no arch-matching binary is found — no fallback to wrong arch.
+function candidateNativeFilenames(): string[] {
+  const base = `index.${process.platform}-${process.arch}`;
+  if (process.platform === 'darwin') {
+    return [`${base}.node`];
+  }
+  if (process.platform === 'linux') {
+    return [`${base}-gnu.node`, `${base}-musl.node`, `${base}.node`];
+  }
+  if (process.platform === 'win32') {
+    return [`${base}-msvc.node`, `${base}.node`];
+  }
+  return [`${base}.node`];
+}
+
 function resolveNativeModule(): string | null {
   const nativeDir = path.resolve(__dirname, '../../src/main/native');
-  const expected = `index.${process.platform}-${process.arch}.node`;
   if (!fs.existsSync(nativeDir)) return null;
-  const files = fs.readdirSync(nativeDir);
-  const match = files.find((f) => f === expected);
+  const files = new Set(fs.readdirSync(nativeDir));
+  const match = candidateNativeFilenames().find((c) => files.has(c));
   return match ? path.join(nativeDir, match) : null;
 }
 
