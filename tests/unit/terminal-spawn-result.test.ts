@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * TDD tests for structured TerminalSpawnResult.
  * Verifies that TERMINAL_SPAWN handler returns { ok, sessionId } on success
  * and { ok, error, code, diagnostic } on failure — never throws.
+ *
+ * Updated for Phase 3 PR-1: mocks the Rust PTY via getNativeMod() instead of node-pty.
  */
 
 // Mock electron before any imports that reference it
@@ -23,31 +25,43 @@ vi.mock('electron', () => {
   };
 });
 
-// Mock node-pty so we can control spawn behaviour per test
-const mockOnData = vi.fn();
-const mockOnExit = vi.fn();
-const mockKill = vi.fn();
-
-const mockPtyProcess = {
-  onData: mockOnData,
-  onExit: mockOnExit,
-  kill: mockKill,
+// Mock the Rust native module via fs-handlers
+const mockPtyHandle = {
+  write: vi.fn(),
+  resize: vi.fn(),
+  kill: vi.fn(),
 };
 
-const mockPtySpawn = vi.fn();
+const mockSpawnPty = vi.fn();
 
-vi.mock('node-pty', () => ({
-  spawn: (...args: unknown[]) => mockPtySpawn(...args),
-}));
+vi.mock('../../src/main/ipc/fs-handlers', async () => {
+  const actual = await vi.importActual<typeof import('../../src/main/ipc/fs-handlers')>(
+    '../../src/main/ipc/fs-handlers'
+  );
+  return {
+    ...actual,
+    getNativeMod: () => ({
+      readTree: vi.fn(),
+      readTreeWithError: vi.fn(),
+      readFile: vi.fn(),
+      writeFile: vi.fn(),
+      deletePath: vi.fn(),
+      startWatcher: vi.fn(),
+      spawnPty: (...args: unknown[]) => mockSpawnPty(...args),
+    }),
+  };
+});
 
 // Mock fs to avoid real filesystem access
 vi.mock('fs', () => ({
   default: {
     existsSync: () => true,
     readdirSync: () => [],
+    statSync: () => ({ mtimeMs: 0 }),
   },
   existsSync: () => true,
   readdirSync: () => [],
+  statSync: () => ({ mtimeMs: 0 }),
 }));
 
 // Mock the MCP config writer
@@ -81,11 +95,6 @@ vi.mock('../../src/main/agent/status-detector', () => ({
   },
 }));
 
-// Mock getDefaultShell used in terminal-handlers
-vi.mock('../../src/main/utils/shell', () => ({
-  getDefaultShell: () => '/bin/zsh',
-}));
-
 // ---- Helpers ----------------------------------------------------------------
 
 async function getSpawnHandler() {
@@ -105,12 +114,10 @@ describe('TERMINAL_SPAWN handler — TerminalSpawnResult', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: spawn succeeds
-    mockPtySpawn.mockReturnValue(mockPtyProcess);
-    mockOnData.mockImplementation(() => {});
-    mockOnExit.mockImplementation(() => {});
+    mockSpawnPty.mockReturnValue(mockPtyHandle);
   });
 
-  it('returns { ok: true, sessionId } when pty.spawn succeeds', async () => {
+  it('returns { ok: true, sessionId } when spawnPty succeeds', async () => {
     const handler = await getSpawnHandler();
     const result = await handler(fakeEvent, { cwd: '/tmp' });
 
@@ -129,9 +136,9 @@ describe('TERMINAL_SPAWN handler — TerminalSpawnResult', () => {
     expect(r1.sessionId).not.toBe(r2.sessionId);
   });
 
-  it('returns { ok: false, error, code, diagnostic } when pty.spawn throws ENOENT', async () => {
+  it('returns { ok: false, error, code, diagnostic } when spawnPty throws ENOENT', async () => {
     const err = Object.assign(new Error('spawn /bin/nonexistent_shell_xyz ENOENT'), { code: 'ENOENT' });
-    mockPtySpawn.mockImplementation(() => { throw err; });
+    mockSpawnPty.mockImplementation(() => { throw err; });
 
     const handler = await getSpawnHandler();
     const result = await handler(fakeEvent, { shell: '/bin/nonexistent_shell_xyz', cwd: '/tmp' });
@@ -145,7 +152,7 @@ describe('TERMINAL_SPAWN handler — TerminalSpawnResult', () => {
 
   it('diagnostic includes path and home fields on spawn failure', async () => {
     const err = Object.assign(new Error('spawn failed'), { code: 'EACCES' });
-    mockPtySpawn.mockImplementation(() => { throw err; });
+    mockSpawnPty.mockImplementation(() => { throw err; });
 
     const handler = await getSpawnHandler();
     const result = await handler(fakeEvent, { cwd: '/tmp' });
@@ -160,7 +167,7 @@ describe('TERMINAL_SPAWN handler — TerminalSpawnResult', () => {
     delete process.env.PATH;
 
     const err = Object.assign(new Error('spawn failed'), { code: 'ENOENT' });
-    mockPtySpawn.mockImplementation(() => { throw err; });
+    mockSpawnPty.mockImplementation(() => { throw err; });
 
     const handler = await getSpawnHandler();
     const result = await handler(fakeEvent, { cwd: '/tmp' });
@@ -173,7 +180,7 @@ describe('TERMINAL_SPAWN handler — TerminalSpawnResult', () => {
 
   it('does not throw — always returns a result object', async () => {
     const err = new Error('unexpected crash');
-    mockPtySpawn.mockImplementation(() => { throw err; });
+    mockSpawnPty.mockImplementation(() => { throw err; });
 
     const handler = await getSpawnHandler();
 
