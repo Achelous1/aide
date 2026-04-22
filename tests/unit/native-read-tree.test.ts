@@ -5,7 +5,7 @@
  * Verifies that the Rust implementation returns the same shape
  * as the existing JS readTree for the same directory.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -52,6 +52,12 @@ describe.skipIf(nativeModPath === null)('native read_tree (napi-rs)', () => {
     fs.writeFileSync(path.join(testDir, 'file1.txt'), 'a');
     fs.writeFileSync(path.join(testDir, 'file2.txt'), 'b');
     fs.mkdirSync(path.join(testDir, 'subdir'));
+  });
+
+  afterAll(() => {
+    if (testDir) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   it('returns 3 entries for a dir with 2 files + 1 subdir', () => {
