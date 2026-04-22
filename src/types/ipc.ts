@@ -65,16 +65,6 @@ export interface WorkspaceInfo {
 
 export type AgentStatus = 'idle' | 'processing' | 'awaiting-input';
 
-export interface GitStatus {
-  branch: string;
-  modified: string[];
-  added: string[];
-  deleted: string[];
-  untracked: string[];
-  ahead: number;
-  behind: number;
-}
-
 export interface TerminalTab {
   id: string;
   type: 'agent' | 'shell' | 'plugin';
@@ -106,30 +96,6 @@ export type LayoutNode = Pane | SplitLayout;
 /** Type guard: check if a LayoutNode is a SplitLayout */
 export function isSplitLayout(node: LayoutNode): node is SplitLayout {
   return 'direction' in node && 'children' in node;
-}
-
-/** GitHub PR summary */
-export interface GithubPR {
-  number: number;
-  title: string;
-  state: string;
-  author: string;
-  createdAt: string;
-  updatedAt: string;
-  url: string;
-  draft: boolean;
-}
-
-/** GitHub Issue summary */
-export interface GithubIssue {
-  number: number;
-  title: string;
-  state: string;
-  author: string;
-  createdAt: string;
-  updatedAt: string;
-  url: string;
-  labels: string[];
 }
 
 /** Plugin specification */
@@ -260,15 +226,6 @@ export interface AideAPI {
     openPrivacySettings(): Promise<void>;
     isDarwin(): boolean;
   };
-  git: {
-    status(cwd: string): Promise<GitStatus>;
-    commit(cwd: string, message: string): Promise<unknown>;
-    push(cwd: string): Promise<unknown>;
-    pull(cwd: string): Promise<unknown>;
-    branch(cwd: string): Promise<unknown>;
-    log(cwd: string, limit?: number): Promise<unknown>;
-    remoteUrl(cwd: string): Promise<{ owner: string; repo: string } | null>;
-  };
   terminal: {
     spawn(options?: TerminalSpawnOptions): Promise<TerminalSpawnResult>;
     write(sessionId: string, data: string): Promise<void>;
@@ -322,11 +279,6 @@ export interface AideAPI {
     onReveal(callback: (filePath: string) => void): () => void;
     onSelect(callback: (filePath: string) => void): () => void;
     onRefresh(callback: () => void): () => void;
-  };
-  github: {
-    listPRs(owner: string, repo: string): Promise<GithubPR[]>;
-    listIssues(owner: string, repo: string): Promise<GithubIssue[]>;
-    getPR(owner: string, repo: string, prNumber: number): Promise<GithubPR & { body: string; additions: number; deletions: number; changedFiles: number }>;
   };
   session: {
     save(session: SavedSession): Promise<void>;
