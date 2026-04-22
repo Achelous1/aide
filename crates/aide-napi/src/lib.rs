@@ -56,6 +56,21 @@ pub struct ExportedReadTreeResult {
 }
 
 #[napi]
+pub fn read_file(path: String) -> napi::Result<String> {
+    aide_core::read_file(&path).map_err(|e| napi::Error::from_reason(e.to_string()))
+}
+
+#[napi]
+pub fn write_file(path: String, content: String) -> napi::Result<()> {
+    aide_core::write_file(&path, &content).map_err(|e| napi::Error::from_reason(e.to_string()))
+}
+
+#[napi]
+pub fn delete_path(path: String) -> napi::Result<()> {
+    aide_core::delete_path(&path).map_err(|e| napi::Error::from_reason(e.to_string()))
+}
+
+#[napi]
 pub fn read_tree_with_error(dir_path: String) -> ExportedReadTreeResult {
     let result = aide_core::read_tree_with_error(&dir_path);
     ExportedReadTreeResult {

@@ -1,4 +1,5 @@
 use std::fs;
+use std::io;
 use std::path::Path;
 
 /// Mirrors the TypeScript `FileTreeNode` type.
@@ -355,6 +356,30 @@ mod tests {
         let err = result.error.expect("expected error for unreadable dir");
         assert_eq!(err.code, ReadTreeErrorCode::EPERM,
             "unreadable dir must yield EPERM");
+    }
+}
+
+/// Read the UTF-8 text content of `path`.
+/// Returns `io::Error` on any failure (ENOENT, EACCES, invalid UTF-8, etc.).
+pub fn read_file(path: &str) -> Result<String, io::Error> {
+    fs::read_to_string(path)
+}
+
+/// Write `content` to `path`, creating or overwriting the file.
+/// The parent directory must already exist; this function does NOT create it.
+pub fn write_file(path: &str, content: &str) -> Result<(), io::Error> {
+    fs::write(path, content)
+}
+
+/// Delete `path` — file or directory (recursive).
+/// Mirrors `fs.rmSync(path, { recursive: true })` without `force: true`:
+/// throws `io::Error(NotFound)` if the path does not exist.
+pub fn delete_path(path: &str) -> Result<(), io::Error> {
+    let meta = fs::metadata(path)?;
+    if meta.is_dir() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
     }
 }
 
