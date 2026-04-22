@@ -8,6 +8,28 @@ import { WATCHER_EXCLUSIONS } from './watcher-exclusions';
 import { FileIndex } from './file-index';
 import type { FileTreeNode, FsReadTreeError } from '../../types/ipc';
 
+// Spike: lazy-load the Rust native module — optional so dev without build:native still works
+// In dev/package: __dirname = .vite/build/ → native/ is copied there by vite.main.config plugin
+// In packaged app: asar.unpack ensures .node is in app.asar.unpacked/native/
+let _nativeMod: { readTree: (dir: string) => FileTreeNode[] } | null = null;
+function getNativeMod(): { readTree: (dir: string) => FileTreeNode[] } | null {
+  if (_nativeMod !== null) return _nativeMod;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // __dirname in both dev and packaged points to .vite/build (or equivalent)
+    // The vite copy plugin places .node in .vite/build/native/
+    // The forge afterCopy hook places it at buildPath/native/ which ends up in app.asar.unpacked/native/
+    const nativeDir = path.resolve(__dirname, 'native');
+    if (!fs.existsSync(nativeDir)) return null;
+    const files = fs.readdirSync(nativeDir).filter((f) => f.endsWith('.node'));
+    if (files.length === 0) return null;
+    _nativeMod = require(path.join(nativeDir, files[0]));
+    return _nativeMod;
+  } catch {
+    return null;
+  }
+}
+
 const fileIndex = new FileIndex();
 
 /** Returns immediate children only — no recursion. Directories have no children
@@ -136,5 +158,12 @@ export function registerFsHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle(IPC_CHANNELS.FS_SEARCH_FILES, (_event, query: string, limit?: number) => {
     return fileIndex.search(query, limit);
+  });
+
+  // Spike: native Rust read_tree — coexists with JS version on a separate channel
+  ipcMain.handle(IPC_CHANNELS.FS_READ_TREE_NATIVE, (_event, dirPath: string) => {
+    const mod = getNativeMod();
+    if (!mod) return { ok: false, error: 'native module not loaded' };
+    return { ok: true, nodes: mod.readTree(dirPath) };
   });
 }
