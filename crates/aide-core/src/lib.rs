@@ -53,6 +53,85 @@ pub fn read_tree(dir_path: &str) -> Vec<FileNode> {
     nodes
 }
 
+/// Error code for read_tree_with_error, mirroring FsReadTreeError['code'] in TS.
+#[derive(Debug, PartialEq)]
+pub enum ReadTreeErrorCode {
+    EPERM,
+    ENOENT,
+    ENOTDIR,
+    UNKNOWN,
+}
+
+/// Error detail returned when the directory cannot be read.
+#[derive(Debug, PartialEq)]
+pub struct ReadTreeError {
+    pub code: ReadTreeErrorCode,
+    pub path: String,
+    pub message: String,
+}
+
+/// Result type for read_tree_with_error.
+#[derive(Debug)]
+pub struct ReadTreeResult {
+    pub nodes: Vec<FileNode>,
+    pub error: Option<ReadTreeError>,
+}
+
+/// Read the immediate children of `dir_path`, returning structured error info on failure.
+/// On success: `{ nodes: [...], error: None }`.
+/// On failure: `{ nodes: [], error: Some(...) }`.
+/// Error code mapping mirrors the JS readTreeWithError():
+///   PermissionDenied (EPERM/EACCES) → EPERM
+///   NotFound (ENOENT)               → ENOENT
+///   raw OS error 20 (ENOTDIR)       → ENOTDIR  (std::io::ErrorKind lacks a discriminant)
+///   everything else                 → UNKNOWN
+pub fn read_tree_with_error(dir_path: &str) -> ReadTreeResult {
+    match fs::read_dir(dir_path) {
+        Ok(entries) => {
+            let mut nodes = Vec::new();
+            for entry in entries.flatten() {
+                let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+                    eprintln!("[aide-core] skipping non-UTF-8 filename in {dir_path}");
+                    continue;
+                };
+                let full_path = Path::new(dir_path).join(&name);
+                let Some(path_str) = full_path.to_str().map(str::to_owned) else {
+                    eprintln!("[aide-core] skipping non-UTF-8 path in {dir_path}");
+                    continue;
+                };
+                let node_type = match entry.file_type() {
+                    Ok(ft) if ft.is_dir() => NodeType::Directory,
+                    Ok(_) => NodeType::File,
+                    Err(_) => NodeType::File,
+                };
+                nodes.push(FileNode { name, path: path_str, node_type });
+            }
+            ReadTreeResult { nodes, error: None }
+        }
+        Err(e) => {
+            use std::io::ErrorKind;
+            // ENOTDIR (errno 20) has no ErrorKind variant in stable Rust — check raw OS error.
+            let code = if e.raw_os_error() == Some(20) {
+                ReadTreeErrorCode::ENOTDIR
+            } else {
+                match e.kind() {
+                    ErrorKind::PermissionDenied => ReadTreeErrorCode::EPERM,
+                    ErrorKind::NotFound => ReadTreeErrorCode::ENOENT,
+                    _ => ReadTreeErrorCode::UNKNOWN,
+                }
+            };
+            ReadTreeResult {
+                nodes: vec![],
+                error: Some(ReadTreeError {
+                    code,
+                    path: dir_path.to_owned(),
+                    message: e.to_string(),
+                }),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,4 +276,76 @@ mod tests {
         assert_eq!(find("broken_sym").node_type, NodeType::File,
             "broken symlink must be classified as File");
     }
+
+    // ── read_tree_with_error tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_read_tree_with_error_success() {
+        let tmp = make_test_dir();
+        let result = read_tree_with_error(tmp.path().to_str().unwrap());
+        assert!(result.error.is_none(), "expected no error on success");
+        assert_eq!(result.nodes.len(), 3, "expected 3 nodes");
+    }
+
+    #[test]
+    fn test_read_tree_with_error_enoent() {
+        let result = read_tree_with_error("/nonexistent/path/aide-test-xyz-99999");
+        assert!(result.nodes.is_empty());
+        let err = result.error.expect("expected error");
+        assert_eq!(err.code, ReadTreeErrorCode::ENOENT);
+        assert_eq!(err.path, "/nonexistent/path/aide-test-xyz-99999");
+        assert!(!err.message.is_empty());
+    }
+
+    #[test]
+    fn test_read_tree_with_error_enotdir() {
+        // Pass a regular file path — read_dir on a file gives ENOTDIR (OS error 20).
+        let tmp = TempDir::new().unwrap();
+        let file_path = tmp.path().join("regular.txt");
+        stdfs::write(&file_path, b"hello").unwrap();
+        let result = read_tree_with_error(file_path.to_str().unwrap());
+        assert!(result.nodes.is_empty());
+        let err = result.error.expect("expected error");
+        assert_eq!(err.code, ReadTreeErrorCode::ENOTDIR,
+            "read_dir on a file must yield ENOTDIR");
+    }
+
+    /// EPERM test: requires a directory we cannot read.
+    /// On macOS/Linux this is achieved by removing read permission (chmod 000).
+    /// Skipped on Windows where permission manipulation differs.
+    /// Also skipped when running as root (uid 0) — root bypasses permission checks.
+    #[test]
+    #[cfg(unix)]
+    fn test_read_tree_with_error_eperm() {
+        use std::os::unix::fs::PermissionsExt;
+        // Running as root bypasses permission checks — test would produce success, not EPERM.
+        if unsafe { libc_getuid() } == 0 {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let locked = tmp.path().join("locked_dir");
+        stdfs::create_dir(&locked).unwrap();
+        stdfs::set_permissions(&locked, stdfs::Permissions::from_mode(0o000)).unwrap();
+
+        let result = read_tree_with_error(locked.to_str().unwrap());
+
+        // Restore permissions before assertions so TempDir cleanup succeeds.
+        let _ = stdfs::set_permissions(&locked, stdfs::Permissions::from_mode(0o755));
+
+        assert!(result.nodes.is_empty());
+        let err = result.error.expect("expected error for unreadable dir");
+        assert_eq!(err.code, ReadTreeErrorCode::EPERM,
+            "unreadable dir must yield EPERM");
+    }
+}
+
+// Minimal safe FFI shim — only used in the EPERM test to detect root.
+#[cfg(unix)]
+extern "C" {
+    fn getuid() -> u32;
+}
+
+#[cfg(unix)]
+unsafe fn libc_getuid() -> u32 {
+    getuid()
 }
