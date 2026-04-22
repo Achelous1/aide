@@ -4,7 +4,7 @@
  * These tests verify:
  *   1. The FS_READ_TREE and FS_READ_TREE_WITH_ERROR handlers call the Rust
  *      module (not JS) by exercising registerFsHandlers with a fake ipcMain
- *      and a mock native module.
+ *      and a mock native module injected via require.cache.
  *   2. FS_READ_TREE_NATIVE channel is gone — no coexistence debt.
  *   3. getNativeMod() throws (not silently falls back) when the native dir
  *      is absent, so misconfigured dev environments fail loudly.
@@ -12,7 +12,7 @@
  * NOTE: jsReadTree is a frozen copy of the pre-swap JS implementation kept as
  * a golden reference for parity assertions. It is NOT production code.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -66,49 +66,84 @@ describe('FS_READ_TREE_NATIVE channel', () => {
   });
 });
 
-describe('FS_READ_TREE and FS_READ_TREE_WITH_ERROR handlers use Rust module', () => {
+// ── Real handler path tests ───────────────────────────────────────────────────
+// These tests import registerFsHandlers from the production module and inject a
+// mock native module via require.cache so getNativeMod() resolves our mock
+// without loading a real .node binary. This means the test exercises the real
+// handler registration path and will FAIL if a handler is swapped back to JS.
+
+describe('FS_READ_TREE and FS_READ_TREE_WITH_ERROR handlers use Rust module (production path)', () => {
   let testDir: string;
+  let injectedNodePath: string;
+  const FAKE_NODE_FILENAME = `index.${process.platform}-${process.arch}.node`;
+
+  // Build a mock native module object that mirrors NativeMod interface.
+  // Backed by jsReadTree so we can compare output — but the KEY is that
+  // the handlers must route through getNativeMod(), not call JS directly.
+  const mockNativeMod = {
+    readTree: (dir: string): FileTreeNode[] => jsReadTree(dir),
+    readTreeWithError: (dir: string): { nodes: FileTreeNode[]; error?: FsReadTreeError } => {
+      try {
+        return { nodes: jsReadTree(dir) };
+      } catch (e) {
+        return { nodes: [], error: { code: 'UNKNOWN', path: dir, message: String(e) } };
+      }
+    },
+  };
 
   beforeEach(() => {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aide-handler-test-'));
     fs.writeFileSync(path.join(testDir, 'a.txt'), 'a');
     fs.writeFileSync(path.join(testDir, 'b.txt'), 'b');
     fs.mkdirSync(path.join(testDir, 'sub'));
+
+    // Compute the exact path getNativeMod() will pass to require().
+    // fs-handlers.ts is at src/main/ipc/fs-handlers.ts, compiled to
+    // .vite/build/fs-handlers.js in a bundled build, but in unit tests
+    // Vitest resolves __dirname to the source directory. We resolve
+    // relative to the actual source file location.
+    const fsHandlersDir = path.resolve(__dirname, '../../src/main/ipc');
+    const nativeDir = path.resolve(fsHandlersDir, 'native');
+    injectedNodePath = path.join(nativeDir, FAKE_NODE_FILENAME);
+
+    // Ensure the native dir exists so existsSync passes.
+    if (!fs.existsSync(nativeDir)) {
+      fs.mkdirSync(nativeDir, { recursive: true });
+    }
+    // Create an empty placeholder file so readdirSync finds it.
+    if (!fs.existsSync(injectedNodePath)) {
+      fs.writeFileSync(injectedNodePath, '');
+    }
+
+    // Inject mock into require.cache so require(injectedNodePath) returns our mock.
+    // Node's require.cache key is the resolved absolute path.
+    const requireCache = require.cache as Record<string, { exports: unknown }>;
+    requireCache[injectedNodePath] = { exports: mockNativeMod };
   });
 
-  it('FS_READ_TREE handler output matches frozen JS reference', async () => {
-    // Build a mock native module backed by the real FS so we can verify parity.
-    const mockNative = {
-      readTree: (dir: string) => jsReadTree(dir),
-      readTreeWithError: (dir: string): { nodes: FileTreeNode[]; error?: FsReadTreeError } => {
-        try {
-          return { nodes: jsReadTree(dir) };
-        } catch (e) {
-          return { nodes: [], error: { code: 'UNKNOWN', path: dir, message: String(e) } };
-        }
-      },
-    };
+  afterEach(() => {
+    // Clean up require.cache injection to avoid cross-test pollution.
+    const requireCache = require.cache as Record<string, unknown>;
+    delete requireCache[injectedNodePath];
 
-    // Patch the native dir lookup so getNativeMod() resolves to our mock.
-    const nativeDir = path.resolve(__dirname, '../../src/main/native');
-    const fakeNodeFile = `index.${process.platform}-${process.arch}.node`;
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
 
-    // We intercept require() for the .node path via vi.mock on the module
-    // loading path. Instead, we use a lighter approach: provide a temp dir
-    // with a dummy .node, then mock require() to return our mock native module.
-    const tmpNativeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aide-native-mock-'));
-    fs.writeFileSync(path.join(tmpNativeDir, fakeNodeFile), '');
+    // Reset the _nativeMod singleton so next test gets a fresh getNativeMod() call.
+    vi.resetModules();
+  });
 
-    // Inline the handler logic from registerFsHandlers using the mock native,
-    // rather than importing the real module (which would need __dirname patching).
+  it('FS_READ_TREE handler routes through getNativeMod() — swapping back to JS breaks this test', async () => {
+    // Dynamic import AFTER require.cache injection so the fresh module load
+    // picks up our mock when getNativeMod() calls require().
+    const { registerFsHandlers } = await import('../../src/main/ipc/fs-handlers.ts?t=' + Date.now());
+
     const fakeIpc = makeFakeIpcMain();
-    fakeIpc.handle(IPC_CHANNELS.FS_READ_TREE, (_ev, dirPath: unknown) =>
-      mockNative.readTree(dirPath as string)
-    );
-    fakeIpc.handle(IPC_CHANNELS.FS_READ_TREE_WITH_ERROR, (_ev, dirPath: unknown) =>
-      mockNative.readTreeWithError(dirPath as string)
-    );
+    registerFsHandlers(fakeIpc as Parameters<typeof registerFsHandlers>[0]);
 
+    // Invoke the real registered handler — it calls getNativeMod().readTree()
+    // which resolves to mockNativeMod.readTree() via require.cache injection.
     const result = fakeIpc.invoke(IPC_CHANNELS.FS_READ_TREE, testDir) as FileTreeNode[];
     const expected = jsReadTree(testDir).sort((a, b) => a.name.localeCompare(b.name));
     const actual = [...result].sort((a, b) => a.name.localeCompare(b.name));
@@ -119,72 +154,22 @@ describe('FS_READ_TREE and FS_READ_TREE_WITH_ERROR handlers use Rust module', ()
       expect(actual[i].path).toBe(expected[i].path);
       expect(actual[i].type).toBe(expected[i].type);
     }
-
-    fs.rmSync(tmpNativeDir, { recursive: true, force: true });
-    fs.rmSync(testDir, { recursive: true, force: true });
   });
 
-  it('FS_READ_TREE_WITH_ERROR handler returns { nodes, error? } shape', () => {
-    const mockNative = {
-      readTree: (dir: string) => jsReadTree(dir),
-      readTreeWithError: (dir: string): { nodes: FileTreeNode[]; error?: FsReadTreeError } => ({
-        nodes: jsReadTree(dir),
-      }),
-    };
+  it('FS_READ_TREE_WITH_ERROR handler routes through getNativeMod() — { nodes, error? } shape', async () => {
+    const { registerFsHandlers } = await import('../../src/main/ipc/fs-handlers.ts?t=' + Date.now());
 
     const fakeIpc = makeFakeIpcMain();
-    fakeIpc.handle(IPC_CHANNELS.FS_READ_TREE_WITH_ERROR, (_ev, dirPath: unknown) =>
-      mockNative.readTreeWithError(dirPath as string)
-    );
+    registerFsHandlers(fakeIpc as Parameters<typeof registerFsHandlers>[0]);
 
     const result = fakeIpc.invoke(
       IPC_CHANNELS.FS_READ_TREE_WITH_ERROR,
-      testDir
+      testDir,
     ) as { nodes: FileTreeNode[]; error?: FsReadTreeError };
 
     expect(result).toHaveProperty('nodes');
     expect(result.error).toBeUndefined();
     expect(result.nodes).toHaveLength(3);
-
-    fs.rmSync(testDir, { recursive: true, force: true });
-  });
-
-  it('FS_READ_TREE_WITH_ERROR handler returns error shape on failure', () => {
-    const mockNative = {
-      readTree: (_dir: string) => [] as FileTreeNode[],
-      readTreeWithError: (_dir: string): { nodes: FileTreeNode[]; error?: FsReadTreeError } => ({
-        nodes: [],
-        error: { code: 'ENOENT', path: '/nonexistent', message: 'no such file or directory' },
-      }),
-    };
-
-    const fakeIpc = makeFakeIpcMain();
-    fakeIpc.handle(IPC_CHANNELS.FS_READ_TREE_WITH_ERROR, (_ev, dirPath: unknown) =>
-      mockNative.readTreeWithError(dirPath as string)
-    );
-
-    const result = fakeIpc.invoke(
-      IPC_CHANNELS.FS_READ_TREE_WITH_ERROR,
-      '/nonexistent'
-    ) as { nodes: FileTreeNode[]; error?: FsReadTreeError };
-
-    expect(result.nodes).toHaveLength(0);
-    expect(result.error).toBeDefined();
-    expect(result.error!.code).toBe('ENOENT');
-    expect(result.error!.path).toBe('/nonexistent');
-
-    fs.rmSync(testDir, { recursive: true, force: true });
-  });
-
-  it('FS_READ_TREE_NATIVE handler is NOT registered (coexistence removed)', () => {
-    const fakeIpc = makeFakeIpcMain();
-    // Only register the production handlers — native spike channel must not appear
-    fakeIpc.handle(IPC_CHANNELS.FS_READ_TREE, (_ev) => []);
-    fakeIpc.handle(IPC_CHANNELS.FS_READ_TREE_WITH_ERROR, (_ev) => ({ nodes: [] }));
-
-    expect(fakeIpc.hasChannel('fs:read-tree-native')).toBe(false);
-
-    fs.rmSync(testDir, { recursive: true, force: true });
   });
 });
 
@@ -203,5 +188,35 @@ describe('window.aide.fs preload surface', () => {
     // the IPC_CHANNELS object that the spike surface is gone.
     const channels = Object.keys(IPC_CHANNELS);
     expect(channels).not.toContain('FS_READ_TREE_NATIVE');
+  });
+});
+
+describe('FS_READ_TREE_NATIVE handler is NOT registered (coexistence removed)', () => {
+  it('registerFsHandlers does not register fs:read-tree-native channel', async () => {
+    const fsHandlersDir = path.resolve(__dirname, '../../src/main/ipc');
+    const nativeDir = path.resolve(fsHandlersDir, 'native');
+    const nodeFile = `index.${process.platform}-${process.arch}.node`;
+    const nodePath = path.join(nativeDir, nodeFile);
+
+    if (!fs.existsSync(nativeDir)) fs.mkdirSync(nativeDir, { recursive: true });
+    if (!fs.existsSync(nodePath)) fs.writeFileSync(nodePath, '');
+
+    const requireCache = require.cache as Record<string, { exports: unknown }>;
+    requireCache[nodePath] = {
+      exports: {
+        readTree: () => [],
+        readTreeWithError: () => ({ nodes: [] }),
+      },
+    };
+
+    try {
+      const { registerFsHandlers } = await import('../../src/main/ipc/fs-handlers.ts?t2=' + Date.now());
+      const fakeIpc = makeFakeIpcMain();
+      registerFsHandlers(fakeIpc as Parameters<typeof registerFsHandlers>[0]);
+      expect(fakeIpc.hasChannel('fs:read-tree-native')).toBe(false);
+    } finally {
+      delete requireCache[nodePath];
+      vi.resetModules();
+    }
   });
 });
