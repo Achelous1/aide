@@ -156,12 +156,13 @@ function refreshPlugins(cwd: string): void {
     },
   );
   // Re-watch .aide/ data files so MCP-triggered writes refresh the UI.
-  // depth=0 means only direct children of aideDir.
+  // depth=1 emits events for direct children of aideDir (depth 0 would only
+  // fire on the directory itself — wrong for file-write detection).
   dataWatcher?.stop();
   const aideDir = path.join(cwd, '.aide');
   dataWatcher = getNativeMod().startWatcher(
     aideDir,
-    0,
+    1,
     WATCHER_EXCLUSIONS,
     (ev) => {
       if (ev.path.endsWith('.json') && !ev.path.endsWith('settings.json')) {

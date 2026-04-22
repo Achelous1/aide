@@ -111,17 +111,23 @@ export function setWorkspaceWatcher(workspacePath: string | null): void {
   // simply return an empty tree until the walk completes.
   void fileIndex.initialize(workspacePath);
 
-  activeWatcherHandle = getNativeMod().startWatcher(
+  // Guard against late events that arrive after stop() is called.
+  let stopped = false;
+  const inner = getNativeMod().startWatcher(
     workspacePath,
     3,
     WATCHER_EXCLUSIONS,
     (ev) => {
+      if (stopped) return;
       if (ev.kind === 'add') {
         if (ev.entryKind === 'directory') fileIndex.addPath(ev.path, 'directory');
         else fileIndex.addPath(ev.path, 'file');
       } else if (ev.kind === 'remove') {
-        if (ev.entryKind === 'directory') fileIndex.removeDir(ev.path);
-        else fileIndex.removePath(ev.path);
+        // Path is already gone at event time so entryKind may be unreliable.
+        // Call both: removePath deletes the exact-path key; removeDir iterates
+        // the prefix for children. Both are idempotent — no harm in double-dispatch.
+        fileIndex.removePath(ev.path);
+        fileIndex.removeDir(ev.path);
       }
       if (watcherDebounceTimer) clearTimeout(watcherDebounceTimer);
       watcherDebounceTimer = setTimeout(() => {
@@ -130,6 +136,12 @@ export function setWorkspaceWatcher(workspacePath: string | null): void {
       }, 500);
     },
   );
+  activeWatcherHandle = {
+    stop() {
+      stopped = true;
+      inner.stop();
+    },
+  };
 }
 
 export function registerFsHandlers(ipcMain: IpcMain): void {

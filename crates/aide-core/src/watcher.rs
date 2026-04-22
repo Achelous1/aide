@@ -10,6 +10,7 @@
 //!   - macOS `/dev/fd/N` EBADF guard: paths starting with `/dev/fd/` are dropped.
 //!   - Drop-safe: stopping the watcher never panics.
 
+use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{
@@ -53,7 +54,7 @@ impl WatcherHandle {
     /// Explicit stop — sets the stopped flag and lets the thread drain.
     /// Idempotent: safe to call multiple times.
     pub fn stop(&self) {
-        self.stopped.store(true, Ordering::Relaxed);
+        self.stopped.store(true, Ordering::Release);
     }
 }
 
@@ -175,7 +176,10 @@ pub fn watch_path<F>(
 where
     F: Fn(WatchEvent) + Send + 'static,
 {
-    let root = PathBuf::from(path);
+    let raw_root = PathBuf::from(path);
+    // Canonicalise so that strip_prefix works on macOS where FSEvents returns
+    // /private/var/... but the caller passed /var/... (symlink via /tmp etc.).
+    let root = fs::canonicalize(&raw_root).unwrap_or(raw_root);
     let stopped = Arc::new(AtomicBool::new(false));
     let stopped_clone = Arc::clone(&stopped);
 
@@ -192,7 +196,7 @@ where
 
     let thread_handle = thread::spawn(move || {
         loop {
-            if stopped_clone.load(Ordering::Relaxed) {
+            if stopped_clone.load(Ordering::Acquire) {
                 break;
             }
             // Block with a timeout so we periodically check the stopped flag.
@@ -288,7 +292,10 @@ fn should_emit(path: &Path, root: &Path, depth: Option<u32>, exclusions: &[Strin
         return false;
     }
     if let Some(max_depth) = depth {
-        match path_depth_below(root, path) {
+        // Canonicalise the event path so that macOS FSEvents /private/var/...
+        // paths strip correctly against the canonicalised root.
+        let canonical = fs::canonicalize(path).unwrap_or_else(|_| path.to_owned());
+        match path_depth_below(root, &canonical) {
             Some(d) if d as u32 <= max_depth => {}
             _ => return false,
         }
@@ -449,14 +456,6 @@ mod tests {
         assert!(!excluded_found, "node_modules/pkg.js must be excluded");
     }
 
-    // macOS FSEvents coalesces kernel events with unpredictable latency (up to
-    // several seconds under load). Asserting that a specific file *appears*
-    // within a fixed wall-clock window is inherently racy on that backend.
-    // The depth-filter logic is covered by the unit tests `test_path_depth_below`
-    // and `should_emit` (via `test_is_excluded_*`). Re-enable this integration
-    // test in round 3 when a poll-based or inotify-direct approach is available.
-    // See: https://github.com/notify-rs/notify/issues/434
-    #[ignore = "macOS FSEvents event delivery timing is non-deterministic; depth logic tested by unit tests"]
     #[test]
     fn test_watcher_depth_limit() {
         let tmp = TempDir::new().unwrap();
