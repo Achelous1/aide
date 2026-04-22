@@ -1,5 +1,6 @@
 #![warn(clippy::all)]
 
+use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
 /// napi-exported shape. Named separately from `aide_core::FileNode` to avoid
@@ -102,4 +103,90 @@ pub fn read_tree_with_error(dir_path: String) -> ExportedReadTreeResult {
             message: e.message,
         }),
     }
+}
+
+// ── Watcher bindings ──────────────────────────────────────────────────────────
+
+/// Event payload sent from the Rust watcher thread to JS via ThreadsafeFunction.
+#[napi(object)]
+pub struct WatcherEventPayload {
+    /// "add" | "remove" | "modify" | "rename"
+    pub kind: String,
+    pub path: String,
+    /// "file" | "directory" — present for add/remove events
+    pub entry_kind: Option<String>,
+    /// Source path — present for rename events
+    pub from: Option<String>,
+}
+
+/// Opaque JS handle for a running watcher. Call `.stop()` to terminate.
+#[napi]
+pub struct WatcherJsHandle {
+    inner: aide_core::watcher::WatcherHandle,
+}
+
+#[napi]
+impl WatcherJsHandle {
+    /// Stop the watcher. Idempotent — safe to call multiple times.
+    #[napi]
+    pub fn stop(&mut self) {
+        self.inner.stop();
+    }
+}
+
+/// Start a filesystem watcher at `path`.
+///
+/// - `depth`: maximum depth below `path` to emit events for (1 = immediate
+///   children). Pass `undefined`/`null` for unlimited depth.
+/// - `exclusions`: array of glob-style patterns to exclude (same syntax as
+///   `watcher-exclusions.ts`).
+/// - `callback`: called on the JS thread for each qualifying event.
+///
+/// Returns a `WatcherJsHandle`; call `.stop()` when done.
+#[napi]
+pub fn start_watcher(
+    path: String,
+    depth: Option<u32>,
+    exclusions: Vec<String>,
+    callback: ThreadsafeFunction<WatcherEventPayload, ErrorStrategy::Fatal>,
+) -> napi::Result<WatcherJsHandle> {
+    let handle = aide_core::watcher::watch_path(&path, depth, exclusions, move |ev| {
+        let payload = match ev {
+            aide_core::watcher::WatchEvent::Add { path, kind } => WatcherEventPayload {
+                kind: "add".to_string(),
+                path,
+                entry_kind: Some(match kind {
+                    aide_core::watcher::EntryKind::File => "file".to_string(),
+                    aide_core::watcher::EntryKind::Directory => "directory".to_string(),
+                }),
+                from: None,
+            },
+            aide_core::watcher::WatchEvent::Remove { path, kind } => WatcherEventPayload {
+                kind: "remove".to_string(),
+                path,
+                entry_kind: Some(match kind {
+                    aide_core::watcher::EntryKind::File => "file".to_string(),
+                    aide_core::watcher::EntryKind::Directory => "directory".to_string(),
+                }),
+                from: None,
+            },
+            aide_core::watcher::WatchEvent::Modify { path } => WatcherEventPayload {
+                kind: "modify".to_string(),
+                path,
+                entry_kind: None,
+                from: None,
+            },
+            aide_core::watcher::WatchEvent::Rename { from, to } => WatcherEventPayload {
+                kind: "rename".to_string(),
+                path: to,
+                entry_kind: None,
+                from: Some(from),
+            },
+        };
+        // NonBlocking: the Rust watcher thread never waits for JS to process.
+        callback.call(payload, ThreadsafeFunctionCallMode::NonBlocking);
+    })
+    .map_err(|e| napi::Error::from_reason(format!("start_watcher: {e}")))?;
+
+    Ok(WatcherJsHandle { inner: handle })
 }
