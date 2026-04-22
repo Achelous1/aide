@@ -12,4 +12,6 @@ napi = { version = "2", default-features = false, features = ["napi8"] }
 napi-derive = "2"
 
 [build-dependencies]
-napi-build = "2"
+# Pinned to 2.1.4 — napi-build 2.3.x bumps MSRV to rustc ≥1.88, but our
+# toolchain is pinned at 1.82. Bump only after updating rust-toolchain.toml.
+napi-build = "=2.1.4"

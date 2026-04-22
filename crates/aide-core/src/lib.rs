@@ -25,9 +25,19 @@ pub fn read_tree(dir_path: &str) -> Vec<FileNode> {
 
     let mut nodes = Vec::new();
     for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
+        // Skip entries whose names are not valid UTF-8.
+        // NOTE: to_string_lossy would silently produce paths with U+FFFD replacement
+        // characters that can't be opened again. Skipping is safer for Phase 1 scope.
+        // A Buffer-returning API for non-UTF8 names is deferred to a future phase.
+        let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+            eprintln!("[aide-core] skipping non-UTF-8 filename in {dir_path}");
+            continue;
+        };
         let full_path = Path::new(dir_path).join(&name);
-        let path_str = full_path.to_string_lossy().into_owned();
+        let Some(path_str) = full_path.to_str().map(str::to_owned) else {
+            eprintln!("[aide-core] skipping non-UTF-8 path in {dir_path}");
+            continue;
+        };
 
         // NOTE: symlinks are classified as 'file' to match Node.js Dirent.isDirectory()
         // semantics: isDirectory() returns false for symlinks by default (does not follow).
@@ -79,6 +89,65 @@ mod tests {
     fn test_read_tree_nonexistent_returns_empty() {
         let result = read_tree("/nonexistent/path/that/does/not/exist/abc123");
         assert!(result.is_empty(), "expected empty vec for nonexistent path");
+    }
+
+    /// Trailing-slash parity: a dir path with a trailing separator must
+    /// produce identical output to the same path without one.
+    #[test]
+    fn test_read_tree_strips_trailing_slash() {
+        let tmp = make_test_dir();
+        let base = tmp.path().to_str().unwrap();
+        let with_slash = format!("{}/", base);
+
+        let mut without = read_tree(base);
+        let mut with_ts = read_tree(&with_slash);
+        without.sort_by(|a, b| a.name.cmp(&b.name));
+        with_ts.sort_by(|a, b| a.name.cmp(&b.name));
+
+        assert_eq!(without.len(), with_ts.len(), "entry count must match");
+        for (a, b) in without.iter().zip(with_ts.iter()) {
+            assert_eq!(a.name, b.name, "names must match");
+            assert_eq!(a.path, b.path, "paths must match (no double-slash)");
+            assert_eq!(a.node_type, b.node_type, "types must match");
+        }
+    }
+
+    /// Non-UTF8 filename handling: entries whose names cannot be decoded as
+    /// valid UTF-8 are silently skipped. This is documented contract — Phase 1
+    /// defers a Buffer API to avoid rippling the napi type contract.
+    ///
+    /// gated to Linux because macOS/APFS rejects non-UTF-8 byte sequences at
+    /// the filesystem level (EILSEQ), making it impossible to create such files
+    /// in a portable test. On Linux (ext4, tmpfs) arbitrary bytes are allowed.
+    /// The skip-contract is still enforced by the production code path and
+    /// documented here for any future Windows/Linux CI run.
+    ///
+    /// If this test fails it means to_string_lossy replacement behaviour
+    /// changed; any change must be intentional.
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_read_tree_skips_non_utf8_filenames() {
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+
+        // A valid UTF-8 file we expect to see.
+        stdfs::write(root.join("valid.txt"), b"ok").unwrap();
+
+        // A filename with an invalid UTF-8 byte sequence: 0x66 0xFF 0x6F ("f<invalid>o")
+        let invalid_bytes: &[u8] = &[0x66, 0xFF, 0x6F];
+        let invalid_name = OsStr::from_bytes(invalid_bytes);
+        let invalid_path = root.join(invalid_name);
+        stdfs::write(&invalid_path, b"bad").unwrap();
+
+        let result = read_tree(root.to_str().unwrap());
+
+        // The non-UTF8 entry must be skipped entirely.
+        // The valid entry must still appear.
+        assert_eq!(result.len(), 1, "non-UTF8 entry must be skipped");
+        assert_eq!(result[0].name, "valid.txt");
     }
 
     /// Symlink parity test: verifies Rust classifies symlinks identically to

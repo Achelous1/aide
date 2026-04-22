@@ -5,7 +5,7 @@
  * Verifies that the Rust implementation returns the same shape
  * as the existing JS readTree for the same directory.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -26,18 +26,41 @@ function jsReadTree(dirPath: string): Array<{ name: string; path: string; type: 
   }));
 }
 
-// Resolve the built .node file using arch-aware matching.
-// Returns null if the arch-matching binary is absent — no fallback to wrong arch.
+// Resolve the built .node file using arch-aware candidate matching.
+// napi-rs appends a libc suffix on Linux (-gnu/-musl) and Windows (-msvc).
+// Returns null if no arch-matching binary is found — no fallback to wrong arch.
+function candidateNativeFilenames(): string[] {
+  const base = `index.${process.platform}-${process.arch}`;
+  if (process.platform === 'darwin') {
+    return [`${base}.node`];
+  }
+  if (process.platform === 'linux') {
+    return [`${base}-gnu.node`, `${base}-musl.node`, `${base}.node`];
+  }
+  if (process.platform === 'win32') {
+    return [`${base}-msvc.node`, `${base}.node`];
+  }
+  return [`${base}.node`];
+}
+
 function resolveNativeModule(): string | null {
   const nativeDir = path.resolve(__dirname, '../../src/main/native');
-  const expected = `index.${process.platform}-${process.arch}.node`;
   if (!fs.existsSync(nativeDir)) return null;
-  const files = fs.readdirSync(nativeDir);
-  const match = files.find((f) => f === expected);
+  const files = new Set(fs.readdirSync(nativeDir));
+  const match = candidateNativeFilenames().find((c) => files.has(c));
   return match ? path.join(nativeDir, match) : null;
 }
 
 const nativeModPath = resolveNativeModule();
+
+// On Linux CI the native module MUST exist because build:native ran first.
+// Silent skip here would turn a broken Linux Rust toolchain into a green CI.
+if (process.env.CI === 'true' && process.platform === 'linux' && nativeModPath === null) {
+  throw new Error(
+    'native module missing on Linux CI — build:native likely failed silently. ' +
+      'Check the Build native module step output.',
+  );
+}
 
 describe.skipIf(nativeModPath === null)('native read_tree (napi-rs)', () => {
   let nativeMod: { readTree: (dir: string) => Array<{ name: string; path: string; type: string }> };
@@ -52,6 +75,12 @@ describe.skipIf(nativeModPath === null)('native read_tree (napi-rs)', () => {
     fs.writeFileSync(path.join(testDir, 'file1.txt'), 'a');
     fs.writeFileSync(path.join(testDir, 'file2.txt'), 'b');
     fs.mkdirSync(path.join(testDir, 'subdir'));
+  });
+
+  afterAll(() => {
+    if (testDir) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   it('returns 3 entries for a dir with 2 files + 1 subdir', () => {
@@ -107,4 +136,60 @@ describe.skipIf(nativeModPath === null)('native read_tree (napi-rs)', () => {
       fs.rmSync(symlinkDir, { recursive: true, force: true });
     }
   });
+
+  it('trailing-slash parity: output is identical with or without trailing slash', () => {
+    // Lock in the contract that Rust and JS both normalise trailing slashes.
+    const withSlash = testDir.endsWith('/') ? testDir : testDir + '/';
+    const rustWithout = nativeMod.readTree(testDir).sort((a, b) => a.name.localeCompare(b.name));
+    const rustWith = nativeMod.readTree(withSlash).sort((a, b) => a.name.localeCompare(b.name));
+    const jsWithout = jsReadTree(testDir).sort((a, b) => a.name.localeCompare(b.name));
+    const jsWith = jsReadTree(withSlash).sort((a, b) => a.name.localeCompare(b.name));
+
+    expect(rustWith).toHaveLength(rustWithout.length);
+    expect(jsWith).toHaveLength(jsWithout.length);
+    for (let i = 0; i < rustWithout.length; i++) {
+      expect(rustWith[i].name).toBe(rustWithout[i].name);
+      expect(rustWith[i].path).toBe(rustWithout[i].path, 'Rust path must not have double-slash');
+      expect(jsWith[i].path).toBe(jsWithout[i].path, 'JS path must not have double-slash');
+    }
+  });
+
+  // Non-UTF8 filename handling: Rust skips entries with non-UTF8 names while
+  // Node.js (on Linux) can represent them. On macOS/APFS the OS rejects creation
+  // of non-UTF8 filenames entirely, so this test is gated to Linux.
+  // Contract: Rust skips the entry; JS may include it. Both must handle the dir
+  // without throwing.
+  it.skipIf(process.platform !== 'linux')(
+    'non-UTF8 filenames: Rust skips, neither implementation throws',
+    () => {
+      const nonUtf8Dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aide-utf8-test-'));
+      try {
+        fs.writeFileSync(path.join(nonUtf8Dir, 'valid.txt'), 'ok');
+        // Write a file with invalid UTF-8 bytes in its name. We must pass the
+        // path as a Buffer — converting to string (even via 'binary' encoding)
+        // lets Node re-encode to valid UTF-8 before the syscall (0xFF → 0xC3 0xBF),
+        // which would defeat the whole point of the test.
+        const invalidName = Buffer.from([0x66, 0xff, 0x6f]); // "f<invalid>o"
+        const bufferPath = Buffer.concat([Buffer.from(nonUtf8Dir + path.sep), invalidName]);
+        fs.writeFileSync(bufferPath, 'bad');
+
+        const rustResult = nativeMod.readTree(nonUtf8Dir);
+        // Rust must skip the non-UTF8 entry and return only valid.txt.
+        expect(rustResult).toHaveLength(1);
+        expect(rustResult[0].name).toBe('valid.txt');
+
+        // JS must not throw — just returns whatever it can.
+        expect(() => jsReadTree(nonUtf8Dir)).not.toThrow();
+
+        // Assert the documented JS/Rust divergence: JS sees both entries,
+        // Rust skips the non-UTF8 one. Regression guard — if JS ever starts
+        // skipping too, this intentionally breaks to surface the contract change.
+        const jsEntries = jsReadTree(nonUtf8Dir);
+        expect(jsEntries.length).toBeGreaterThanOrEqual(2); // JS sees ASCII file AND non-UTF8 entry
+        expect(rustResult).toHaveLength(1); // Rust skips the non-UTF8 entry
+      } finally {
+        fs.rmSync(nonUtf8Dir, { recursive: true, force: true });
+      }
+    },
+  );
 });

@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest, ubuntu-latest, windows-latest]
         node-version: [20]
 
     steps:
@@ -28,14 +28,39 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
 
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
       - name: Install dependencies
         run: pnpm install
 
       - name: Lint
         run: pnpm lint
 
-      - name: Test
+      - name: Build native module
+        # Windows cross-compile is not set up until Phase 7. Skip explicitly so
+        # failures are visible rather than swallowed by continue-on-error.
+        if: matrix.os != 'windows-latest'
+        run: pnpm build:native
+
+      - name: Test (Node)
         run: pnpm test
+
+      - name: Test (Rust)
+        # Rust toolchain targets are not configured for Windows until Phase 7.
+        if: matrix.os != 'windows-latest'
+        run: cargo test -p aide-core
 
       - name: Build
         run: pnpm run package
