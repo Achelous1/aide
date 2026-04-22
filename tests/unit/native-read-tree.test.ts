@@ -39,6 +39,15 @@ function resolveNativeModule(): string | null {
 
 const nativeModPath = resolveNativeModule();
 
+// On Linux CI the native module MUST exist because build:native ran first.
+// Silent skip here would turn a broken Linux Rust toolchain into a green CI.
+if (process.env.CI === 'true' && process.platform === 'linux' && nativeModPath === null) {
+  throw new Error(
+    'native module missing on Linux CI — build:native likely failed silently. ' +
+      'Check the Build native module step output.',
+  );
+}
+
 describe.skipIf(nativeModPath === null)('native read_tree (napi-rs)', () => {
   let nativeMod: { readTree: (dir: string) => Array<{ name: string; path: string; type: string }> };
   let testDir: string;
@@ -153,6 +162,13 @@ describe.skipIf(nativeModPath === null)('native read_tree (napi-rs)', () => {
 
         // JS must not throw — just returns whatever it can.
         expect(() => jsReadTree(nonUtf8Dir)).not.toThrow();
+
+        // Assert the documented JS/Rust divergence: JS sees both entries,
+        // Rust skips the non-UTF8 one. Regression guard — if JS ever starts
+        // skipping too, this intentionally breaks to surface the contract change.
+        const jsEntries = jsReadTree(nonUtf8Dir);
+        expect(jsEntries.length).toBeGreaterThanOrEqual(2); // JS sees ASCII file AND non-UTF8 entry
+        expect(rustResult).toHaveLength(1); // Rust skips the non-UTF8 entry
       } finally {
         fs.rmSync(nonUtf8Dir, { recursive: true, force: true });
       }
