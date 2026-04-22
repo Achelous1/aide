@@ -110,15 +110,18 @@ pub fn read_tree_with_error(dir_path: &str) -> ReadTreeResult {
         }
         Err(e) => {
             use std::io::ErrorKind;
-            // ENOTDIR (errno 20) has no ErrorKind variant in stable Rust — check raw OS error.
-            let code = if e.raw_os_error() == Some(20) {
-                ReadTreeErrorCode::ENOTDIR
-            } else {
-                match e.kind() {
+            // ENOTDIR has no ErrorKind variant in stable Rust — check raw OS error.
+            // Unix: errno 20. Windows: ERROR_DIRECTORY (267).
+            let code = match e.raw_os_error() {
+                #[cfg(unix)]
+                Some(20) => ReadTreeErrorCode::ENOTDIR,
+                #[cfg(windows)]
+                Some(267) => ReadTreeErrorCode::ENOTDIR,
+                _ => match e.kind() {
                     ErrorKind::PermissionDenied => ReadTreeErrorCode::EPERM,
                     ErrorKind::NotFound => ReadTreeErrorCode::ENOENT,
                     _ => ReadTreeErrorCode::UNKNOWN,
-                }
+                },
             };
             ReadTreeResult {
                 nodes: vec![],
@@ -275,6 +278,22 @@ mod tests {
             "symlink-to-dir must be classified as File (matches JS Dirent.isDirectory()=false)");
         assert_eq!(find("broken_sym").node_type, NodeType::File,
             "broken symlink must be classified as File");
+    }
+
+    /// Windows ENOTDIR: ERROR_DIRECTORY (267) must map to ENOTDIR.
+    /// Not executed on current CI (Windows CI is not enabled), but locks the
+    /// mapping so future Windows CI runs validate it automatically.
+    #[test]
+    #[cfg(windows)]
+    fn test_read_tree_with_error_enotdir_windows() {
+        let tmp = TempDir::new().unwrap();
+        let file_path = tmp.path().join("regular.txt");
+        stdfs::write(&file_path, b"hello").unwrap();
+        let result = read_tree_with_error(file_path.to_str().unwrap());
+        assert!(result.nodes.is_empty());
+        let err = result.error.expect("expected error");
+        assert_eq!(err.code, ReadTreeErrorCode::ENOTDIR,
+            "read_dir on a file on Windows must yield ENOTDIR (ERROR_DIRECTORY 267)");
     }
 
     // ── read_tree_with_error tests ──────────────────────────────────────────
