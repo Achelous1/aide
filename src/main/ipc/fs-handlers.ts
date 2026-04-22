@@ -51,8 +51,15 @@ function getNativeMod(): NativeMod {
       `[aide] No arch-matching .node file found in ${nativeDir} for ${process.platform}-${process.arch}. Run \`pnpm build:native\`.`
     );
   }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  _nativeMod = require(path.join(nativeDir, match)) as NativeMod;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _nativeMod = require(path.join(nativeDir, match)) as NativeMod;
+  } catch (err) {
+    throw new Error(
+      `[aide] Failed to load native module ${match}: ${err instanceof Error ? err.message : String(err)}. ` +
+        `Try rebuilding with "pnpm build:native". If this persists on a packaged build, the binary may be ABI-mismatched or corrupted.`
+    );
+  }
   return _nativeMod;
 }
 
