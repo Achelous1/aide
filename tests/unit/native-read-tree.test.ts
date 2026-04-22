@@ -165,9 +165,13 @@ describe.skipIf(nativeModPath === null)('native read_tree (napi-rs)', () => {
       const nonUtf8Dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aide-utf8-test-'));
       try {
         fs.writeFileSync(path.join(nonUtf8Dir, 'valid.txt'), 'ok');
-        // Write a file with invalid UTF-8 bytes in its name via Buffer.
+        // Write a file with invalid UTF-8 bytes in its name. We must pass the
+        // path as a Buffer — converting to string (even via 'binary' encoding)
+        // lets Node re-encode to valid UTF-8 before the syscall (0xFF → 0xC3 0xBF),
+        // which would defeat the whole point of the test.
         const invalidName = Buffer.from([0x66, 0xff, 0x6f]); // "f<invalid>o"
-        fs.writeFileSync(path.join(nonUtf8Dir, invalidName.toString('binary')), 'bad');
+        const bufferPath = Buffer.concat([Buffer.from(nonUtf8Dir + path.sep), invalidName]);
+        fs.writeFileSync(bufferPath, 'bad');
 
         const rustResult = nativeMod.readTree(nonUtf8Dir);
         // Rust must skip the non-UTF8 entry and return only valid.txt.
