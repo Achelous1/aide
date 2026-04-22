@@ -13,7 +13,8 @@
     "lint": "eslint --ext .ts,.tsx src/",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:native": "napi build --platform --release --js false --output-dir src/main/native --manifest-path crates/aide-napi/Cargo.toml"
   },
   "keywords": [
     "electron",
@@ -45,6 +46,7 @@
     "@electron-forge/plugin-fuses": "^7.11.1",
     "@electron-forge/plugin-vite": "^7.11.1",
     "@electron/fuses": "^1.8.0",
+    "@napi-rs/cli": "^3.6.2",
     "@playwright/test": "^1.50.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",

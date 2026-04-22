@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "crates/aide-core",
+    "crates/aide-napi",
+]
+resolver = "2"

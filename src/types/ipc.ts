@@ -255,6 +255,8 @@ export interface AideAPI {
     delete(filePath: string): Promise<void>;
     onChanged(callback: () => void): () => void;
     searchFiles(query: string, limit?: number): Promise<FileTreeNode[]>;
+    /** Spike: Rust native read_tree via napi-rs */
+    readTreeNative(dirPath: string): Promise<{ ok: boolean; nodes?: FileTreeNode[]; error?: string }>;
   };
   system: {
     openPrivacySettings(): Promise<void>;

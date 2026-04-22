@@ -85,6 +85,9 @@ export const IPC_CHANNELS = {
   AGENT_STATUS: 'agent:status',
   AGENT_SESSION_ID: 'agent:session-id',
 
+  // Native (Rust spike — coexists with JS version)
+  FS_READ_TREE_NATIVE: 'fs:read-tree-native',
+
   // Workspace
   WORKSPACE_LIST: 'workspace:list',
   WORKSPACE_CREATE: 'workspace:create',
