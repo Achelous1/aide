@@ -7,6 +7,12 @@ use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use std::io::{self, Read, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
+
+/// Maximum time to accumulate output before flushing to JS (16ms ≈ one frame).
+const BATCH_WINDOW_MS: u64 = 16;
+/// Maximum bytes to accumulate before forcing a flush regardless of elapsed time.
+const BATCH_BYTES_MAX: usize = 64 * 1024;
 
 /// Opaque handle that owns a running PTY child process.
 ///
@@ -121,7 +127,23 @@ pub fn spawn_pty(
         // straddle chunk boundaries; without this carry-over, from_utf8_lossy
         // would replace the split bytes with U+FFFD on each side.
         let mut pending: Vec<u8> = Vec::new();
+        // Output batching: accumulate decoded text and flush at most every
+        // BATCH_WINDOW_MS or when BATCH_BYTES_MAX is reached, reducing the
+        // number of ThreadsafeFunction crossings during burst output.
+        let mut batch = String::new();
+        let mut batch_start: Option<Instant> = None;
+        let batch_window = Duration::from_millis(BATCH_WINDOW_MS);
         loop {
+            // Flush the batch before blocking on the next read, so that a
+            // trailing chunk after idle output isn't held indefinitely.
+            if !batch.is_empty() {
+                let should_flush = batch.len() >= BATCH_BYTES_MAX
+                    || batch_start.map_or(true, |t| t.elapsed() >= batch_window);
+                if should_flush {
+                    on_data(std::mem::take(&mut batch));
+                    batch_start = None;
+                }
+            }
             match reader.read(&mut buf) {
                 Ok(0) => break, // EOF
                 Ok(n) => {
@@ -147,7 +169,11 @@ pub fn spawn_pty(
                             // SAFETY: valid_up_to guaranteed this slice is valid UTF-8.
                             unsafe { String::from_utf8_unchecked(pending[..valid_end].to_vec()) }
                         };
-                        on_data(text);
+                        // Accumulate into batch instead of calling on_data directly.
+                        batch.push_str(&text);
+                        if batch_start.is_none() {
+                            batch_start = Some(Instant::now());
+                        }
                         pending.drain(..valid_end);
                     }
                     // Cap pending growth to avoid unbounded memory if a stream
@@ -155,12 +181,29 @@ pub fn spawn_pty(
                     // practice — terminals are text — but defensive).
                     if pending.len() > 16 * 1024 {
                         let text = String::from_utf8_lossy(&pending).into_owned();
-                        on_data(text);
+                        batch.push_str(&text);
+                        if batch_start.is_none() {
+                            batch_start = Some(Instant::now());
+                        }
                         pending.clear();
+                    }
+                    // Always flush after a read that produced data. This ensures
+                    // prompt delivery when the next read() will block (slow streams,
+                    // interactive shells). Burst coalescing is handled by the pre-read
+                    // check above: on fast back-to-back reads the batch accumulates
+                    // until the window elapses or the size limit is hit, at which point
+                    // the pre-read flush fires before blocking on the next read.
+                    if !batch.is_empty() {
+                        on_data(std::mem::take(&mut batch));
+                        batch_start = None;
                     }
                 }
                 Err(_) => break,
             }
+        }
+        // Flush any remaining batch content.
+        if !batch.is_empty() {
+            on_data(std::mem::take(&mut batch));
         }
         // Flush any remaining bytes (incomplete sequence at EOF gets lossy decoded).
         if !pending.is_empty() {
