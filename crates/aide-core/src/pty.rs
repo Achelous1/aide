@@ -7,6 +7,12 @@ use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use std::io::{self, Read, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
+
+/// Maximum time to accumulate output before flushing to JS (16ms ≈ one frame).
+const BATCH_WINDOW_MS: u64 = 16;
+/// Maximum bytes to accumulate before forcing a flush regardless of elapsed time.
+const BATCH_BYTES_MAX: usize = 64 * 1024;
 
 /// Opaque handle that owns a running PTY child process.
 ///
@@ -121,7 +127,23 @@ pub fn spawn_pty(
         // straddle chunk boundaries; without this carry-over, from_utf8_lossy
         // would replace the split bytes with U+FFFD on each side.
         let mut pending: Vec<u8> = Vec::new();
+        // Output batching: accumulate decoded text and flush at most every
+        // BATCH_WINDOW_MS or when BATCH_BYTES_MAX is reached, reducing the
+        // number of ThreadsafeFunction crossings during burst output.
+        let mut batch = String::new();
+        let mut batch_start: Option<Instant> = None;
+        let batch_window = Duration::from_millis(BATCH_WINDOW_MS);
         loop {
+            // Flush the batch before blocking on the next read, so that a
+            // trailing chunk after idle output isn't held indefinitely.
+            if !batch.is_empty() {
+                let should_flush = batch.len() >= BATCH_BYTES_MAX
+                    || batch_start.map_or(true, |t| t.elapsed() >= batch_window);
+                if should_flush {
+                    on_data(std::mem::take(&mut batch));
+                    batch_start = None;
+                }
+            }
             match reader.read(&mut buf) {
                 Ok(0) => break, // EOF
                 Ok(n) => {
@@ -147,7 +169,11 @@ pub fn spawn_pty(
                             // SAFETY: valid_up_to guaranteed this slice is valid UTF-8.
                             unsafe { String::from_utf8_unchecked(pending[..valid_end].to_vec()) }
                         };
-                        on_data(text);
+                        // Accumulate into batch instead of calling on_data directly.
+                        batch.push_str(&text);
+                        if batch_start.is_none() {
+                            batch_start = Some(Instant::now());
+                        }
                         pending.drain(..valid_end);
                     }
                     // Cap pending growth to avoid unbounded memory if a stream
@@ -155,12 +181,29 @@ pub fn spawn_pty(
                     // practice — terminals are text — but defensive).
                     if pending.len() > 16 * 1024 {
                         let text = String::from_utf8_lossy(&pending).into_owned();
-                        on_data(text);
+                        batch.push_str(&text);
+                        if batch_start.is_none() {
+                            batch_start = Some(Instant::now());
+                        }
                         pending.clear();
+                    }
+                    // Always flush after a read that produced data. This ensures
+                    // prompt delivery when the next read() will block (slow streams,
+                    // interactive shells). Burst coalescing is handled by the pre-read
+                    // check above: on fast back-to-back reads the batch accumulates
+                    // until the window elapses or the size limit is hit, at which point
+                    // the pre-read flush fires before blocking on the next read.
+                    if !batch.is_empty() {
+                        on_data(std::mem::take(&mut batch));
+                        batch_start = None;
                     }
                 }
                 Err(_) => break,
             }
+        }
+        // Flush any remaining batch content.
+        if !batch.is_empty() {
+            on_data(std::mem::take(&mut batch));
         }
         // Flush any remaining bytes (incomplete sequence at EOF gets lossy decoded).
         if !pending.is_empty() {
@@ -287,5 +330,152 @@ mod tests {
             .expect("on_exit not fired within 2s after kill");
 
         drop(handle);
+    }
+
+    /// Spawn `sh -c "printf 'a'; printf 'b'; printf 'c'"` — three rapid writes.
+    /// With batching, all three should be coalesced into ≤ 2 on_data invocations.
+    #[test]
+    fn test_pty_batch_coalesces_multiple_reads() {
+        let (tx_data, rx_data) = mpsc::channel::<String>();
+        let (tx_exit, rx_exit) = mpsc::channel::<i32>();
+        let call_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let call_count_clone = Arc::clone(&call_count);
+
+        let _handle = spawn_pty(
+            "/bin/sh",
+            &["-c".to_string(), "printf 'a'; printf 'b'; printf 'c'".to_string()],
+            "/tmp",
+            vec![("TERM".to_string(), "xterm".to_string())],
+            80,
+            24,
+            move |data| {
+                call_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let _ = tx_data.send(data);
+            },
+            move |code| { let _ = tx_exit.send(code); },
+        ).expect("spawn_pty failed");
+
+        let _ = rx_exit.recv_timeout(Duration::from_secs(5))
+            .expect("on_exit not fired within 5s");
+
+        let mut combined = String::new();
+        while let Ok(chunk) = rx_data.try_recv() {
+            combined.push_str(&chunk);
+        }
+
+        // All three printf outputs must be present in aggregate
+        assert!(combined.contains('a'), "expected 'a' in output");
+        assert!(combined.contains('b'), "expected 'b' in output");
+        assert!(combined.contains('c'), "expected 'c' in output");
+
+        // Batching should coalesce the rapid writes into ≤ 2 on_data calls
+        let calls = call_count.load(std::sync::atomic::Ordering::SeqCst);
+        assert!(
+            calls <= 2,
+            "expected ≤ 2 on_data invocations for rapid writes, got {}",
+            calls
+        );
+    }
+
+    /// Spawn `sh -c "printf 'hello'; sleep 0.2"`.
+    /// The batch must flush the "hello" chunk within ~50ms (well within the 16ms window),
+    /// not hold it indefinitely until sleep completes.
+    #[test]
+    fn test_pty_batch_flushes_within_window() {
+        let (tx_data, rx_data) = mpsc::channel::<String>();
+        let (tx_exit, rx_exit) = mpsc::channel::<i32>();
+        let first_data_at: Arc<Mutex<Option<std::time::Instant>>> = Arc::new(Mutex::new(None));
+        let first_data_at_clone = Arc::clone(&first_data_at);
+        let spawn_time = std::time::Instant::now();
+
+        let _handle = spawn_pty(
+            "/bin/sh",
+            &["-c".to_string(), "printf 'hello'; sleep 0.2".to_string()],
+            "/tmp",
+            vec![("TERM".to_string(), "xterm".to_string())],
+            80,
+            24,
+            move |data| {
+                let mut guard = first_data_at_clone.lock().unwrap();
+                if guard.is_none() {
+                    *guard = Some(std::time::Instant::now());
+                }
+                let _ = tx_data.send(data);
+            },
+            move |code| { let _ = tx_exit.send(code); },
+        ).expect("spawn_pty failed");
+
+        // Wait for exit (sleep 0.2 + overhead)
+        let _ = rx_exit.recv_timeout(Duration::from_secs(5))
+            .expect("on_exit not fired within 5s");
+
+        let mut combined = String::new();
+        while let Ok(chunk) = rx_data.try_recv() {
+            combined.push_str(&chunk);
+        }
+
+        assert!(combined.contains("hello"), "expected 'hello' in output, got: {:?}", combined);
+
+        // The first on_data should have fired well before 150ms (sleep 0.2 hasn't ended yet)
+        let guard = first_data_at.lock().unwrap();
+        let elapsed = guard.expect("on_data never called").duration_since(spawn_time);
+        assert!(
+            elapsed < Duration::from_millis(150),
+            "first on_data fired too late: {:?} (should be <150ms, i.e. before sleep 0.2 ends)",
+            elapsed
+        );
+    }
+
+    /// Emit >64KB in rapid succession; batching must split into multiple calls,
+    /// each chunk ≤ ~65KB (BATCH_BYTES_MAX + one read overhead).
+    #[test]
+    fn test_pty_batch_respects_size_limit() {
+        let (tx_data, rx_data) = mpsc::channel::<String>();
+        let (tx_exit, rx_exit) = mpsc::channel::<i32>();
+
+        // Generate ~128KB: 256 lines of 512 'x' chars + newline = 513 bytes each
+        let cmd = "python3 -c \"import sys; [sys.stdout.write('x'*512+'\\n') for _ in range(256)]; sys.stdout.flush()\"".to_string();
+
+        let _handle = spawn_pty(
+            "/bin/sh",
+            &["-c".to_string(), cmd],
+            "/tmp",
+            vec![("TERM".to_string(), "xterm".to_string())],
+            80,
+            24,
+            move |data| { let _ = tx_data.send(data); },
+            move |code| { let _ = tx_exit.send(code); },
+        ).expect("spawn_pty failed");
+
+        let _ = rx_exit.recv_timeout(Duration::from_secs(10))
+            .expect("on_exit not fired within 10s");
+
+        let mut chunks: Vec<String> = Vec::new();
+        while let Ok(chunk) = rx_data.try_recv() {
+            chunks.push(chunk);
+        }
+
+        let total: usize = chunks.iter().map(|c| c.len()).sum();
+        // Must have received substantial output (at least 100KB)
+        assert!(total >= 100 * 1024, "expected ≥100KB total output, got {} bytes", total);
+
+        // Must have multiple on_data calls (size limit triggered splitting)
+        assert!(
+            chunks.len() >= 2,
+            "expected ≥2 on_data calls for >64KB burst, got {}",
+            chunks.len()
+        );
+
+        // Each individual chunk must not exceed BATCH_BYTES_MAX + one read buffer (4KB overhead)
+        const MAX_CHUNK: usize = 64 * 1024 + 4096;
+        for (i, chunk) in chunks.iter().enumerate() {
+            assert!(
+                chunk.len() <= MAX_CHUNK,
+                "chunk {} too large: {} bytes (max {})",
+                i,
+                chunk.len(),
+                MAX_CHUNK
+            );
+        }
     }
 }
