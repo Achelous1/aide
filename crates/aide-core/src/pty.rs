@@ -116,15 +116,56 @@ pub fn spawn_pty(
     let reader_thread = thread::spawn(move || {
         let mut buf = [0u8; 4096];
         let mut on_exit = Some(on_exit);
+        // Trailing bytes from the previous read that didn't form a complete
+        // UTF-8 sequence. A Korean character is 3 bytes in UTF-8 and can
+        // straddle chunk boundaries; without this carry-over, from_utf8_lossy
+        // would replace the split bytes with U+FFFD on each side.
+        let mut pending: Vec<u8> = Vec::new();
         loop {
             match reader.read(&mut buf) {
                 Ok(0) => break, // EOF
                 Ok(n) => {
-                    let text = String::from_utf8_lossy(&buf[..n]).into_owned();
-                    on_data(text);
+                    pending.extend_from_slice(&buf[..n]);
+                    let (valid_end, keep_invalid) = match std::str::from_utf8(&pending) {
+                        Ok(_) => (pending.len(), false),
+                        Err(e) => {
+                            // valid_up_to() gives us the last complete UTF-8 boundary.
+                            // If error_len is None, the remainder is an incomplete
+                            // multi-byte sequence — carry it to the next read.
+                            // If Some, the bytes are genuinely invalid — surface them
+                            // via lossy replacement rather than stalling forever.
+                            match e.error_len() {
+                                None => (e.valid_up_to(), false),
+                                Some(_) => (pending.len(), true),
+                            }
+                        }
+                    };
+                    if valid_end > 0 {
+                        let text = if keep_invalid {
+                            String::from_utf8_lossy(&pending[..valid_end]).into_owned()
+                        } else {
+                            // SAFETY: valid_up_to guaranteed this slice is valid UTF-8.
+                            unsafe { String::from_utf8_unchecked(pending[..valid_end].to_vec()) }
+                        };
+                        on_data(text);
+                        pending.drain(..valid_end);
+                    }
+                    // Cap pending growth to avoid unbounded memory if a stream
+                    // never produces a valid UTF-8 boundary (shouldn't happen in
+                    // practice — terminals are text — but defensive).
+                    if pending.len() > 16 * 1024 {
+                        let text = String::from_utf8_lossy(&pending).into_owned();
+                        on_data(text);
+                        pending.clear();
+                    }
                 }
                 Err(_) => break,
             }
+        }
+        // Flush any remaining bytes (incomplete sequence at EOF gets lossy decoded).
+        if !pending.is_empty() {
+            let text = String::from_utf8_lossy(&pending).into_owned();
+            on_data(text);
         }
         // Determine exit code from child.
         let exit_code = if let Ok(mut child) = child_for_thread.lock() {
