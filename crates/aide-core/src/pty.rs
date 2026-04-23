@@ -247,6 +247,43 @@ pub fn spawn_pty(
         }
     });
 
+    // Watchdog thread: polls the child every 100ms and drops the master when
+    // the child exits naturally (no explicit kill()).  On Windows ConPTY the
+    // master stays open after the child exits, so the reader's read() would
+    // block forever without this.  On Unix the watchdog's master-drop is a
+    // no-op (master is already None or the pipe already got EOF), so running
+    // it cross-platform is safe and avoids a cfg gate.
+    {
+        let master_for_watchdog = Arc::clone(&master);
+        let child_for_watchdog = Arc::clone(&child);
+        thread::spawn(move || {
+            loop {
+                thread::sleep(Duration::from_millis(100));
+                // If master was already taken (explicit kill or previous loop),
+                // there is nothing left to do.
+                let master_gone = match master_for_watchdog.lock() {
+                    Ok(m) => m.is_none(),
+                    Err(_) => true, // lock poisoned — bail
+                };
+                if master_gone {
+                    return;
+                }
+                // Poll child without blocking.
+                let exited = match child_for_watchdog.lock() {
+                    Ok(mut c) => matches!(c.try_wait(), Ok(Some(_))),
+                    Err(_) => true, // lock poisoned — bail
+                };
+                if exited {
+                    // Close the master to unblock the reader thread's read().
+                    if let Ok(mut m) = master_for_watchdog.lock() {
+                        *m = None;
+                    }
+                    return;
+                }
+            }
+        });
+    }
+
     Ok(PtyHandle {
         writer,
         master,
