@@ -138,6 +138,16 @@ sh build.sh   # macOS — out/AIDE.dmg 생성
 
 빌드 스크립트는 의존성 설치, lint, 패키징, 드래그-드롭 인스톨러 레이아웃 DMG 생성을 모두 처리합니다.
 
+### macOS Gatekeeper (서명되지 않은 빌드)
+
+배포용 DMG는 코드 서명이 되어 있지 않기 때문에, macOS가 첫 실행 시 격리(quarantine)시켜 "AIDE가 손상되어 열 수 없습니다"라는 메시지가 표시될 수 있습니다. `/Applications`로 드래그해 설치한 뒤, 아래 명령어로 격리 속성을 제거해주세요:
+
+```bash
+xattr -cr /Applications/AIDE.app
+```
+
+이후 정상적으로 AIDE를 실행할 수 있습니다.
+
 ---
 
 ## 아키텍처
