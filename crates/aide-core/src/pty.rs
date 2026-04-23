@@ -479,3 +479,44 @@ mod tests {
         }
     }
 }
+
+/// Windows-only PTY smoke test: spawn `cmd.exe /C echo hello` via ConPTY,
+/// verify that "hello" arrives through on_data.
+#[cfg(test)]
+#[cfg(windows)]
+mod tests_windows {
+    use super::*;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    /// Spawn `cmd.exe /C echo hello`, collect on_data output,
+    /// assert "hello" substring is received via ConPTY.
+    #[test]
+    fn test_pty_spawn_cmd_echo_windows() {
+        let (tx_data, rx_data) = mpsc::channel::<String>();
+        let (tx_exit, rx_exit) = mpsc::channel::<i32>();
+
+        let handle = spawn_pty(
+            "cmd.exe",
+            &["/C".to_string(), "echo hello".to_string()],
+            "C:\\",
+            vec![("TERM".to_string(), "xterm".to_string())],
+            80,
+            24,
+            move |data| { let _ = tx_data.send(data); },
+            move |code| { let _ = tx_exit.send(code); },
+        ).expect("spawn_pty failed on Windows");
+
+        // Wait for the process to exit.
+        let _ = rx_exit.recv_timeout(Duration::from_secs(10))
+            .expect("on_exit not fired within 10s");
+
+        let mut combined = String::new();
+        while let Ok(chunk) = rx_data.try_recv() {
+            combined.push_str(&chunk);
+        }
+
+        assert!(combined.contains("hello"), "expected 'hello' in output, got: {:?}", combined);
+        drop(handle);
+    }
+}
