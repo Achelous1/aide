@@ -183,7 +183,10 @@ mod tests {
     fn test_read_tree_strips_trailing_slash() {
         let tmp = make_test_dir();
         let base = tmp.path().to_str().unwrap();
-        let with_slash = format!("{}/", base);
+        // Use platform-native separator. Mixing (e.g. '/' on Windows where
+        // base uses '\') would produce paths like `C:\tmp/file` that don't
+        // match the non-trailing form `C:\tmp\file`.
+        let with_slash = format!("{}{}", base, std::path::MAIN_SEPARATOR);
 
         let mut without = read_tree(base);
         let mut with_ts = read_tree(&with_slash);
