@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest, ubuntu-latest, windows-latest]
         node-version: [20]
 
     steps:
@@ -28,14 +28,44 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
 
+      - name: Setup Rust toolchain
+        # Pinned to stable branch SHA as of 2026-04-23.
+        # dtolnay/rust-toolchain has no version tags beyond v1 — SHA is the
+        # standard supply-chain pinning approach for this action.
+        # To update: fetch HEAD of https://github.com/dtolnay/rust-toolchain/tree/stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        with:
+          toolchain: stable
+
+      - name: Capture rustc version for cache key
+        id: rustc-version
+        run: echo "version=$(rustc --version | tr ' ' '-')" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Cache Rust build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-${{ steps.rustc-version.outputs.version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
       - name: Install dependencies
+        # postinstall hook runs `pnpm build:native` → Rust .node is built here.
+        # See scripts/build-native.mjs for the toolchain invocation.
         run: pnpm install
 
       - name: Lint
         run: pnpm lint
 
-      - name: Test
+      - name: Test (Node)
         run: pnpm test
+
+      - name: Test (Rust)
+        run: cargo test -p aide-core
 
       - name: Build
         run: pnpm run package

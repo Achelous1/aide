@@ -22,15 +22,6 @@ export const IPC_CHANNELS = {
   // System
   OPEN_PRIVACY_SETTINGS: 'system:open-privacy-settings',
 
-  // Git
-  GIT_STATUS: 'git:status',
-  GIT_COMMIT: 'git:commit',
-  GIT_PUSH: 'git:push',
-  GIT_PULL: 'git:pull',
-  GIT_BRANCH: 'git:branch',
-  GIT_LOG: 'git:log',
-  GIT_REMOTE_URL: 'git:remote-url',
-
   // Plugin
   PLUGIN_LIST: 'plugin:list',
   PLUGIN_GENERATE_SPEC: 'plugin:generate-spec',
@@ -73,11 +64,6 @@ export const IPC_CHANNELS = {
   UPDATER_INSTALL: 'updater:install',
   UPDATER_INFO_CHANGED: 'updater:info-changed',
   UPDATER_GET_INFO: 'updater:get-info',
-
-  // GitHub
-  GITHUB_LIST_PRS: 'github:list-prs',
-  GITHUB_LIST_ISSUES: 'github:list-issues',
-  GITHUB_GET_PR: 'github:get-pr',
 
   // Agent
   AGENT_LIST_INSTALLED: 'agent:list-installed',

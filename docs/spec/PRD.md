@@ -75,7 +75,7 @@ AIDE의 메인 인터페이스. 모든 상호작용의 시작점.
 
 - Electron 기반 터미널 에뮬레이터
 - 멀티 LLM 지원: Claude Code, Gemini CLI, Codex CLI
-  - AIDE가 직접 LLM API를 호출하지 않음 — CLI 에이전트를 node-pty로 spawn
+  - AIDE가 직접 LLM API를 호출하지 않음 — CLI 에이전트를 Rust portable-pty(via napi-rs)로 spawn
   - 각 에이전트가 자체 OAuth 인증 관리
   - 탭 `+` 버튼 → 드롭다운 메뉴에서 에이전트/셸 선택하여 새 탭 생성
 - Shell 모드: 일반 터미널로 동작 (bash/zsh/powershell)
@@ -165,17 +165,13 @@ AIDE의 메인 인터페이스. 모든 상호작용의 시작점.
 - 재귀 트리 뷰 파일 브라우저 (최대 깊이 10)
 - 모든 디렉토리 표시 (자동 제외 없음)
 - 디렉토리 우선 정렬 + 알파벳 순
-- chokidar 기반 파일 변경 감시 (500ms 디바운스) → 자동 새로고침
-- 파일/폴더 CRUD (IPC: readTree, readFile, writeFile, delete)
+- Rust `notify` crate 기반 파일 변경 감시 → 자동 새로고침 (chokidar 대체, idle CPU 0% avg)
+- 파일/폴더 CRUD (IPC: readTree, readFile, writeFile, delete — Rust native module 처리)
 - 터미널 좌측 사이드 패널 (220px)
 
 ### F4. Git & GitHub Integration
 
-버전 관리 및 협업 기본 기능.
-
-- Git 상태 표시: StatusBar에서 30초 주기 폴링으로 실시간 브랜치명 + 변경 파일 수 표시
-- 기본 Git 작업 (simple-git 기반 IPC): status, commit, push, pull, branch, log
-- AI를 통한 자연어 Git 작업 ("마지막 3개 커밋 squash 해줘")
+> **v0.1.0에서 제거됨.** StatusBar Git 섹션, `git:*` / `github:*` IPC 채널, simple-git/octokit 의존성이 모두 제거되었다. Git 작업은 AI 에이전트 터미널을 통한 자연어 실행으로 대체된다 (예: `git status`, `git commit` 등 직접 셸 명령). UI 수준의 Git 통합은 Post-MVP 로드맵(`@aide/git` 플러그인)으로 이연.
 
 ### F5. Agent Auto-Detection
 
@@ -207,8 +203,12 @@ AIDE의 메인 인터페이스. 모든 상호작용의 시작점.
 │  Request → Analyze → Spec → Generate → Deploy   │
 ├─────────────────────────────────────────────────┤
 │                   Node.js (Main Process)         │
+│         + Rust Core (napi-rs .node module)       │
+│           fs / watcher / PTY                     │
 └─────────────────────────────────────────────────┘
 ```
+
+> **v0.1.0 성능 마일스톤**: Rust `notify` crate 기반 watcher 도입으로 idle CPU가 기존 chokidar 대비 ~127% → 0.0% avg로 감소. 자세한 벤치마크는 [[rust-core-migration]] 참조.
 
 **주요 컴포넌트**:
 
@@ -291,8 +291,8 @@ $ npm test
 - [ ] 플러그인 생성 파이프라인 (자연어 → 스펙 → 코드 → tool/skill)
 - [ ] 플러그인 샌드박스 런타임
 - [ ] 플러그인 관리 (목록, 활성화/비활성화, 삭제)
-- [x] 파일 트리 브라우저 (chokidar 감시, 재귀 트리)
-- [x] Git 기본 기능 (simple-git: status, commit, push, pull, branch, log)
+- [x] 파일 트리 브라우저 (Rust notify 감시, 재귀 트리)
+- [ ] Git UI 통합 (v0.1.0에서 제거 — 에이전트 터미널 통해 자연어로 대체)
 - [x] 다크/라이트 테마 토글 (StatusBar 버튼, .light 클래스 전환)
 - [x] Navbar expanded 토글 (collapsed 48px ↔ expanded 220px, «/» 버튼)
 - [x] 세션 저장/복원 (레이아웃, 탭, 활성 플러그인 — 앱 재시작/워크스페이스 전환 시 복원)
@@ -471,7 +471,8 @@ interface UpdateInfo {
 | Framework | Electron | 크로스 플랫폼, 웹 기술 활용 |
 | Terminal | xterm.js | Electron과 자연스러운 통합, 검증된 터미널 에뮬레이터 |
 | Frontend | React + TypeScript | 컴포넌트 기반 UI, 타입 안전성 |
-| Plugin Sandbox | Node.js VM / Worker Threads | 격리된 실행 환경, Node API 접근 제어 |
+| Plugin Sandbox | Node.js VM / Worker Threads | 격리된 실행 환경, Node API 접근 제어. 플러그인 런타임은 Create n Play 호환성 이유로 Node.js 유지 |
+| Rust Core | napi-rs (.node native module) | fs ops, PTY, file watcher — idle CPU 0% 목표 달성 (v0.1.0) |
 | LLM Integration | Adapter Pattern | 모델별 어댑터로 통일된 인터페이스 |
 | IPC | Electron IPC + Event Emitter | Main/Renderer 간 통신 |
 | State Management | Zustand | 경량, 간결한 상태 관리 |

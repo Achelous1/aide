@@ -1,9 +1,9 @@
 import { IpcMain, BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import chokidar from 'chokidar';
 import { IPC_CHANNELS } from './channels';
 import { WATCHER_EXCLUSIONS } from './watcher-exclusions';
+import { getNativeMod } from './fs-handlers';
 import { generatePluginSpec } from '../plugin/spec-generator';
 import type { PluginSpec } from '../plugin/spec-generator';
 import { generatePluginCode } from '../plugin/code-generator';
@@ -49,7 +49,7 @@ function loadDirIntoRegistry(dir: string): void {
 }
 
 /**
- * Incremental rescan — called from chokidar events AND from PLUGIN_LIST.
+ * Incremental rescan — called from watcher events AND from PLUGIN_LIST.
  * Registers newly added plugins and unregisters plugins whose spec has
  * disappeared. Runs even when the workspace path hasn't changed, so plugins
  * created at runtime (e.g. via MCP aide_create_plugin) are picked up without
@@ -99,10 +99,12 @@ function broadcastHtmlChanged(pluginName: string): void {
   }
 }
 
-let localPluginsWatcher: ReturnType<typeof chokidar.watch> | null = null;
-let localHtmlWatcher: ReturnType<typeof chokidar.watch> | null = null;
+interface WatcherHandle { stop(): void; }
+
+let localPluginsWatcher: WatcherHandle | null = null;
+let localHtmlWatcher: WatcherHandle | null = null;
 let lastLocalDir: string | null = null;
-let dataWatcher: ReturnType<typeof chokidar.watch> | null = null;
+let dataWatcher: WatcherHandle | null = null;
 const localHtmlDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function broadcastDataChanged(): void {
@@ -124,36 +126,50 @@ function refreshPlugins(cwd: string): void {
   // On any filesystem event, rescan the directory to register newly added
   // plugins (e.g. created by MCP aide_create_plugin at runtime) and drop
   // plugins whose spec no longer exists.
-  localPluginsWatcher?.close();
-  localPluginsWatcher = chokidar
-    .watch(localDir, { ignoreInitial: true, depth: 2, ignored: WATCHER_EXCLUSIONS })
-    .on('all', () => {
+  localPluginsWatcher?.stop();
+  localPluginsWatcher = getNativeMod().startWatcher(
+    localDir,
+    2,
+    WATCHER_EXCLUSIONS,
+    () => {
       rescanPluginsDir(localDir);
       broadcastPluginsChanged();
-    });
-  // Re-watch local plugins dir for index.html changes (debounced 300ms)
-  localHtmlWatcher?.close();
-  localHtmlWatcher = chokidar
-    .watch(path.join(localDir, '**/index.html'), { ignoreInitial: true, ignored: WATCHER_EXCLUSIONS })
-    .on('change', (filePath: string) => {
-      const pluginName = path.basename(path.dirname(filePath));
+    },
+  );
+  // Re-watch local plugins dir for index.html changes (debounced 300ms).
+  // Rust watcher emits all events; filter to index.html in the callback.
+  localHtmlWatcher?.stop();
+  localHtmlWatcher = getNativeMod().startWatcher(
+    localDir,
+    undefined,
+    WATCHER_EXCLUSIONS,
+    (ev) => {
+      if (!ev.path.endsWith('index.html')) return;
+      if (ev.kind !== 'modify' && ev.kind !== 'add') return;
+      const pluginName = path.basename(path.dirname(ev.path));
       const existing = localHtmlDebounceTimers.get(pluginName);
       if (existing) clearTimeout(existing);
       localHtmlDebounceTimers.set(pluginName, setTimeout(() => {
         localHtmlDebounceTimers.delete(pluginName);
         broadcastHtmlChanged(pluginName);
       }, 300));
-    });
-  // Re-watch .aide/ data files so MCP-triggered writes refresh the UI
-  dataWatcher?.close();
+    },
+  );
+  // Re-watch .aide/ data files so MCP-triggered writes refresh the UI.
+  // depth=1 emits events for direct children of aideDir (depth 0 would only
+  // fire on the directory itself — wrong for file-write detection).
+  dataWatcher?.stop();
   const aideDir = path.join(cwd, '.aide');
-  dataWatcher = chokidar
-    .watch(aideDir, { ignoreInitial: true, depth: 0, ignored: WATCHER_EXCLUSIONS })
-    .on('change', (filePath: string) => {
-      if (filePath.endsWith('.json') && !filePath.endsWith('settings.json')) {
+  dataWatcher = getNativeMod().startWatcher(
+    aideDir,
+    1,
+    WATCHER_EXCLUSIONS,
+    (ev) => {
+      if (ev.path.endsWith('.json') && !ev.path.endsWith('settings.json')) {
         broadcastDataChanged();
       }
-    });
+    },
+  );
 }
 
 function makeEmitterFactory(getCwd: () => string) {

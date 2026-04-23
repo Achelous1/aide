@@ -23,27 +23,25 @@ DMG_NAME="AIDE"
 DMG_PATH="out/AIDE.dmg"
 DMG_TMP_PATH="out/AIDE-tmp.dmg"
 
-# Install dependencies
+# Install dependencies (postinstall hook builds the Rust .node via scripts/build-native.mjs)
 echo "[1/4] Installing dependencies..."
 pnpm install
 
-# Force-run native module install scripts so node-pty's prebuild download is
-# triggered even when pnpm restores from cache.
-echo "      Rebuilding native modules..."
-pnpm rebuild node-pty
+# Build darwin-universal native module (arm64 + x64 lipo-merged).
+# This replaces the single-arch .node produced by postinstall with a fat binary
+# that runs on both Apple Silicon and Intel Macs.
+echo "      Building darwin-universal native module..."
+pnpm run build:native:universal
 
-# node-pty's loader (lib/utils.js) resolves the native binary from either
-# build/Release, build/Debug, or prebuilds/<platform>-<arch>. Accept any of
-# these; only fail if none exist.
-PTY_BUILT="node_modules/node-pty/build/Release/pty.node"
-PTY_PREBUILD_DIR="node_modules/node-pty/prebuilds/$(uname -s | tr 'A-Z' 'a-z')-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
-PTY_PREBUILD="$PTY_PREBUILD_DIR/pty.node"
-if [ -f "$PTY_BUILT" ]; then
-  echo "      pty.node (built) present ($(stat -f%z "$PTY_BUILT") bytes)"
-elif [ -f "$PTY_PREBUILD" ]; then
-  echo "      pty.node (prebuild) present at $PTY_PREBUILD ($(stat -f%z "$PTY_PREBUILD") bytes)"
+# Verify the universal module was produced.
+NATIVE_DIR="src/main/native"
+NATIVE_NODE="$NATIVE_DIR/index.darwin-universal.node"
+if [ -f "$NATIVE_NODE" ]; then
+  echo "      Rust native module present: $NATIVE_NODE ($(stat -f%z "$NATIVE_NODE") bytes)"
 else
-  echo "::error::pty.node missing: neither $PTY_BUILT nor $PTY_PREBUILD exists."
+  echo "::error::darwin-universal .node missing in $NATIVE_DIR/ after build:native:universal."
+  echo "          Requires rustup targets: aarch64-apple-darwin + x86_64-apple-darwin"
+  echo "          Run: rustup target add aarch64-apple-darwin x86_64-apple-darwin"
   exit 1
 fi
 

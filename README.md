@@ -138,6 +138,16 @@ sh build.sh   # macOS — produces out/AIDE.dmg
 
 The build script handles dependency install, lint, package, and DMG creation with a drag-and-drop installer layout.
 
+### macOS Gatekeeper (unsigned build)
+
+The distributed DMG is not code-signed, so macOS quarantines it on first launch ("AIDE is damaged and can't be opened"). After dragging AIDE into `/Applications`, strip the quarantine attribute:
+
+```bash
+xattr -cr /Applications/AIDE.app
+```
+
+Then launch AIDE normally.
+
 ---
 
 ## Architecture

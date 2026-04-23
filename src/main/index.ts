@@ -7,8 +7,6 @@ import { registerIpcHandlers } from './ipc/handlers';
 import { registerWorkspaceHandlers } from './ipc/workspace-handlers';
 import { registerFsHandlers, setWorkspaceWatcher } from './ipc/fs-handlers';
 import { registerAgentHandlers } from './ipc/agent-handlers';
-import { registerGitHandlers } from './ipc/git-handlers';
-import { registerGithubHandlers } from './ipc/github-handlers';
 import { registerPluginHandlers } from './ipc/plugin-handlers';
 import { registerSettingsHandlers } from './ipc/settings-handlers';
 import { registerSessionHandlers } from './ipc/session-handlers';
@@ -62,7 +60,7 @@ const createWindow = (): void => {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false, // node-pty requires this
+      sandbox: false, // Rust native module requires this
       preload: path.join(__dirname, 'preload.js'),
     },
   });
@@ -101,8 +99,6 @@ app.on('ready', () => {
   const fallbackCwd = getHome();
   registerFsHandlers(ipcMain);
   registerAgentHandlers(ipcMain);
-  registerGitHandlers(ipcMain);
-  registerGithubHandlers(ipcMain);
   registerPluginHandlers(ipcMain, fallbackCwd);
   registerSettingsHandlers(ipcMain, fallbackCwd);
   registerSessionHandlers(ipcMain);

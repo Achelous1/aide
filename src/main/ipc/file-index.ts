@@ -10,13 +10,34 @@ export interface FileIndexEntry {
   type: 'file' | 'directory';
 }
 
+/**
+ * Mirrors the matcher semantics in `crates/aide-core/src/watcher.rs`:
+ *   `**∕<name>/**` → any path component equals <name>
+ *   `**∕*.<ext>`   → filename suffix match
+ * Other patterns fall back to a substring check on the full path.
+ */
+function matchesExclusion(fullPath: string, pattern: string): boolean {
+  const inner = pattern
+    .replace(/^\*\*\//, '')
+    .replace(/\/\*\*$/, '')
+    .replace(/^\*\*/, '');
+
+  // `**/<name>/**` form — component match.
+  if (!inner.includes('/') && !inner.includes('*') && inner.length > 0) {
+    const components = fullPath.split(/[/\\]/);
+    return components.includes(inner);
+  }
+  // `**/*.<ext>` form — filename suffix match.
+  const suffixMatch = inner.match(/^\*\.(.+)$/);
+  if (suffixMatch) {
+    return fullPath.endsWith(`.${suffixMatch[1]}`);
+  }
+  return fullPath.includes(inner);
+}
+
 function isExcluded(fullPath: string): boolean {
   for (const pattern of WATCHER_EXCLUSIONS) {
-    if (typeof pattern === 'string') {
-      if (fullPath === pattern || fullPath.includes(pattern)) return true;
-    } else if (pattern.test(fullPath)) {
-      return true;
-    }
+    if (matchesExclusion(fullPath, pattern)) return true;
   }
   return false;
 }

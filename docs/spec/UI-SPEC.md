@@ -78,8 +78,8 @@
 |---------|------|------|
 | Status Indicator | 상태별 아이콘 (아래 참조) | 에이전트 현재 상태 표시 |
 | Agent Name | `local` 등 (JetBrains Mono 12px) | 에이전트 세션 식별자 |
-| Diff Stats | `+1275 -63` (green/red) | Git 변경 사항 요약 |
-| Branch | `feature/design` 등 (11px, tertiary) | 현재 작업 브랜치 |
+
+> **v0.1.0 변경**: Diff Stats (`+1275 -63`) 및 Branch (`feature/design`) 표시 제거. Git UI 통합이 v0.1.0에서 제거됨.
 
 클릭 시: 해당 프로젝트의 해당 에이전트 세션으로 이동 (Terminal Page 전환).
 
@@ -331,7 +331,7 @@ PRD F7 자동 업데이트 알림 컴포넌트. **WorkspaceNav 가장 하단 —
 - 재귀 트리 뷰 (최대 깊이 10)
 - 모든 디렉토리 표시 (자동 제외 없음)
 - 정렬: 디렉토리 우선, 알파벳 순
-- chokidar 기반 파일 변경 감시 (500ms 디바운스) → `fs:changed` 이벤트 → 자동 새로고침
+- Rust `notify` crate 기반 파일 변경 감시 (WatcherHandle via napi-rs) → `fs:changed` 이벤트 → 자동 새로고침
 - IPC: `readTree(cwd)`, `readFile(path)`, `writeFile(path, content)`, `delete(path)`, `onChanged(callback)`
 - 워크스페이스 경로를 `cwd` prop으로 전달받음
 
@@ -616,10 +616,11 @@ Plugins 탭 선택 시 사이드 패널에 표시되는 플러그인 관리 UI. 
 
 | Element | Spec | 동작 |
 |---------|------|------|
-| Git Branch | 실시간 브랜치명 (11px) | simple-git으로 30초 폴링, 변경 파일 수 표시 |
 | Plugin Count | `[0] plugins active` (11px) | 활성 플러그인 수. 클릭 시 플러그인 패널 (향후) |
 | Spacer | fill | — |
 | Agent Name | `claude-opus-4-6` (11px) | 현재 탭의 에이전트/모델명 표시 |
+
+> **v0.1.0 변경**: Git Branch / 변경 파일 수 표시 섹션 제거. Git UI 통합(simple-git 기반 폴링)이 v0.1.0에서 제거됨.
 
 ### 3.12 Agent Auto-Detection
 

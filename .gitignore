@@ -101,3 +101,11 @@ playwright-report/
 CLAUDE.md
 .aide/
 .mcp.json
+
+# Rust / Cargo
+target/
+**/*.rs.bk
+
+# napi-generated native binaries and type declarations (rebuilt by pnpm build:native)
+src/main/native/*.node
+src/main/native/*.d.ts

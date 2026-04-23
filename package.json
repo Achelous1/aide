@@ -1,7 +1,7 @@
 {
   "name": "aide",
   "productName": "AIDE",
-  "version": "0.0.12",
+  "version": "0.1.0",
   "description": "AI-Driven IDE - Create n Play plugins with natural language",
   "main": ".vite/build/index.js",
   "private": true,
@@ -13,7 +13,10 @@
     "lint": "eslint --ext .ts,.tsx src/",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:native": "node scripts/build-native.mjs",
+    "build:native:universal": "node scripts/build-native.mjs --universal",
+    "postinstall": "pnpm run build:native"
   },
   "keywords": [
     "electron",
@@ -30,7 +33,6 @@
     "onlyBuiltDependencies": [
       "electron",
       "esbuild",
-      "node-pty",
       "electron-winstaller",
       "fs-xattr",
       "macos-alias"
@@ -45,6 +47,7 @@
     "@electron-forge/plugin-fuses": "^7.11.1",
     "@electron-forge/plugin-vite": "^7.11.1",
     "@electron/fuses": "^1.8.0",
+    "@napi-rs/cli": "^3.6.2",
     "@playwright/test": "^1.50.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
@@ -75,13 +78,10 @@
     "@octokit/rest": "^22.0.1",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
-    "chokidar": "^3.6.0",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^8.2.0",
-    "node-pty": "^1.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "simple-git": "^3.27.0",
     "zustand": "^5.0.0"
   }
 }

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../main/ipc/channels';
-import type { AideAPI, AgentStatus, GitStatus, TerminalSpawnOptions, PluginSpec, McpStatus, PluginTool, WorkspaceSettings, SavedSession, UpdateInfo, FsReadTreeError, FileTreeNode } from '../types/ipc';
+import type { AideAPI, AgentStatus, TerminalSpawnOptions, PluginSpec, McpStatus, PluginTool, WorkspaceSettings, SavedSession, UpdateInfo, FsReadTreeError, FileTreeNode } from '../types/ipc';
 
 const aideAPI: AideAPI = {
   fs: {
@@ -29,23 +29,6 @@ const aideAPI: AideAPI = {
 
     searchFiles: (query: string, limit?: number): Promise<FileTreeNode[]> =>
       ipcRenderer.invoke(IPC_CHANNELS.FS_SEARCH_FILES, query, limit),
-  },
-
-  git: {
-    status: (cwd: string): Promise<GitStatus> =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_STATUS, cwd),
-    commit: (cwd: string, message: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_COMMIT, cwd, message),
-    push: (cwd: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_PUSH, cwd),
-    pull: (cwd: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_PULL, cwd),
-    branch: (cwd: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_BRANCH, cwd),
-    log: (cwd: string, limit?: number) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_LOG, cwd, limit),
-    remoteUrl: (cwd: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_REMOTE_URL, cwd),
   },
 
   terminal: {
@@ -146,15 +129,6 @@ const aideAPI: AideAPI = {
   mcp: {
     status: (): Promise<McpStatus> => ipcRenderer.invoke(IPC_CHANNELS.MCP_STATUS),
     tools: (): Promise<PluginTool[]> => ipcRenderer.invoke(IPC_CHANNELS.MCP_TOOLS),
-  },
-
-  github: {
-    listPRs: (owner: string, repo: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_LIST_PRS, owner, repo),
-    listIssues: (owner: string, repo: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_LIST_ISSUES, owner, repo),
-    getPR: (owner: string, repo: string, prNumber: number) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GITHUB_GET_PR, owner, repo, prNumber),
   },
 
   settings: {

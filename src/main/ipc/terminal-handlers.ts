@@ -1,5 +1,4 @@
 import { type IpcMain, BrowserWindow } from 'electron';
-import * as pty from 'node-pty';
 import * as fs from 'fs';
 import * as path from 'path';
 import { IPC_CHANNELS } from './channels';
@@ -7,6 +6,7 @@ import { AgentStatusDetector } from '../agent/status-detector';
 import { getAgentSpawnConfig, COMMON_ENV, type AgentType } from '../agent/agent-config';
 import { getMcpConfigPath } from '../mcp/config-writer';
 import { getHome } from '../utils/home';
+import { getNativeMod, type PtyHandle } from './fs-handlers';
 import type { AgentStatus } from '../../types/ipc';
 
 function getResumeArgs(agentType: string, sessionId: string): string[] {
@@ -70,7 +70,7 @@ function newestJsonlId(dir: string): string | null {
 }
 
 interface PtySession {
-  pty: pty.IPty;
+  handle: PtyHandle;
   webContentsId: number;
   agentSessionId?: string;
   sessionDetectTimer?: ReturnType<typeof setInterval>;
@@ -115,20 +115,8 @@ export async function killAllSessions(): Promise<void> {
   const pending = snapshot.map((session) => {
     if (session.sessionDetectTimer) clearInterval(session.sessionDetectTimer);
     return new Promise<void>((resolve) => {
-      let settled = false;
-      const done = () => {
-        if (settled) return;
-        settled = true;
-        resolve();
-      };
-      try {
-        session.pty.onExit(() => done());
-      } catch {
-        done();
-        return;
-      }
-      try { session.pty.kill(); } catch { /* already dead */ }
-      setTimeout(done, 500);
+      try { session.handle.kill(); } catch { /* already dead */ }
+      setTimeout(resolve, 500);
     });
   });
   await Promise.allSettled(pending);
@@ -197,19 +185,51 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
         }
       }
 
-      let ptyProcess: ReturnType<typeof pty.spawn>;
+      const envTuples: [string, string][] = Object.entries({
+        ...safeBaseEnv,
+        ...COMMON_ENV,
+        ...agentConfig.extraEnv,
+      });
+
+      // Declare session first so callbacks can close over it.
+      // The handle field is filled in after spawnPty succeeds.
+      const session = {
+        handle: null as unknown as PtyHandle,
+        webContentsId: event.sender.id,
+        lastUserInputAt: 0,
+      } as PtySession;
+
+      let handle: PtyHandle;
       try {
-        ptyProcess = pty.spawn(shell, spawnArgs, {
-          name: 'xterm-256color',
-          cols: 80,
-          rows: 24,
+        handle = getNativeMod().spawnPty(
+          shell,
+          spawnArgs,
           cwd,
-          env: {
-            ...safeBaseEnv,
-            ...COMMON_ENV,
-            ...agentConfig.extraEnv,
+          envTuples,
+          80,
+          24,
+          (ev) => {
+            broadcastToRenderer(
+              session.webContentsId,
+              IPC_CHANNELS.TERMINAL_DATA,
+              sessionId,
+              ev.data
+            );
+            // For shell sessions, skip PTY echo that follows user keystrokes.
+            // Agent TUI sessions (claude, gemini, codex) don't echo keystrokes —
+            // their output is always legitimate UI content that must reach the detector.
+            const agentType = options?.agentType ?? 'shell';
+            const sinceInput = Date.now() - session.lastUserInputAt;
+            if (agentType !== 'shell' || sinceInput > USER_ECHO_WINDOW_MS) {
+              statusDetector.feed(sessionId, ev.data);
+            }
           },
-        });
+          () => {
+            if (session.sessionDetectTimer) clearInterval(session.sessionDetectTimer);
+            sessions.delete(sessionId);
+            statusDetector.remove(sessionId);
+          },
+        );
       } catch (spawnErr) {
         const err = spawnErr as NodeJS.ErrnoException;
         return {
@@ -224,36 +244,9 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
         };
       }
 
-      const session: PtySession = {
-        pty: ptyProcess,
-        webContentsId: event.sender.id,
-        lastUserInputAt: 0,
-      };
+      session.handle = handle;
       sessions.set(sessionId, session);
       statusDetector.register(sessionId, options?.agentType ?? 'shell');
-
-      ptyProcess.onData((data: string) => {
-        broadcastToRenderer(
-          session.webContentsId,
-          IPC_CHANNELS.TERMINAL_DATA,
-          sessionId,
-          data
-        );
-        // For shell sessions, skip PTY echo that follows user keystrokes.
-        // Agent TUI sessions (claude, gemini, codex) don't echo keystrokes —
-        // their output is always legitimate UI content that must reach the detector.
-        const agentType = options?.agentType ?? 'shell';
-        const sinceInput = Date.now() - session.lastUserInputAt;
-        if (agentType !== 'shell' || sinceInput > USER_ECHO_WINDOW_MS) {
-          statusDetector.feed(sessionId, data);
-        }
-      });
-
-      ptyProcess.onExit(() => {
-        if (session.sessionDetectTimer) clearInterval(session.sessionDetectTimer);
-        sessions.delete(sessionId);
-        statusDetector.remove(sessionId);
-      });
 
       // Poll filesystem to detect the agent's session ID (1s interval, up to 15 attempts)
       if (options?.agentType && options.agentType !== 'shell') {
@@ -285,7 +278,7 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
       if (session) {
         session.lastUserInputAt = Date.now();
         statusDetector.notifyUserInput(sessionId);
-        session.pty.write(data);
+        session.handle.write(data);
       }
     }
   );
@@ -295,7 +288,7 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
     (_event, sessionId: string, cols: number, rows: number) => {
       const session = sessions.get(sessionId);
       if (session) {
-        session.pty.resize(cols, rows);
+        session.handle.resize(cols, rows);
       }
     }
   );
@@ -303,7 +296,7 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(IPC_CHANNELS.TERMINAL_KILL, (_event, sessionId: string) => {
     const session = sessions.get(sessionId);
     if (session) {
-      session.pty.kill();
+      session.handle.kill();
       sessions.delete(sessionId);
       statusDetector.remove(sessionId);
     }
