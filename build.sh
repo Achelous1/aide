@@ -27,16 +27,21 @@ DMG_TMP_PATH="out/AIDE-tmp.dmg"
 echo "[1/4] Installing dependencies..."
 pnpm install
 
-# Verify the Rust native module was produced by postinstall.
-# Filename pattern: src/main/native/index.<platform>-<arch>.node
-# macOS darwin-arm64 / darwin-x64; Linux adds -gnu/-musl suffix; Windows adds -msvc.
+# Build darwin-universal native module (arm64 + x64 lipo-merged).
+# This replaces the single-arch .node produced by postinstall with a fat binary
+# that runs on both Apple Silicon and Intel Macs.
+echo "      Building darwin-universal native module..."
+pnpm run build:native:universal
+
+# Verify the universal module was produced.
 NATIVE_DIR="src/main/native"
-NATIVE_NODE=$(ls "$NATIVE_DIR"/*.node 2>/dev/null | head -1)
-if [ -n "$NATIVE_NODE" ]; then
+NATIVE_NODE="$NATIVE_DIR/index.darwin-universal.node"
+if [ -f "$NATIVE_NODE" ]; then
   echo "      Rust native module present: $NATIVE_NODE ($(stat -f%z "$NATIVE_NODE") bytes)"
 else
-  echo "::error::Rust native .node missing in $NATIVE_DIR/ after pnpm install."
-  echo "          Check postinstall log — scripts/build-native.mjs requires rustup stable ≥1.82."
+  echo "::error::darwin-universal .node missing in $NATIVE_DIR/ after build:native:universal."
+  echo "          Requires rustup targets: aarch64-apple-darwin + x86_64-apple-darwin"
+  echo "          Run: rustup target add aarch64-apple-darwin x86_64-apple-darwin"
   exit 1
 fi
 

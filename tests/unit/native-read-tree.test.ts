@@ -32,7 +32,8 @@ function jsReadTree(dirPath: string): Array<{ name: string; path: string; type: 
 function candidateNativeFilenames(): string[] {
   const base = `index.${process.platform}-${process.arch}`;
   if (process.platform === 'darwin') {
-    return [`${base}.node`];
+    // Prefer universal (lipo-merged arm64+x64) when present; fall back to arch-specific.
+    return [`index.darwin-universal.node`, `${base}.node`];
   }
   if (process.platform === 'linux') {
     return [`${base}-gnu.node`, `${base}-musl.node`, `${base}.node`];

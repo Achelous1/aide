@@ -6,6 +6,7 @@
  *   2. The loader returns null when no arch-matching .node exists (no wrong-arch crash).
  *   3. On Linux, libc-suffixed variants (-gnu, -musl) are tried before the bare suffix.
  *   4. On Windows, -msvc suffix is tried before the bare suffix.
+ *   5. On macOS, `index.darwin-universal.node` is preferred over the arch-specific file.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'node:fs';
@@ -22,7 +23,8 @@ const EXPECTED_FILENAME = `index.${process.platform}-${process.arch}.node`;
 function candidateNativeFilenames(): string[] {
   const base = `index.${process.platform}-${process.arch}`;
   if (process.platform === 'darwin') {
-    return [`${base}.node`];
+    // Prefer universal (lipo-merged arm64+x64) when present; fall back to arch-specific.
+    return [`index.darwin-universal.node`, `${base}.node`];
   }
   if (process.platform === 'linux') {
     return [`${base}-gnu.node`, `${base}-musl.node`, `${base}.node`];
@@ -105,6 +107,42 @@ describe('arch-aware .node loader', () => {
         expect(path.basename(result!)).toBe(gnuFile);
       } finally {
         fs.rmSync(gnuOnlyDir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  // macOS-specific: universal binary is preferred over the arch-specific file.
+  it.skipIf(process.platform !== 'darwin')(
+    'darwin: picks index.darwin-universal.node over index.darwin-<arch>.node when both present',
+    () => {
+      const darwinDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aide-darwin-univ-test-'));
+      try {
+        const univFile = 'index.darwin-universal.node';
+        const archFile = `index.darwin-${process.arch}.node`;
+        fs.writeFileSync(path.join(darwinDir, univFile), '');
+        fs.writeFileSync(path.join(darwinDir, archFile), '');
+        const result = resolveNodeFile(darwinDir);
+        expect(result).not.toBeNull();
+        expect(path.basename(result!)).toBe(univFile);
+      } finally {
+        fs.rmSync(darwinDir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  // macOS-specific: falls back to arch-specific when universal is absent.
+  it.skipIf(process.platform !== 'darwin')(
+    'darwin: falls back to index.darwin-<arch>.node when universal is absent',
+    () => {
+      const archOnlyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aide-darwin-arch-test-'));
+      try {
+        const archFile = `index.darwin-${process.arch}.node`;
+        fs.writeFileSync(path.join(archOnlyDir, archFile), '');
+        const result = resolveNodeFile(archOnlyDir);
+        expect(result).not.toBeNull();
+        expect(path.basename(result!)).toBe(archFile);
+      } finally {
+        fs.rmSync(archOnlyDir, { recursive: true, force: true });
       }
     },
   );

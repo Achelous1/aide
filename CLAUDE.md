@@ -9,16 +9,20 @@ AIDE (AI-Driven IDE) - Electron-based terminal-centric IDE that integrates CLI c
 ## Development Commands
 
 ```bash
-pnpm install          # Install dependencies + auto-build Rust native module (postinstall)
-pnpm start            # Dev server with HMR
-pnpm run package      # Package app
-pnpm run make         # Build distributable (dmg/exe)
-pnpm lint             # ESLint
-pnpm test             # Vitest (unit)
-pnpm test:e2e         # Playwright (e2e)
+pnpm install                   # Install dependencies + auto-build Rust native module (postinstall)
+pnpm start                     # Dev server with HMR
+pnpm run package               # Package app
+pnpm run make                  # Build distributable (dmg/exe)
+pnpm lint                      # ESLint
+pnpm test                      # Vitest (unit)
+pnpm test:e2e                  # Playwright (e2e)
+pnpm run build:native          # Rebuild single-arch .node (fast, used by dev/CI postinstall)
+pnpm run build:native:universal  # macOS only: lipo-merged arm64+x64 .node for DMG releases
 ```
 
 **Rust toolchain required**: `pnpm install` runs `postinstall` → `scripts/build-native.mjs` which compiles `crates/aide-napi` into `src/main/native/index.<platform>-<arch>.node`. Requires `rustup` with stable ≥1.82. If only Homebrew rustc (1.74) is installed, build fails — install rustup: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`. The build script prepends `~/.cargo/bin` to PATH so rustup shim takes precedence over any Homebrew rustc.
+
+**Universal binary (macOS DMG)**: `build.sh` calls `pnpm run build:native:universal` before packaging. This produces `src/main/native/index.darwin-universal.node` (arm64+x64 fat binary via `lipo`). Requires both targets: `rustup target add aarch64-apple-darwin x86_64-apple-darwin`. Do not commit the universal `.node` — it is built locally by `sh build.sh` only. CI uses the fast single-arch postinstall build.
 
 ## Architecture
 
