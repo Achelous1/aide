@@ -49,17 +49,12 @@ jobs:
         run: pnpm lint
 
       - name: Build native module
-        # Windows cross-compile is not set up until Phase 7. Skip explicitly so
-        # failures are visible rather than swallowed by continue-on-error.
-        if: matrix.os != 'windows-latest'
         run: pnpm build:native
 
       - name: Test (Node)
         run: pnpm test
 
       - name: Test (Rust)
-        # Rust toolchain targets are not configured for Windows until Phase 7.
-        if: matrix.os != 'windows-latest'
         run: cargo test -p aide-core
 
       - name: Build

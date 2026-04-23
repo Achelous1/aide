@@ -149,9 +149,11 @@ describe.skipIf(nativeModPath === null)('native read_tree (napi-rs)', () => {
     }
   });
 
-  it('trailing-slash parity: output is identical with or without trailing slash', () => {
-    // Lock in the contract that Rust and JS both normalise trailing slashes.
-    const withSlash = testDir.endsWith('/') ? testDir : testDir + '/';
+  it('trailing-slash parity: output is identical with or without trailing separator', () => {
+    // Lock in the contract that Rust and JS both normalise trailing separators.
+    // Use path.sep so Windows uses '\' and POSIX uses '/' — mixing separators
+    // would produce paths like `C:\tmp/file` that differ from `C:\tmp\file`.
+    const withSlash = testDir.endsWith(path.sep) ? testDir : testDir + path.sep;
     const rustWithout = nativeMod.readTree(testDir).sort((a, b) => a.name.localeCompare(b.name));
     const rustWith = nativeMod.readTree(withSlash).sort((a, b) => a.name.localeCompare(b.name));
     const jsWithout = jsReadTree(testDir).sort((a, b) => a.name.localeCompare(b.name));
