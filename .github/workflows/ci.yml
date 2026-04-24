@@ -65,7 +65,7 @@ jobs:
         run: pnpm test
 
       - name: Test (Rust)
-        run: cargo test -p aide-core
+        run: cargo test -p smalti-core
 
       - name: Build
         run: pnpm run package
