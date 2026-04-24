@@ -3,11 +3,13 @@ title: "AIDE → Partide 리브랜딩 아이데이션"
 category: ideation
 tags: [branding, naming, rebrand, partide, trademark, namespace]
 created: 2026-04-16
-updated: 2026-04-16
-related: [[index]]
+updated: 2026-04-24
+related: [[rebrand-smalti]], [[rebrand-wnide]], [[index]]
 ---
 
 # AIDE → Partide 리브랜딩 아이데이션
+
+> ⚠️ **SUPERSEDED by [[rebrand-smalti]] (2026-04-24)** — Partide was the frontrunner naming candidate from the particle/IDE blend exploration. It was deprioritized after the team selected `smalti` (Byzantine glass mosaic tiles), which better matched the "Create n Play" assembly metaphor while avoiding Particle Industries trademark proximity. This document is preserved as the Partide decision record; use `rebrand-smalti.md` for the active plan.
 
 > 이 문서는 리브랜딩 아이데이션 기록이며, 실행 전 단계입니다.
 > 당장의 실행 지시가 아닌 맥락·결정사항·리스크 보존을 목적으로 합니다.

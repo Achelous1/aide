@@ -186,7 +186,7 @@ export function WorkspaceNav() {
 
         {/* Scrollable middle — workspace list + add button */}
         <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="flex flex-col gap-0.5 px-1">
+        <div role="list" className="flex flex-col gap-0.5 px-1">
           {workspaces.map((ws) => {
             const isActive = ws.id === activeWorkspaceId;
             const status = getWorkspaceStatus(ws.id);
@@ -198,11 +198,24 @@ export function WorkspaceNav() {
               <div key={ws.id}>
                 {/* Project row */}
                 <div
-                  className={`relative group flex items-center gap-1 px-1 py-1.5 rounded transition-colors ${
-                    isActive ? 'bg-aide-surface-elevated' : 'hover:bg-aide-surface-elevated'
+                  role="listitem"
+                  data-active={isActive ? 'true' : 'false'}
+                  aria-current={isActive ? 'true' : undefined}
+                  className={`group relative flex items-center gap-1 px-1 py-1.5 rounded transition-colors ${
+                    isActive
+                      ? 'bg-smalti-cyan/10'
+                      : 'hover:bg-aide-surface-elevated'
                   }`}
                   onContextMenu={(e) => handleContextMenu(e, ws.id)}
                 >
+                  {/* Left accent bar — only rendered when active */}
+                  {isActive && (
+                    <span
+                      data-testid="accent-bar"
+                      className="absolute inset-y-0 left-0 w-[3px] bg-smalti-cyan rounded-l"
+                    />
+                  )}
+
                   {/* Chevron toggle */}
                   <button
                     onClick={() => toggleProjectExpanded(ws.id)}
@@ -218,7 +231,8 @@ export function WorkspaceNav() {
                     className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
                   >
                     <span
-                      className="w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+                      data-testid="workspace-avatar"
+                      className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold text-white shrink-0${isActive ? ' ring-2 ring-smalti-gold ring-offset-0' : ''}`}
                       style={{ backgroundColor: ws.color }}
                     >
                       {ws.name[0]?.toUpperCase() ?? '?'}
@@ -410,14 +424,15 @@ export function WorkspaceNav() {
             key={ws.id}
             onClick={() => setActive(ws.id)}
             title={ws.name}
+            data-active={isActive ? 'true' : 'false'}
             className={`relative flex items-center justify-center w-7 h-7 rounded-[6px] text-[11px] font-bold font-mono transition-colors ${
               isActive
-                ? 'bg-aide-surface-elevated text-aide-text-primary'
+                ? 'bg-smalti-cyan/10 text-aide-text-primary'
                 : 'text-aide-text-secondary hover:bg-aide-surface-elevated hover:text-aide-text-primary'
             }`}
           >
             <span
-              className="w-7 h-7 rounded-[6px] flex items-center justify-center text-black text-[11px] font-bold"
+              className={`w-7 h-7 rounded-[6px] flex items-center justify-center text-black text-[11px] font-bold${isActive ? ' ring-2 ring-smalti-gold' : ''}`}
               style={{ backgroundColor: ws.color }}
             >
               {ws.name[0]?.toUpperCase() ?? '?'}

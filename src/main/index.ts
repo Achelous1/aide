@@ -112,7 +112,7 @@ app.on('ready', () => {
     const mcpHome = (process.env.HOME && process.env.HOME !== '/') ? process.env.HOME : userInfo().homedir;
     writeMcpConfig(mcpHome);
   } catch (err) {
-    console.error('[AIDE] MCP setup failed (non-fatal):', err);
+    console.error('[smalti] MCP setup failed (non-fatal):', err);
   }
 });
 

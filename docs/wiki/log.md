@@ -12,3 +12,4 @@
 2026-04-17 [ingest] Created [[plugin-scope-local-only]] — 글로벌 플러그인 스코프 완전 제거, .mcp.json 프로젝트 루트 쓰기 제거, 기존 파일 자동 마이그레이션 (PR #53)
 2026-04-17 [ingest] Created [[app-settings-persistence]] — 테마 + 윈도우 해상도 저장/복원, aide-app-settings electron-store 추가 (PR #54)
 2026-04-22 [ingest] Created [[rust-core-migration]] — promoted from ideation after PRs #90/#91/#92/#93/#94 merged (Phase 0 spike + Phase 1 readTree/fsops/watcher swap)
+2026-04-24 [update] Cross-ref cleanup: [[rebrand-partide]] and [[rebrand-wnide]] marked as historical (SUPERSEDED), [[rebrand-smalti]] elevated as current candidate. Bidirectional `related` frontmatter links restored. `rust-core-migration` crate naming discussion updated to reference smalti.

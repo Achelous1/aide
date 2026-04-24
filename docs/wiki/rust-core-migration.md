@@ -4,7 +4,7 @@ category: decision
 tags: [architecture, rust, napi-rs, migration, phase-1-complete]
 created: 2026-04-22
 updated: 2026-04-22
-related: [[rebrand-partide]], [[watcher-performance]], [[main-process-cpu-home-watcher-bugfix]]
+related: [[rebrand-smalti]], [[rebrand-partide]], [[watcher-performance]], [[main-process-cpu-home-watcher-bugfix]]
 ---
 
 # Rust Core Migration — Phase 0+1 Execution Record
@@ -98,4 +98,5 @@ crates/
 
 - [[main-process-cpu-home-watcher-bugfix]] — chokidar idle CPU 127% 근본 원인 (Rust 이전 동기)
 - [[watcher-performance]] — JS watcher 최적화 로드맵 (Rust 이전으로 자연 종료)
+- [[rebrand-smalti]] — 현 확정 후보 (crate 네이밍 smalti-core 지향)
 - [[rebrand-partide]] — 리브랜드 아이데이션 (crate 이름 aide-core 결정에 영향)
