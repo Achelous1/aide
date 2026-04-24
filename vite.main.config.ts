@@ -7,10 +7,15 @@ import { resolve, join } from 'path';
 //   Linux musl  → index.linux-x64-musl.node
 //   Windows     → index.win32-x64-msvc.node
 // Return candidates in priority order; copy the first one found in srcDir.
+//
+// MUST stay in sync with src/main/ipc/fs-handlers.ts:candidateNativeFilenames —
+// divergence in v0.1.0 caused the universal binary not to land in .vite/build/
+// → packaged app failed with "Rust native module directory not found".
 function candidateNativeFilenames(): string[] {
   const base = `index.${process.platform}-${process.arch}`;
   if (process.platform === 'darwin') {
-    return [`${base}.node`];
+    // Prefer universal (lipo-merged arm64+x64) when present, fall back to arch-specific.
+    return [`index.darwin-universal.node`, `${base}.node`];
   }
   if (process.platform === 'linux') {
     return [`${base}-gnu.node`, `${base}-musl.node`, `${base}.node`];

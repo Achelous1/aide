@@ -3,6 +3,17 @@
 All notable changes to AIDE are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning per [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] — 2026-04-23
+
+Hotfix for v0.1.0 packaging regression.
+
+### Fixed
+- **Packaged app failed to locate Rust native module on macOS** — Vite `closeBundle` plugin's `candidateNativeFilenames()` did not recognize the `index.darwin-universal.node` filename produced by `build.sh`'s `--universal` lipo flow. Result: the `.node` never landed in `.vite/build/native/`, so the asar contained no native module, and the packaged app threw `[aide] Rust native module directory not found. Run \`pnpm build:native\` first.` immediately on open (file tree empty, terminal tabs crashed with `Failed to open terminal (UNKNOWN)`).
+- Vite plugin candidate list now mirrors `src/main/ipc/fs-handlers.ts:candidateNativeFilenames` exactly — universal takes priority on darwin. Added a code comment tying the two functions together to prevent future drift.
+
+### Known limitations
+- v0.1.0 DMG on GitHub Releases is broken. Users who auto-updated to v0.1.0 must download v0.1.1 manually (the app cannot run to trigger its own updater).
+
 ## [0.1.0] — 2026-04-23
 
 Minor release marking the Rust core migration milestone. Electron shell stays JavaScript; main-process backend (file system, watcher, PTY) now runs on a napi-rs Rust core. 37 feat/fix commits since v0.0.12.
