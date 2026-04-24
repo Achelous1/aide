@@ -13,7 +13,7 @@ function safeCwd() {
   try { return require("os").userInfo().homedir; } catch { /* ignore */ }
   return "/tmp";
 }
-const PLUGINS_DIR = path.join(safeCwd(), ".aide", "plugins");
+const PLUGINS_DIR = path.join(safeCwd(), ".smalti", "plugins");
 // Back-compat: AIDE_* fallback until task_reb_f03 (v0.2.0)
 // TODO(task_reb_f03): drop AIDE_WORKSPACE fallback after v0.2.0.
 const WORKSPACE = process.env.SMALTI_WORKSPACE || process.env.AIDE_WORKSPACE || safeCwd();
@@ -287,19 +287,19 @@ Style rules:
 - Dark/light parity: test both themes mentally before finalizing. If a color looks good on dark but unreadable on light (or vice versa), you've used the wrong variable. Example: buttons use var(--accent) for bg + #000 for text — this works because --accent differs per theme but black text stays readable on emerald in both.
 
 CDN Libraries (OFFLINE-CAPABLE):
-Plugins can load external libraries via the aide-cdn:// protocol, which caches files locally for offline use.
-Usage: <script src="aide-cdn://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-URL format: aide-cdn://{cdn-hostname}/{path} — maps to https://{cdn-hostname}/{path}
+Plugins can load external libraries via the smalti-cdn:// protocol, which caches files locally for offline use.
+Usage: <script src="smalti-cdn://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+URL format: smalti-cdn://{cdn-hostname}/{path} — maps to https://{cdn-hostname}/{path}
 Supported hosts: cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, esm.sh, or any HTTPS CDN.
-First load requires network; subsequent loads work fully offline from ~/.aide/cdn-cache/.
+First load requires network; subsequent loads work fully offline from ~/.smalti/cdn-cache/.
 ALWAYS pin versions (e.g. chart.js@4.4.1, not chart.js@latest) — cache is keyed by exact URL path.
 Common examples:
-  Chart.js: aide-cdn://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js
-  D3: aide-cdn://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js
-  Three.js: aide-cdn://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js
-  Marked: aide-cdn://cdn.jsdelivr.net/npm/marked@15.0.0/marked.min.js
-  Tailwind CSS: aide-cdn://cdn.jsdelivr.net/npm/@tailwindcss/browser@4/cdn.min.js
-NEVER use raw https:// URLs — they are blocked by the plugin sandbox. ALWAYS use aide-cdn:// prefix.`;
+  Chart.js: smalti-cdn://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js
+  D3: smalti-cdn://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js
+  Three.js: smalti-cdn://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js
+  Marked: smalti-cdn://cdn.jsdelivr.net/npm/marked@15.0.0/marked.min.js
+  Tailwind CSS: smalti-cdn://cdn.jsdelivr.net/npm/@tailwindcss/browser@4/cdn.min.js
+NEVER use raw https:// URLs — they are blocked by the plugin sandbox. ALWAYS use smalti-cdn:// prefix.`;
 
 function getBuiltinTools() {
   const builtins = [

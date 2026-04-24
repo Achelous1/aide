@@ -5,9 +5,13 @@ import path from 'node:path';
 describe('forge.config.ts brand identifiers', () => {
   const content = fs.readFileSync(path.resolve(__dirname, '../../forge.config.ts'), 'utf-8');
 
-  describe('preserved fields (awaiting D8 userData migration)', () => {
-    it("packagerConfig.name stays 'AIDE'", () => {
-      expect(content).toMatch(/name:\s*['"]AIDE['"]/);
+  describe('D8: productName and packager fields flipped to smalti', () => {
+    it("packagerConfig.name is 'smalti'", () => {
+      expect(content).toMatch(/name:\s*['"]smalti['"]/);
+    });
+
+    it("packagerConfig.name no longer uses 'AIDE'", () => {
+      expect(content).not.toMatch(/name:\s*['"]AIDE['"]/);
     });
   });
 

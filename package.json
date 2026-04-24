@@ -1,6 +1,6 @@
 {
   "name": "aide",
-  "productName": "AIDE",
+  "productName": "smalti",
   "version": "0.1.1",
   "description": "AI-Driven IDE - Create n Play plugins with natural language",
   "main": ".vite/build/index.js",

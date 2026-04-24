@@ -75,8 +75,8 @@ related: [[rebrand-partide]], [[watcher-performance]], [[main-process-cpu-home-w
 
 ```
 crates/
-├── aide-core/    # 핵심 Rust 로직 (fs, watcher 등)
-└── aide-napi/    # napi-rs 바인딩 (.node 빌드 대상)
+├── smalti-core/    # 핵심 Rust 로직 (fs, watcher 등)
+└── smalti-napi/    # napi-rs 바인딩 (.node 빌드 대상)
 ```
 
 빌드: `pnpm build:native` → `src/main/native/index.darwin-arm64.node`

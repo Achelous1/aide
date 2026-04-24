@@ -51,9 +51,9 @@ export function getMcpConfigPath(): string {
 }
 
 export function getMcpServerPath(): string {
-  // Use ~/.aide/ instead of userData — userData path contains "Application Support"
+  // Use ~/.smalti/ instead of userData — userData path contains "Application Support"
   // which has a space that Claude Code CLI mishandles when spawning the MCP process.
-  return path.join(getHome(), '.aide', 'aide-mcp-server.js');
+  return path.join(getHome(), '.smalti', 'smalti-mcp-server.js');
 }
 
 /**

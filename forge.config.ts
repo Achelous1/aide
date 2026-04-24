@@ -43,7 +43,7 @@ const config: ForgeConfig = {
     asar: {
       unpack: '**/native/*.node',
     },
-    name: 'AIDE',
+    name: 'smalti',
     icon: path.resolve(__dirname, 'resources', 'icon'),
     extendInfo: {
       NSDocumentsFolderUsageDescription: 'smalti reads workspace files from your Documents folder.',
@@ -62,7 +62,7 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({ name: 'AIDE' }),
+    new MakerSquirrel({ name: 'smalti' }),
     new MakerZIP({}, ['darwin']),
   ],
   plugins: [

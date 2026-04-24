@@ -9,7 +9,7 @@ created: 2026-04-14
 
 ## 증상 1 — 터미널 에이전트 EPERM uv_cwd
 
-AIDE에서 클로드코드(또는 다른 CLI 에이전트)를 실행할 때:
+smalti에서 클로드코드(또는 다른 CLI 에이전트)를 실행할 때:
 
 ```
 Error: EPERM: process.cwd failed with error operation not permitted, uv_cwd

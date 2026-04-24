@@ -1,4 +1,4 @@
-# AIDE UI Functional Specification
+# smalti UI Functional Specification
 
 디자인 시스템(design.pen)에 정의된 UI 컴포넌트의 기능 명세서.
 개발 시 각 컴포넌트의 동작, 상태, 인터랙션을 참조한다.
@@ -96,9 +96,9 @@
 | `Open in Terminal` | 해당 프로젝트로 전환 (Terminal Page) |
 | `Show in Finder / Explorer` | OS 파일 탐색기에서 경로 열기 |
 | Divider | — |
-| `Remove from Workspace` | AIDE 워크스페이스 목록에서 제거 (로컬 파일 유지). 확인 불필요. 현재 열려 있던 경우 Welcome Page로 이동. |
+| `Remove from Workspace` | smalti 워크스페이스 목록에서 제거 (로컬 파일 유지). 확인 불필요. 현재 열려 있던 경우 Welcome Page로 이동. |
 
-> **Note**: AIDE는 프로젝트 폴더를 직접 삭제하는 기능을 제공하지 않음. 파일 삭제는 OS 파일 탐색기에서 수행.
+> **Note**: smalti는 프로젝트 폴더를 직접 삭제하는 기능을 제공하지 않음. 파일 삭제는 OS 파일 탐색기에서 수행.
 
 ### 2.4 Hero Section
 
@@ -300,7 +300,7 @@ PRD F7 자동 업데이트 알림 컴포넌트. **WorkspaceNav 가장 하단 —
 1. `setDownloading(true)` → 버튼 비활성, 라벨 변경
 2. `await window.aide.updater.download()` 호출
 3. Main process가 GitHub asset (`browser_download_url`)에서 DMG fetch
-4. `~/Downloads/AIDE-<tag>.dmg` 저장
+4. `~/Downloads/smalti-<tag>.dmg` 저장
 5. `shell.showItemInFolder(path)` → Finder가 다운로드 폴더 자동 오픈
 6. 성공/실패에 따라 `idle` 또는 `error` 상태로 복귀
 
@@ -369,14 +369,14 @@ PRD F7 자동 업데이트 알림 컴포넌트. **WorkspaceNav 가장 하단 —
 
 | Code | Description |
 |------|-------------|
-| `EPERM` | `AIDE needs permission to read this folder. Open Settings to grant access.` |
+| `EPERM` | `smalti needs permission to read this folder. Open Settings to grant access.` |
 | `ENOENT` | `Folder no longer exists: {path basename}` |
 | `ENOTDIR` | `Path is not a directory: {path basename}` |
 | `UNKNOWN` | `Failed to read folder: {message}` |
 
 **자동 재시도**:
 - 에러 코드가 `EPERM`일 때, window `focus` 이벤트 수신 시 자동으로 `loadTree`를 재호출한다
-- 사용자가 System Settings에서 권한을 부여하고 AIDE로 돌아오면 즉시 트리가 복구된다
+- 사용자가 System Settings에서 권한을 부여하고 smalti로 돌아오면 즉시 트리가 복구된다
 
 **플랫폼 가드**:
 - Linux/Windows에서는 `Open Settings` 버튼 비표시, `Retry`만 노출

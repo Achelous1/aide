@@ -13,7 +13,7 @@ import { getActiveWorkspacePath } from './workspace-handlers';
 const registry = new PluginRegistry();
 
 function getLocalPluginsDir(cwd: string): string {
-  return path.join(cwd, '.aide', 'plugins');
+  return path.join(cwd, '.smalti', 'plugins');
 }
 
 function readPluginSpec(pluginDir: string): PluginSpec | null {
@@ -155,11 +155,11 @@ function refreshPlugins(cwd: string): void {
       }, 300));
     },
   );
-  // Re-watch .aide/ data files so MCP-triggered writes refresh the UI.
-  // depth=1 emits events for direct children of aideDir (depth 0 would only
+  // Re-watch .smalti/ data files so MCP-triggered writes refresh the UI.
+  // depth=1 emits events for direct children of smaltiDir (depth 0 would only
   // fire on the directory itself — wrong for file-write detection).
   dataWatcher?.stop();
-  const aideDir = path.join(cwd, '.aide');
+  const aideDir = path.join(cwd, '.smalti');
   dataWatcher = getNativeMod().startWatcher(
     aideDir,
     1,
@@ -175,7 +175,7 @@ function refreshPlugins(cwd: string): void {
 function makeEmitterFactory(getCwd: () => string) {
   return (emittingPluginId: string) => (event: string, data: Record<string, unknown>): void => {
     const cwd = getCwd();
-    const settingsPath = path.join(cwd, '.aide', 'settings.json');
+    const settingsPath = path.join(cwd, '.smalti', 'settings.json');
     let settings: { pluginBindings?: Record<string, Array<{ plugin: string; tool: string; args: Record<string, unknown> }>>; pluginPermissions?: Record<string, { emit: string[] }> };
     try {
       settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));

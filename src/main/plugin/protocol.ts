@@ -23,7 +23,7 @@ import { getActiveWorkspacePath } from '../ipc/workspace-handlers';
 function findPluginHtml(pluginId: string, fallbackCwd: string): string | null {
   const effectiveCwd = getActiveWorkspacePath() ?? fallbackCwd;
   const dirs = [
-    path.join(effectiveCwd, '.aide', 'plugins'),
+    path.join(effectiveCwd, '.smalti', 'plugins'),
   ];
 
   for (const dir of dirs) {
@@ -58,6 +58,24 @@ function findPluginHtml(pluginId: string, fallbackCwd: string): string | null {
  */
 export function registerCustomSchemes(): void {
   protocol.registerSchemesAsPrivileged([
+    // New smalti-* schemes (primary)
+    {
+      scheme: 'smalti',
+      privileges: { standard: true, secure: true, supportFetchAPI: true },
+    },
+    {
+      scheme: 'smalti-plugin',
+      privileges: { standard: true, secure: true, supportFetchAPI: true },
+    },
+    {
+      scheme: 'smalti-cdn',
+      privileges: { standard: true, secure: true, supportFetchAPI: true },
+    },
+    // Legacy aide-* schemes retained for backward compat (1-2 releases)
+    {
+      scheme: 'aide',
+      privileges: { standard: true, secure: true, supportFetchAPI: true },
+    },
     {
       scheme: 'aide-plugin',
       privileges: { standard: true, secure: true, supportFetchAPI: true },
@@ -103,7 +121,7 @@ function injectShim(html: string): string {
  * Must be called AFTER app.whenReady() — installs the request handler.
  */
 export function registerPluginProtocol(cwd: string): void {
-  protocol.handle('aide-plugin', (request) => {
+  const handler = (request: Request): Response => {
     const url = new URL(request.url);
     const pluginId = url.hostname;
 
@@ -117,5 +135,10 @@ export function registerPluginProtocol(cwd: string): void {
     return new Response(injectShim(html), {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });
-  });
+  };
+
+  // Primary: new smalti-plugin:// scheme
+  protocol.handle('smalti-plugin', handler);
+  // Legacy alias: aide-plugin:// retained for backward compat (1-2 releases)
+  protocol.handle('aide-plugin', handler);
 }
