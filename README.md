@@ -1,14 +1,26 @@
 [한국어](./README_kor.md) · **English**
 
+<p align="center">
+  <img src="docs/brand/smalti-icon-source-1024.png" width="180" alt="AIDE — rebranding to smalti" />
+</p>
+
 # AIDE — AI-Driven IDE
 
 > A terminal-centric IDE that integrates CLI code agents (Claude Code, Gemini CLI, Codex CLI) and lets you generate plugins from natural language via the **Create n Play** system.
+
+> 🎨 **Rebrand in progress**: AIDE is being renamed to **smalti** (Italian for *Byzantine glass mosaic tiles*). See [`docs/ideation/rebrand-smalti.md`](docs/ideation/rebrand-smalti.md). Package/binary name changes land with v0.1.0 pending trademark clearance.
 
 ---
 
 ## Overview
 
 AIDE is an Electron-based IDE built around a single core idea: **the IDE should adapt to you, not the other way around**. Instead of installing dozens of pre-built plugins from a marketplace, you describe what you want in natural language and an AI agent generates a working plugin instantly. The plugin runs in a sandboxed environment, registers itself as an AI tool, and is immediately usable both by you and by the AI assistant.
+
+<p align="center">
+  <img src="docs/assets/screenshot-hero-overview.png" alt="AIDE full workspace — multi-pane layout with terminals, code, and plugin UI" />
+  <br/>
+  <sub><em>A typical workspace: multi-agent terminals, code editor pane, and a plugin-rendered kanban board — all in one window.</em></sub>
+</p>
 
 AIDE does not call LLM APIs directly. It spawns CLI agents (`claude`, `gemini`, `codex`) as PTY processes via a Rust `portable-pty`-backed native module, so each agent manages its own authentication and you keep full control of your provider relationships.
 
@@ -44,6 +56,12 @@ AIDE collapses this stack:
 | **Agent status indicators** | Real-time visual feedback (idle / processing / awaiting input) for every agent session, surfaced in the workspace navbar. |
 | **Theme system** | Dark and light themes with smooth transitions, JetBrains Mono typography, agent-specific accent colors. |
 | **Rust core** | File system, watcher, and PTY operations run in a Rust `portable-pty` + `notify` native module (napi-rs). Idle CPU dropped from ~127% to ~0% on packaged builds; Korean / emoji terminal output no longer corrupts at read boundaries. |
+
+<p align="center">
+  <img src="docs/assets/screenshot-split-panes.png" alt="Split panes — terminal on the left, code editor on the right" />
+  <br/>
+  <sub><em>Split-screen layout: an agent session on the left, code editing on the right. Drag tabs between panes to rearrange on the fly.</em></sub>
+</p>
 
 ---
 
@@ -89,6 +107,12 @@ AIDE:   Plugin appears in the Plugins panel. Toggle ON to activate.
 ### Plugin scopes
 
 Plugins are **workspace-local**. Each plugin lives under `<workspace>/.aide/plugins/<plugin-id>/` and is visible only in that workspace. Runtime-added plugins (via MCP, file manager, or direct copy) are auto-discovered without restart.
+
+<p align="center">
+  <img src="docs/assets/screenshot-plugin-kanban.png" alt="Plugin UI — agent-todo-board kanban rendered as a pane" />
+  <br/>
+  <sub><em>A plugin generated from natural language (<code>agent-todo-board</code>) rendering its UI as a full pane, alongside the agent session that created it.</em></sub>
+</p>
 
 ---
 
@@ -192,6 +216,12 @@ AIDE follows Electron's three-process model with strict security boundaries.
 - Plugin iframes are served by a custom `aide-plugin://` protocol so they get their own opaque origin
 - CDN assets are proxied through `aide-cdn://` with a hostname allowlist and on-disk cache
 - Plugin VM sandboxes have an explicit `require()` shim that only allows `path` and a permission-gated `fs`
+
+<p align="center">
+  <img src="docs/assets/screenshot-file-explorer.png" alt="File explorer + markdown preview side by side" />
+  <br/>
+  <sub><em>File explorer, terminal, and Markdown rendering in adjacent panes — navigate and edit project docs without leaving the IDE.</em></sub>
+</p>
 
 ---
 
