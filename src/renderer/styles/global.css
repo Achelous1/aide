@@ -30,6 +30,17 @@
   --tab-inactive-bg: #1A1C23;
   --scrollbar-thumb: rgba(255, 255, 255, 0.08);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
+  /* smalti semantic tokens — dark (default) — RGB triplets for Tailwind opacity modifier support */
+  --smalti-canvas: 10 11 16;
+  --smalti-surface: 17 19 27;
+  --smalti-raised: 27 30 42;
+  --smalti-divider: 42 46 61;
+  --smalti-ink-body: 230 231 237;
+  --smalti-ink-muted: 155 160 176;
+  --smalti-cyan: 79 179 191;
+  --smalti-gold: 201 162 75;
+  --smalti-crimson: 241 12 69;
+  --smalti-sky-blue: 111 197 219;
 }
 
 .light {
@@ -53,6 +64,17 @@
   --tab-inactive-bg: #E8E8E3;
   --scrollbar-thumb: rgba(0, 0, 0, 0.12);
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.22);
+  /* smalti semantic tokens — light — RGB triplets for Tailwind opacity modifier support */
+  --smalti-canvas: 245 245 240;
+  --smalti-surface: 234 234 228;
+  --smalti-raised: 222 222 214;
+  --smalti-divider: 200 200 190;
+  --smalti-ink-body: 17 19 27;
+  --smalti-ink-muted: 90 95 110;
+  --smalti-cyan: 43 138 148;
+  --smalti-gold: 168 128 42;
+  --smalti-crimson: 200 8 58;
+  --smalti-sky-blue: 74 159 184;
 }
 
 html, body, #root {
