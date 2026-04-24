@@ -1,8 +1,16 @@
 {
-  "name": "aide",
-  "productName": "smalti",
+  "name": "smalti",
+  "productName": "SMALTI",
   "version": "0.1.1",
-  "description": "AI-Driven IDE - Create n Play plugins with natural language",
+  "description": "smalti — a terminal-centric AI-driven IDE with natural-language plugin generation",
+  "homepage": "https://github.com/Achelous1/smalti",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Achelous1/smalti.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Achelous1/smalti/issues"
+  },
   "main": ".vite/build/index.js",
   "private": true,
   "scripts": {

@@ -8,7 +8,7 @@
 
 > A terminal-centric IDE that integrates CLI code agents (Claude Code, Gemini CLI, Codex CLI) and lets you generate plugins from natural language via the **Create n Play** system.
 
-> 🎨 **Rebrand in progress**: AIDE is being renamed to **smalti** (Italian for *Byzantine glass mosaic tiles*). See [`docs/ideation/rebrand-smalti.md`](docs/ideation/rebrand-smalti.md). Package/binary name changes land with v0.1.0 pending trademark clearance.
+> 🎨 **Rebrand in progress**: Product name transitioning from AIDE to **smalti** (Italian for *Byzantine glass mosaic tiles*) — code identifiers (protocols, env vars, package name) still use the legacy `aide` prefix and will migrate with v0.1.0 pending trademark clearance. See [`docs/ideation/rebrand-smalti.md`](docs/ideation/rebrand-smalti.md).
 
 ---
 
@@ -145,8 +145,8 @@ Each CLI manages its own authentication (`claude login`, `gemini auth`, etc.).
 ### Run from source
 
 ```bash
-git clone https://github.com/Achelous1/aide.git
-cd aide
+git clone https://github.com/Achelous1/smalti.git
+cd smalti
 pnpm install   # also runs a postinstall hook that builds the Rust native module
                # via scripts/build-native.mjs; first install compiles aide-core +
                # aide-napi (~30s); subsequent installs use cargo cache
@@ -295,4 +295,4 @@ See [LICENSE](./LICENSE).
 
 ## Contributing
 
-Issues and PRs welcome at [github.com/Achelous1/aide](https://github.com/Achelous1/aide).
+Issues and PRs welcome at [github.com/Achelous1/smalti](https://github.com/Achelous1/smalti).

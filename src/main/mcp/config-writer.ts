@@ -141,19 +141,19 @@ export function writeMcpConfig(workspacePath: string): string {
   try {
     unregisterAideFromJsonConfig(path.join(home, '.claude.json'));
   } catch (err) {
-    console.warn('[AIDE] Failed to clean legacy Claude MCP entry:', (err as Error).message);
+    console.warn('[smalti] Failed to clean legacy Claude MCP entry:', (err as Error).message);
   }
   try {
     unregisterAideFromJsonConfig(path.join(home, '.mcp.json'));
   } catch (err) {
-    console.warn('[AIDE] Failed to clean legacy ~/.mcp.json entry:', (err as Error).message);
+    console.warn('[smalti] Failed to clean legacy ~/.mcp.json entry:', (err as Error).message);
   }
 
   // Register in ~/.gemini/settings.json (Gemini has no --mcp-config flag)
   try {
     registerJsonMcpConfig(path.join(home, '.gemini', 'settings.json'), nodePath, serverPath);
   } catch (err) {
-    console.warn('[AIDE] Failed to register Gemini MCP config:', (err as Error).message);
+    console.warn('[smalti] Failed to register Gemini MCP config:', (err as Error).message);
   }
 
   // Register in ~/.codex/config.toml (Codex has no --mcp-config flag)
@@ -166,7 +166,7 @@ export function writeMcpConfig(workspacePath: string): string {
     const block = `[mcp_servers.aide]\ncommand = ${JSON.stringify(nodePath)}\nargs = [${JSON.stringify(serverPath)}]\n`;
     fs.writeFileSync(codexConfigPath, prefix.length > 0 ? `${prefix}\n\n${block}` : block);
   } catch (err) {
-    console.warn('[AIDE] Failed to register Codex MCP config:', (err as Error).message);
+    console.warn('[smalti] Failed to register Codex MCP config:', (err as Error).message);
   }
 
   const config = {

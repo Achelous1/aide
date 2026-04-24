@@ -3,11 +3,13 @@ title: "AIDE → wnide 리브랜딩 아이데이션"
 category: ideation
 tags: [branding, naming, rebrand, wnide, trademark, namespace, provocative-branding]
 created: 2026-04-18
-updated: 2026-04-18
-related: [[rebrand-partide]], [[index]]
+updated: 2026-04-24
+related: [[rebrand-smalti]], [[rebrand-partide]], [[index]]
 ---
 
 # AIDE → wnide 리브랜딩 아이데이션
+
+> ⚠️ **SUPERSEDED by [[rebrand-smalti]] (2026-04-24)** — `wnide` was a provocative-branding alternative ("Why Need IDE?") held for its slogan value. It was deprioritized for the reasons documented in §6 (pronunciation risk, "whine" homophone, initialism fatigue). The active rebrand plan is in `rebrand-smalti.md`. Retain this document only as historical context for the category-question framing.
 
 > 이 문서는 리브랜딩 아이데이션 기록이며, 실행 전 단계입니다.
 > `rebrand-partide.md` 와 동일한 포맷으로 작성되어, 두 후보를 1:1 비교할 수 있게 맞췄습니다.

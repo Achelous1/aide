@@ -9,6 +9,8 @@ related: [[rebrand-partide]], [[rebrand-wnide]], [[index]]
 
 # AIDE → smalti 리브랜딩 아이데이션
 
+> 🔖 **Current rebrand candidate.** Supersedes [[rebrand-partide]] and [[rebrand-wnide]]. Status: conditional GO pending trademark Class 3 clearance (task_reb_a01).
+
 > 이 문서는 리브랜딩 아이데이션 기록이며, 실행 전 단계입니다.
 > `rebrand-partide.md`·`rebrand-wnide.md` 와 동일한 포맷으로 작성되어, 세 후보를 1:1:1 비교할 수 있게 맞췄습니다.
 
@@ -204,7 +206,7 @@ Partide·wnide 체크리스트와 동일 구조. smalti 채택 시 변경되는 
 - [ ] IPC 프로토콜: `aide://` → `smalti://`, `aide-plugin://` → `smalti-plugin://`, `aide-cdn://` → `smalti-cdn://`
 - [ ] 환경변수: `AIDE_*` → `SMALTI_*`
 - [ ] 앱 메뉴 문자열
-- [ ] 에러·로그 프리픽스 `[AIDE]` → `[smalti]`
+- [x] 에러·로그 프리픽스 `[AIDE]` → `[smalti]`
 
 ### Phase E: 문서 교체
 

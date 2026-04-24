@@ -712,12 +712,12 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
             sessionId = agentResult.sessionId;
           } else {
             // agent not installed or spawn failed — fall back to plain shell
-            console.warn('[AIDE] Session restore: agent spawn failed, falling back to shell', agentResult.error);
+            console.warn('[smalti] Session restore: agent spawn failed, falling back to shell', agentResult.error);
             const shellResult = await window.aide.terminal.spawn({ cwd: wsPath });
             if (shellResult.ok) {
               sessionId = shellResult.sessionId;
             } else {
-              console.warn('[AIDE] Session restore: shell spawn also failed, skipping tab', shellResult.error);
+              console.warn('[smalti] Session restore: shell spawn also failed, skipping tab', shellResult.error);
               restoreFailCount++;
             }
           }
@@ -752,7 +752,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
           useTerminalStore.getState().addTab(tab);
           activeTabId = tab.id;
         } else {
-          console.warn('[AIDE] Session restore: fallback shell spawn failed', fallbackResult.error);
+          console.warn('[smalti] Session restore: fallback shell spawn failed', fallbackResult.error);
           restoreFailCount++;
         }
       }
