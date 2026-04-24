@@ -10,7 +10,7 @@
 
 AIDE is an Electron-based IDE built around a single core idea: **the IDE should adapt to you, not the other way around**. Instead of installing dozens of pre-built plugins from a marketplace, you describe what you want in natural language and an AI agent generates a working plugin instantly. The plugin runs in a sandboxed environment, registers itself as an AI tool, and is immediately usable both by you and by the AI assistant.
 
-AIDE does not call LLM APIs directly. It spawns CLI agents (`claude`, `gemini`, `codex`) as PTY processes via `node-pty`, so each agent manages its own authentication and you keep full control of your provider relationships.
+AIDE does not call LLM APIs directly. It spawns CLI agents (`claude`, `gemini`, `codex`) as PTY processes via a Rust `portable-pty`-backed native module, so each agent manages its own authentication and you keep full control of your provider relationships.
 
 ---
 
@@ -25,7 +25,7 @@ Existing IDEs (IntelliJ, VSCode) have huge plugin ecosystems, but:
 
 AIDE collapses this stack:
 
-- **One workspace** holds your terminal, AI agents, file tree, Git, and plugin UIs
+- **One workspace** holds your terminal, AI agents, file tree, and plugin UIs
 - **Natural-language plugins** mean the marginal cost of "I wish my IDE could do X" drops to a single sentence
 - **CLI-first** means you bring your own agent and your own auth — no vendor lock-in
 
@@ -43,6 +43,7 @@ AIDE collapses this stack:
 | **Offline CDN** | Plugins load external libraries via the `aide-cdn://` protocol, which caches CDN assets locally so plugins keep working offline. |
 | **Agent status indicators** | Real-time visual feedback (idle / processing / awaiting input) for every agent session, surfaced in the workspace navbar. |
 | **Theme system** | Dark and light themes with smooth transitions, JetBrains Mono typography, agent-specific accent colors. |
+| **Rust core** | File system, watcher, and PTY operations run in a Rust `portable-pty` + `notify` native module (napi-rs). Idle CPU dropped from ~127% to ~0% on packaged builds; Korean / emoji terminal output no longer corrupts at read boundaries. |
 
 ---
 
@@ -87,12 +88,7 @@ AIDE:   Plugin appears in the Plugins panel. Toggle ON to activate.
 
 ### Plugin scopes
 
-| Scope | Location | Use case |
-|---|---|---|
-| **Local** | `<workspace>/.aide/plugins/` | Project-specific tools (linters, formatters, code generators tailored to one repo) |
-| **Global** | `~/.aide/plugins/` | Reusable tools available across all workspaces |
-
-Plugins added at runtime (via MCP, manual file copy, or any file manager) are auto-discovered without restarting the app.
+Plugins are **workspace-local**. Each plugin lives under `<workspace>/.aide/plugins/<plugin-id>/` and is visible only in that workspace. Runtime-added plugins (via MCP, file manager, or direct copy) are auto-discovered without restart.
 
 ---
 
@@ -100,9 +96,10 @@ Plugins added at runtime (via MCP, manual file copy, or any file manager) are au
 
 ### Requirements
 
-- **macOS** (Apple Silicon or Intel) — Windows and Linux builds are planned
+- **macOS** (Apple Silicon or Intel) — Windows / Linux: source install works (CI validates all 3 OSes); packaged DMG releases are currently macOS-only.
 - **Node.js** ≥ 18
 - **pnpm** (the project uses `node-linker=hoisted`, so npm/yarn will not work as-is)
+- **Rust** (rustup with stable ≥ 1.82) — required for the Rust core. `pnpm install` auto-builds it. If rustup isn't present: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`. If Homebrew rustc is also installed, the build script prepends `~/.cargo/bin` to PATH so rustup takes priority — no manual action needed.
 
 ### Optional CLI agents
 
@@ -126,8 +123,10 @@ Each CLI manages its own authentication (`claude login`, `gemini auth`, etc.).
 ```bash
 git clone https://github.com/Achelous1/aide.git
 cd aide
-pnpm install
-pnpm start    # dev server with HMR
+pnpm install   # also runs a postinstall hook that builds the Rust native module
+               # via scripts/build-native.mjs; first install compiles aide-core +
+               # aide-napi (~30s); subsequent installs use cargo cache
+pnpm start     # dev server with HMR
 ```
 
 ### Build a distributable
@@ -136,7 +135,7 @@ pnpm start    # dev server with HMR
 sh build.sh   # macOS — produces out/AIDE.dmg
 ```
 
-The build script handles dependency install, lint, package, and DMG creation with a drag-and-drop installer layout.
+The build script handles dependency install, lint, package, and DMG creation with a drag-and-drop installer layout. It also runs `pnpm run build:native:universal` to produce a lipo-merged arm64 + x64 universal binary, so the DMG runs on both Apple Silicon and Intel Macs.
 
 ### macOS Gatekeeper (unsigned build)
 
@@ -175,13 +174,15 @@ AIDE follows Electron's three-process model with strict security boundaries.
 │                       Main Process (Node.js)             │
 │  ┌─────────────┐ ┌────────────┐ ┌──────────────────────┐ │
 │  │ Terminal    │ │ Plugin     │ │ MCP Server           │ │
-│  │ (node-pty)  │ │ Registry   │ │ (NDJSON over stdio)  │ │
+│  │ (Rust PTY)  │ │ Registry   │ │ (NDJSON over stdio)  │ │
 │  └─────────────┘ └────────────┘ └──────────────────────┘ │
 │  ┌─────────────┐ ┌────────────┐ ┌──────────────────────┐ │
-│  │ FS / Git    │ │ VM Sandbox │ │ Custom Protocols     │ │
-│  │ Watchers    │ │            │ │ (aide-plugin/cdn)    │ │
+│  │ FS Watcher  │ │ VM Sandbox │ │ Custom Protocols     │ │
+│  │(Rust notify)│ │            │ │ (aide-plugin/cdn)    │ │
 │  └─────────────┘ └────────────┘ └──────────────────────┘ │
 └──────────────────────────────────────────────────────────┘
+  Backend ops (FS, watcher, PTY) route through
+  crates/aide-core + crates/aide-napi → .node loaded by Main process.
 ```
 
 ### Security boundaries
@@ -201,7 +202,8 @@ AIDE follows Electron's three-process model with strict security boundaries.
 | **Shell** | Electron + electron-forge (Vite plugin) |
 | **UI** | React 19, TypeScript 5, Tailwind CSS 3 |
 | **State** | Zustand 5 |
-| **Terminal** | xterm.js + node-pty |
+| **Terminal** | xterm.js + Rust portable-pty (napi-rs) |
+| **Rust core** | napi-rs (crates/aide-core, crates/aide-napi) — FS, watcher, PTY |
 | **Persistence** | electron-store (per-workspace sessions) |
 | **Plugin sandbox** | Node.js `vm` module with scoped `require` |
 | **Custom protocols** | `aide-plugin://`, `aide-cdn://` |
@@ -217,7 +219,7 @@ AIDE ships with an embedded **Model Context Protocol** server that exposes plugi
 
 ### What the MCP server does
 
-When AIDE starts, it writes a self-contained MCP server script to `~/.aide/aide-mcp-server.js` and registers it in each agent's global config:
+When AIDE starts, it writes a self-contained MCP server script to `~/.aide/aide-mcp-server.js` and registers it in each agent's global config. The MCP server remains Node.js-hosted because it executes plugin JavaScript via `node:vm`.
 
 | Agent | Config file | Format |
 |---|---|---|
