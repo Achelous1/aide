@@ -143,7 +143,7 @@ The build script handles dependency install, lint, package, and DMG creation wit
 The distributed DMG is not code-signed, so macOS quarantines it on first launch ("AIDE is damaged and can't be opened"). After dragging AIDE into `/Applications`, strip the quarantine attribute:
 
 ```bash
-xattr -cr /Applications/AIDE.app
+xattr -c /Applications/AIDE.app
 ```
 
 Then launch AIDE normally.
