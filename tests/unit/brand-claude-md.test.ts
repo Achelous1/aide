@@ -19,10 +19,12 @@ function countStandaloneAide(content: string): number {
 }
 
 describe('CLAUDE.md brand prose migration (E2)', () => {
+  // `.claude/CLAUDE.md` is a local-only brand-identity harness file
+  // (present in the developer's working tree but intentionally untracked —
+  // only the committed CLAUDE.md files participate in CI).
   it.each([
     'CLAUDE.md',
     'docs/CLAUDE.md',
-    '.claude/CLAUDE.md',
   ])('%s prose no longer uses AIDE as brand name', (file) => {
     const content = fs.readFileSync(path.resolve(ROOT, file), 'utf-8');
     const count = countStandaloneAide(content);
