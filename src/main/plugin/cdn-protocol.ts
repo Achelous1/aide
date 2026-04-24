@@ -49,10 +49,10 @@ function inferMimeType(pathname: string): string {
 }
 
 function getCacheDir(): string {
-  return path.join(getHome(), '.aide', 'cdn-cache');
+  return path.join(getHome(), '.smalti', 'cdn-cache');
 }
 
-/** Map aide-cdn://host/path?query to ~/.aide/cdn-cache/host/path[_queryhash] */
+/** Map aide-cdn://host/path?query to ~/.smalti/cdn-cache/host/path[_queryhash] */
 function urlToCachePath(url: URL): string {
   const segments = (url.hostname + url.pathname)
     .split('/')
@@ -97,7 +97,7 @@ async function downloadAndCache(realUrl: string, cachePath: string, fallbackMime
 }
 
 export function registerCdnProtocol(): void {
-  protocol.handle('aide-cdn', async (request) => {
+  const handler = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
 
     // Security: domain allowlist
@@ -140,5 +140,10 @@ export function registerCdnProtocol(): void {
         headers: { 'Content-Type': 'text/plain' },
       });
     }
-  });
+  };
+
+  // Primary: new smalti-cdn:// scheme
+  protocol.handle('smalti-cdn', handler);
+  // Legacy alias: aide-cdn:// retained for backward compat (1-2 releases)
+  protocol.handle('aide-cdn', handler);
 }

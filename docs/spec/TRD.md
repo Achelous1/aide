@@ -1,8 +1,8 @@
-# AIDE - Technical Requirements Document (MVP)
+# smalti - Technical Requirements Document (MVP)
 
 ## Overview
 
-AIDE는 CLI 기반 AI 코드 에이전트(Claude Code, Gemini CLI, Codex CLI)를 통합하는 Electron 앱이다. 직접 LLM API를 호출하지 않고, 각 에이전트의 네이티브 프로토콜(MCP, function calling 등)을 활용한다.
+smalti는 CLI 기반 AI 코드 에이전트(Claude Code, Gemini CLI, Codex CLI)를 통합하는 Electron 앱이다. 직접 LLM API를 호출하지 않고, 각 에이전트의 네이티브 프로토콜(MCP, function calling 등)을 활용한다.
 
 ---
 
@@ -14,7 +14,7 @@ AIDE는 CLI 기반 AI 코드 에이전트(Claude Code, Gemini CLI, Codex CLI)를
 | Frontend | React 19 + TypeScript | 컴포넌트 기반, 타입 안전성, Electron과 검증된 조합 |
 | Bundler | Vite (via @electron-forge/plugin-vite) | 빠른 HMR, 모던 빌드 |
 | Terminal | xterm.js + portable-pty (Rust) | 멀티플랫폼 터미널 에뮬레이션 (macOS, Windows) |
-| Rust Core | napi-rs (.node native module) | fs ops, PTY, file watcher — `crates/aide-core` + `crates/aide-napi` |
+| Rust Core | napi-rs (.node native module) | fs ops, PTY, file watcher — `crates/smalti-core` + `crates/smalti-napi` |
 | State | Zustand | 경량, 보일러플레이트 최소 |
 | Styling | Tailwind CSS | 유틸리티 기반, 빠른 UI 구성 |
 | Data Storage | JSON (electron-store) | 워크스페이스 목록(`aide-workspaces`), 세션 레이아웃(`aide-sessions`), 앱 전역 설정(`aide-app-settings`: 테마·윈도우 bounds), 플러그인 스펙 저장 |
@@ -111,13 +111,13 @@ interface AgentProcess {
 
 #### 2.1 Plugin Generation Pipeline
 
-에이전트에게 플러그인 생성을 위임하는 구조. AIDE가 직접 코드를 생성하지 않고, 에이전트의 코드 생성 능력을 활용한다.
+에이전트에게 플러그인 생성을 위임하는 구조. smalti가 직접 코드를 생성하지 않고, 에이전트의 코드 생성 능력을 활용한다.
 
 ```
 사용자: "미사용 import 정리 플러그인 만들어줘"
     │
     ▼
-AIDE: 플러그인 생성 프롬프트 조립
+smalti: 플러그인 생성 프롬프트 조립
     │  - 플러그인 스펙 스키마 제공
     │  - 샌드박스 API 명세 제공
     │  - tool/skill 등록 포맷 제공
@@ -129,7 +129,7 @@ AIDE: 플러그인 생성 프롬프트 조립
     │  - tool/skill manifest
     │
     ▼
-AIDE: 검증 → 샌드박스 로드 → 레지스트리 등록
+smalti: 검증 → 샌드박스 로드 → 레지스트리 등록
 ```
 
 #### 2.2 Plugin Spec Schema
@@ -203,11 +203,11 @@ interface ToolRegistry {
 }
 ```
 
-에이전트가 tool을 호출하면 AIDE가 중간에서 해당 플러그인의 샌드박스 함수를 실행하고 결과를 반환한다.
+에이전트가 tool을 호출하면 smalti가 중간에서 해당 플러그인의 샌드박스 함수를 실행하고 결과를 반환한다.
 
 #### 2.5 Plugin Workspace Isolation
 
-플러그인은 **워크스페이스 단위로만** 관리된다. 글로벌 플러그인 개념은 없으며, 모든 플러그인은 `{workspace}/.aide/plugins/`에 저장된다. AIDE는 프로젝트 루트에 어떠한 파일도 생성하지 않는다 (예: `.mcp.json` 미생성 — MCP 서버는 spawn 시점의 cwd에서 플러그인 경로를 유도).
+플러그인은 **워크스페이스 단위로만** 관리된다. 글로벌 플러그인 개념은 없으며, 모든 플러그인은 `{workspace}/.aide/plugins/`에 저장된다. smalti는 프로젝트 루트에 어떠한 파일도 생성하지 않는다 (예: `.mcp.json` 미생성 — MCP 서버는 spawn 시점의 cwd에서 플러그인 경로를 유도).
 
 **워크스페이스 전환 시 플러그인 갱신 흐름**:
 
@@ -236,7 +236,7 @@ Main: refreshPlugins(ws-b)
 - `window.aide.workspace.open()` IPC가 완료된 후에 `loadPlugins()`를 호출해야 한다 — 순서가 바뀌면 메인 프로세스가 구 경로를 기준으로 플러그인을 반환한다.
 - `PluginRegistry.clearPlugins()`는 레지스트리의 모든 플러그인을 제거하고 활성 sandbox를 stop한다.
 - 동일 워크스페이스로 재전환 시 (`lastLocalDir` 동일) 불필요한 스캔을 생략한다.
-- 기존 워크스페이스에 `.mcp.json`이 남아있으면 `WORKSPACE_OPEN` 시점에 `migrateProjectMcpJson`이 AIDE 엔트리만 제거한다 (사용자 정의 서버는 보존).
+- 기존 워크스페이스에 `.mcp.json`이 남아있으면 `WORKSPACE_OPEN` 시점에 `migrateProjectMcpJson`이 smalti 엔트리만 제거한다 (사용자 정의 서버는 보존).
 
 #### 2.6 Plugin ↔ Plugin 이벤트 브릿지
 
@@ -423,7 +423,7 @@ function UpdateNotice() {
 **보안 고려**:
 - GitHub API 호출에 인증 없음 (rate limit 60/h, 폴링 60분이라 충분)
 - 다운로드 URL은 오직 `assets.browser_download_url`만 사용 (사용자 입력 신뢰 X)
-- 다운로드 후 `~/Downloads/AIDE-<tag>.dmg`로 저장 — 워크스페이스 외부
+- 다운로드 후 `~/Downloads/smalti-<tag>.dmg`로 저장 — 워크스페이스 외부
 
 ---
 
@@ -489,8 +489,8 @@ aide/
 ├── vite.renderer.config.ts      # Renderer 빌드 (React + path alias)
 │
 ├── crates/
-│   ├── aide-core/               # 핵심 Rust 로직 (fs, watcher, pty)
-│   └── aide-napi/               # napi-rs 바인딩 (.node 빌드 대상)
+│   ├── smalti-core/             # 핵심 Rust 로직 (fs, watcher, pty)
+│   └── smalti-napi/             # napi-rs 바인딩 (.node 빌드 대상)
 │
 ├── scripts/
 │   └── build-native.mjs         # postinstall: Rust .node 빌드 스크립트
@@ -583,7 +583,7 @@ aide/
 }
 ```
 
-**Rust crate dependencies** (in `crates/aide-napi/Cargo.toml`):
+**Rust crate dependencies** (in `crates/smalti-napi/Cargo.toml`):
 
 | Crate | Role |
 |-------|------|
@@ -690,7 +690,7 @@ type FsReadTreeError = {
 
 ### 권한 범위: Files and Folders (Full Disk Access 불필요)
 
-AIDE 워크스페이스 파일트리는 **Files and Folders** 섹션의 per-folder 권한(Documents / Desktop / Downloads / 외장 볼륨 등 개별 토글)으로 충분히 동작한다. Full Disk Access는 시스템 전역 권한(Library, Trash, 다른 사용자 홈 등 포함)으로, 백업/안티바이러스 계열 앱에 적합하며 VS Code·Cursor 등 표준 IDE도 요구하지 않는다. AIDE도 동일한 최소 권한 정책을 따른다.
+smalti 워크스페이스 파일트리는 **Files and Folders** 섹션의 per-folder 권한(Documents / Desktop / Downloads / 외장 볼륨 등 개별 토글)으로 충분히 동작한다. Full Disk Access는 시스템 전역 권한(Library, Trash, 다른 사용자 홈 등 포함)으로, 백업/안티바이러스 계열 앱에 적합하며 VS Code·Cursor 등 표준 IDE도 요구하지 않는다. smalti도 동일한 최소 권한 정책을 따른다.
 
 이 경우 Permission Banner의 `Open Settings` 버튼은 System Settings의 **Files and Folders 패널을 바로 연다.**
 
@@ -709,7 +709,7 @@ macOS 버전에 따라 Privacy & Security URL 스킴이 다르다. `OPEN_PRIVACY
 
 ### 배경
 
-AIDE 메인 프로세스가 idle 상태에서 CPU 100%+를 소모하는 이슈가 발견되었다. 원인은 구 구현의 `chokidar.watch(cwd, { depth: 3 })`가 workspace 전체를 감시하면서 `node_modules`, `.git`, `dist` 같은 대형 디렉토리의 파일 이벤트를 전부 수신하는 것이었다. v0.1.0에서 chokidar는 Rust `notify` crate 기반 `WatcherHandle`로 전면 교체되었다. 자세한 근거 및 벤치마크 결과는 [[rust-core-migration]] 참조 (idle CPU 0.0% avg, 기존 chokidar 기반 ~127% 대비).
+smalti 메인 프로세스가 idle 상태에서 CPU 100%+를 소모하는 이슈가 발견되었다. 원인은 구 구현의 `chokidar.watch(cwd, { depth: 3 })`가 workspace 전체를 감시하면서 `node_modules`, `.git`, `dist` 같은 대형 디렉토리의 파일 이벤트를 전부 수신하는 것이었다. v0.1.0에서 chokidar는 Rust `notify` crate 기반 `WatcherHandle`로 전면 교체되었다. 자세한 근거 및 벤치마크 결과는 [[rust-core-migration]] 참조 (idle CPU 0.0% avg, 기존 chokidar 기반 ~127% 대비).
 
 ### Exclusion 패턴 (현재)
 

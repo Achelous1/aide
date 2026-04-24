@@ -81,7 +81,7 @@ if (universalMode) {
     '--release',
     '--js', 'false',
     '--output-dir', outputDir,
-    '--manifest-path', 'crates/aide-napi/Cargo.toml',
+    '--manifest-path', 'crates/smalti-napi/Cargo.toml',
   ];
 
   // Build arm64
@@ -115,7 +115,7 @@ const napiCmd = [
   '--release',
   '--js false',
   '--output-dir src/main/native',
-  '--manifest-path crates/aide-napi/Cargo.toml',
+  '--manifest-path crates/smalti-napi/Cargo.toml',
 ].join(' ');
 
 console.log(`[build:native] ${napiCmd}`);

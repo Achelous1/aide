@@ -1,7 +1,7 @@
 [한국어](./README_kor.md) · **English**
 
 <p align="center">
-  <img src="docs/brand/smalti-icon-source-1024.png" width="180" alt="AIDE — rebranding to smalti" />
+  <img src="docs/brand/smalti-icon-source-1024.png" width="180" alt="smalti logo" />
 </p>
 
 # smalti — AI-Driven IDE
@@ -17,7 +17,7 @@
 smalti is an Electron-based IDE built around a single core idea: **the IDE should adapt to you, not the other way around**. Instead of installing dozens of pre-built plugins from a marketplace, you describe what you want in natural language and an AI agent generates a working plugin instantly. The plugin runs in a sandboxed environment, registers itself as an AI tool, and is immediately usable both by you and by the AI assistant.
 
 <p align="center">
-  <img src="docs/assets/screenshot-hero-overview.png" alt="AIDE full workspace — multi-pane layout with terminals, code, and plugin UI" />
+  <img src="docs/assets/screenshot-hero-overview.png" alt="smalti full workspace — multi-pane layout with terminals, code, and plugin UI" />
   <br/>
   <sub><em>A typical workspace: multi-agent terminals, code editor pane, and a plugin-rendered kanban board — all in one window.</em></sub>
 </p>

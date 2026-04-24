@@ -1,6 +1,6 @@
 {
   "name": "smalti",
-  "productName": "AIDE",
+  "productName": "smalti",
   "version": "0.1.1",
   "description": "smalti — a terminal-centric AI-driven IDE with natural-language plugin generation",
   "homepage": "https://github.com/Achelous1/smalti",

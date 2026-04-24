@@ -6,7 +6,7 @@ import { getActiveWorkspacePath } from './workspace-handlers';
 import type { WorkspaceSettings } from '../../types/ipc';
 
 function getSettingsPath(cwd: string): string {
-  return path.join(cwd, '.aide', 'settings.json');
+  return path.join(cwd, '.smalti', 'settings.json');
 }
 
 function readSettings(cwd: string): WorkspaceSettings {

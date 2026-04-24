@@ -1,4 +1,4 @@
-# AIDE Documentation Guide
+# smalti Documentation Guide
 
 > This file governs how Claude reads, writes, and maintains the `docs/` knowledge base.
 > It encodes the **LLM Wiki** pattern (Karpathy, 2025): knowledge compiled once into a persistent,
@@ -137,7 +137,7 @@ Run lint proactively after major refactors or when the wiki grows beyond 20 page
 `index.md` is the navigational catalog. Keep it organized by category, not by recency.
 
 ```markdown
-# AIDE Wiki Index
+# smalti Wiki Index
 
 ## Architecture
 - [[electron-3-process-model]] — Main/Preload/Renderer boundaries and security rules

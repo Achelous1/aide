@@ -6,8 +6,8 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'u
 
 describe('smalti brand identifiers in package.json', () => {
   it('uses smalti as name', () => expect(pkg.name).toBe('smalti'));
-  // Deferred to task_reb_d08 (userData migration); changing productName alone would orphan ~/Library/Application Support/AIDE/
-  it('keeps productName as AIDE pending userData migration', () => expect(pkg.productName).toBe('AIDE'));
+  // D8 shipped: productName flipped to 'smalti' alongside the copy-only ~/.aide → ~/.smalti migration (src/main/migrate-aide-data.ts)
+  it('uses smalti as productName (D8 userData migration shipped)', () => expect(pkg.productName).toBe('smalti'));
   it('has smalti github homepage', () => expect(pkg.homepage).toMatch(/github\.com\/Achelous1\/smalti/));
   it('has smalti repository url', () => expect(pkg.repository?.url).toMatch(/smalti\.git$/));
   it('has smalti bugs url', () => expect(pkg.bugs?.url).toMatch(/smalti\/issues/));

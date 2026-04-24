@@ -1,5 +1,5 @@
 [package]
-name = "aide-napi"
+name = "smalti-napi"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-aide-core = { path = "../aide-core" }
+smalti-core = { path = "../smalti-core" }
 # Pinned to exact versions matching Cargo.lock — same policy as napi-build below.
 # To update: bump version here, run `cargo update -p napi -p napi-derive`, verify tests pass.
 napi = { version = "=2.16.17", default-features = false, features = ["napi8"] }

@@ -100,7 +100,7 @@ export function PluginView({ pluginId, pluginName }: PluginViewProps) {
     <iframe
       key={iframeKey}
       ref={iframeRef}
-      src={`aide-plugin://${pluginId}/index.html`}
+      src={`smalti-plugin://${pluginId}/index.html`}
       sandbox="allow-scripts allow-same-origin"
       className="w-full h-full border-0"
       title={pluginName}

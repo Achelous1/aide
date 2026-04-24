@@ -21,7 +21,7 @@ export const COMMON_ENV: Record<string, string> = {
   TERM: 'xterm-256color',
   COLORTERM: 'truecolor',
   FORCE_COLOR: '1',
-  TERM_PROGRAM: 'AIDE',
+  TERM_PROGRAM: 'smalti',
 };
 
 /** Returns process.env entries whose keys start with the given prefix */

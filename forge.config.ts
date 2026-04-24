@@ -43,14 +43,14 @@ const config: ForgeConfig = {
     asar: {
       unpack: '**/native/*.node',
     },
-    name: 'AIDE',
+    name: 'smalti',
     icon: path.resolve(__dirname, 'resources', 'icon'),
     extendInfo: {
-      NSDocumentsFolderUsageDescription: 'AIDE reads workspace files from your Documents folder.',
-      NSDesktopFolderUsageDescription: 'AIDE reads workspace files from your Desktop folder.',
-      NSDownloadsFolderUsageDescription: 'AIDE reads workspace files from your Downloads folder.',
-      NSRemovableVolumesUsageDescription: 'AIDE reads workspace files from external volumes.',
-      NSNetworkVolumesUsageDescription: 'AIDE reads workspace files from network volumes.',
+      NSDocumentsFolderUsageDescription: 'smalti reads workspace files from your Documents folder.',
+      NSDesktopFolderUsageDescription: 'smalti reads workspace files from your Desktop folder.',
+      NSDownloadsFolderUsageDescription: 'smalti reads workspace files from your Downloads folder.',
+      NSRemovableVolumesUsageDescription: 'smalti reads workspace files from external volumes.',
+      NSNetworkVolumesUsageDescription: 'smalti reads workspace files from network volumes.',
     },
     afterCopy: [
       (buildPath, _electronVersion, _platform, _arch, callback) => {
@@ -62,7 +62,7 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({ name: 'AIDE' }),
+    new MakerSquirrel({ name: 'smalti' }),
     new MakerZIP({}, ['darwin']),
   ],
   plugins: [

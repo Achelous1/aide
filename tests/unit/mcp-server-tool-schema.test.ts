@@ -35,7 +35,7 @@ describe('MCP server getBuiltinTools — plugin tool schema', () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aide-mcp-schema-'));
-    const pluginDir = path.join(tmpDir, '.aide', 'plugins', 'sample-plugin');
+    const pluginDir = path.join(tmpDir, '.smalti', 'plugins', 'sample-plugin');
     fs.mkdirSync(path.join(pluginDir, 'src'), { recursive: true });
     const spec = {
       name: 'sample-plugin',

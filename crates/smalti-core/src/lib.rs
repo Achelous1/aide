@@ -34,12 +34,12 @@ pub fn read_tree(dir_path: &str) -> Vec<FileNode> {
         // characters that can't be opened again. Skipping is safer for Phase 1 scope.
         // A Buffer-returning API for non-UTF8 names is deferred to a future phase.
         let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
-            eprintln!("[aide-core] skipping non-UTF-8 filename in {dir_path}");
+            eprintln!("[smalti-core] skipping non-UTF-8 filename in {dir_path}");
             continue;
         };
         let full_path = Path::new(dir_path).join(&name);
         let Some(path_str) = full_path.to_str().map(str::to_owned) else {
-            eprintln!("[aide-core] skipping non-UTF-8 path in {dir_path}");
+            eprintln!("[smalti-core] skipping non-UTF-8 path in {dir_path}");
             continue;
         };
 

@@ -11,9 +11,9 @@ related: [[watcher-performance]]
 
 ## Context
 
-AIDE가 프로젝트 루트에 `.mcp.json`을 자동 생성하여 사용자 코드베이스를 오염시키는 문제가 있었다. 목표는 **AIDE 생성 파일은 `.aide/` 디렉토리 외에 코드베이스에 영향을 주지 않아야 한다**는 것.
+smalti가 프로젝트 루트에 `.mcp.json`을 자동 생성하여 사용자 코드베이스를 오염시키는 문제가 있었다. 목표는 **smalti 생성 파일은 `.aide/` 디렉토리 외에 코드베이스에 영향을 주지 않아야 한다**는 것.
 
-AUDIT 결과 `.mcp.json`이 workspace root에 AIDE가 생성하는 유일한 파일이었다. 제거 가능성을 검토한 결과:
+AUDIT 결과 `.mcp.json`이 workspace root에 smalti가 생성하는 유일한 파일이었다. 제거 가능성을 검토한 결과:
 - `AIDE_PLUGINS_DIR`과 `AIDE_WORKSPACE`는 `process.cwd()`에서 유도 가능
 - MCP 서버(server.js)의 `safeCwd()` 폴백이 이미 이를 처리
 
@@ -27,13 +27,13 @@ AUDIT 결과 `.mcp.json`이 workspace root에 AIDE가 생성하는 유일한 파
 
 1. **하나의 깔끔한 모델** — 글로벌/로컬 이중 경로는 복잡도만 증가시키고 실제 가치 없음
 2. **`.mcp.json` 제거 가능** — 글로벌 경로(`AIDE_GLOBAL_PLUGINS_DIR`) 전달이 불필요해지면서 `.mcp.json`도 제거 가능
-3. **사용자 코드베이스 불간섭** — 프로젝트 루트에 AIDE 생성물이 없음
+3. **사용자 코드베이스 불간섭** — 프로젝트 루트에 smalti 생성물이 없음
 4. **MCP 서버 자립** — server.js가 cwd에서 경로 유도, 환경 변수 의존성 제거
 
 ### 거부된 대안
 
 - **Soft deprecation with warning**: 롤백 경로를 남겨두는 대신, 하드 삭제 + 마이그레이션으로 깨끗하게 정리
-- **`.mcp.json` 유지하되 AIDE 서버만 별도 config**: 결국 사용자 루트에 파일이 남으므로 목표 위배
+- **`.mcp.json` 유지하되 smalti 서버만 별도 config**: 결국 사용자 루트에 파일이 남으므로 목표 위배
 
 ## 구현
 
@@ -65,7 +65,7 @@ export function migrateProjectMcpJson(workspacePath: string): void {
     if (Object.keys(config.mcpServers).length === 0) {
       const topKeys = Object.keys(config).filter((k) => k !== 'mcpServers');
       if (topKeys.length === 0) {
-        fs.unlinkSync(mcpPath); // AIDE-only → 파일 삭제
+        fs.unlinkSync(mcpPath); // smalti-only → 파일 삭제
       } else {
         delete config.mcpServers;
         fs.writeFileSync(mcpPath, JSON.stringify(config, null, 2));
@@ -94,7 +94,7 @@ export function migrateProjectMcpJson(workspacePath: string): void {
 ```
 workspace/
 ├── .aide/plugins/       ← 로컬 플러그인
-├── .mcp.json            ← AIDE 생성 (제거 대상)
+├── .mcp.json            ← smalti 생성 (제거 대상)
 └── ...
 
 ~/.aide/plugins/         ← 글로벌 플러그인 (제거 대상)

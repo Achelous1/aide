@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol } from 'electron';
 
 import { userInfo } from 'os';
 import path from 'path';
@@ -18,6 +18,7 @@ import { writeMcpConfig } from './mcp/config-writer';
 import { registerCustomSchemes, registerPluginProtocol } from './plugin/protocol';
 import { registerCdnProtocol } from './plugin/cdn-protocol';
 import { getHome } from './utils/home';
+import { migrateAideToSmalti } from './migrate-aide-data';
 
 fixPackagedEnv();
 
@@ -55,7 +56,7 @@ const createWindow = (): void => {
     y: windowBounds?.y,
     minWidth: 800,
     minHeight: 600,
-    title: 'AIDE',
+    title: 'smalti',
     titleBarStyle: 'hiddenInset',
     webPreferences: {
       contextIsolation: true,
@@ -93,6 +94,16 @@ const createWindow = (): void => {
 };
 
 app.on('ready', () => {
+  // Migrate ~/.aide → ~/.smalti (copy-only, non-fatal)
+  migrateAideToSmalti().then((result) => {
+    if (result.migrated) {
+      console.log('[smalti] Migrated ~/.aide → ~/.smalti');
+    } else if (result.skipped) {
+      console.log(`[smalti] Migration skipped: ${result.skipped}`);
+    }
+  }).catch((err) => {
+    console.error('[smalti] Migration failed (non-fatal):', err);
+  });
   registerIpcHandlers();
   registerAppSettingsHandlers(ipcMain);
   registerWorkspaceHandlers(ipcMain);
@@ -104,6 +115,17 @@ app.on('ready', () => {
   registerSessionHandlers(ipcMain);
   registerPluginProtocol(fallbackCwd);
   registerCdnProtocol();
+
+  // Register smalti:// and aide:// base scheme handlers (forward to 404 stub;
+  // real content is served by smalti-plugin:// and smalti-cdn://).
+  // Primary: smalti://
+  protocol.handle('smalti', () =>
+    new Response('Not Found', { status: 404, headers: { 'Content-Type': 'text/plain' } }),
+  );
+  // Legacy alias: aide:// retained for backward compat (1-2 releases)
+  protocol.handle('aide', () =>
+    new Response('Not Found', { status: 404, headers: { 'Content-Type': 'text/plain' } }),
+  );
   registerUpdaterHandlers(ipcMain);
   createWindow();
   startUpdatePolling();

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AIDE (AI-Driven IDE) - Electron-based terminal-centric IDE that integrates CLI code agents (Claude Code, Gemini CLI, Codex CLI) and generates plugins from natural language via "Create n Play" system.
+smalti — AI-Driven IDE. Electron-based terminal-centric IDE that integrates CLI code agents (Claude Code, Gemini CLI, Codex CLI) and generates plugins from natural language via "Create n Play" system.
 
 ## Development Commands
 
@@ -34,7 +34,7 @@ pnpm run build:native:universal  # macOS only: lipo-merged arm64+x64 .node for D
 
 ### Key Design Decisions
 
-- **No direct LLM API calls** — AIDE spawns CLI agents (claude, gemini, codex) as pty processes via node-pty. Agents handle their own auth (OAuth).
+- **No direct LLM API calls** — smalti spawns CLI agents (claude, gemini, codex) as pty processes via node-pty. Agents handle their own auth (OAuth).
 - **IPC channels** defined in `src/main/ipc/channels.ts` — single source of truth for channel names shared between main and preload.
 - **Plugin sandbox** — plugins run in isolated vm/worker context with scoped filesystem access per `plugin.spec.json` permissions.
 - **Tool/Skill Registry** — generated plugins auto-register as AI tools that agents can invoke via their native protocols (MCP, function calling).
@@ -58,7 +58,7 @@ docs/                 # Project documentation (specs, raw sources, wiki)
 
 ### Spec Documents
 
-Human-authored specification documents that define what AIDE is and how it should work. These are the authoritative design references — read them before making architectural or feature decisions.
+Human-authored specification documents that define what smalti is and how it should work. These are the authoritative design references — read them before making architectural or feature decisions.
 
 - **`spec/PRD.md`** — Product Requirements Document. Defines the product vision, problem statement, core "Create n Play" concept, feature list (F1–F7), and MVP success criteria.
 - **`spec/TRD.md`** — Technical Requirements Document. Defines the tech stack, Electron 3-process architecture, IPC contract, plugin sandbox model, and platform-specific constraints.

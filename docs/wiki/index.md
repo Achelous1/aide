@@ -1,4 +1,4 @@
-# AIDE Wiki Index
+# smalti Wiki Index
 
 ## Architecture
 - [[workspace-context-menu]] — 워크스페이스 rename/경로 표시/Show in Finder, IPC 구조 및 컨텍스트 메뉴 구현

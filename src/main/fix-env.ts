@@ -70,7 +70,7 @@ export function fixPackagedEnv(): void {
     }
   } catch {
     // Fallback: ensure minimal PATH + try to detect nvm's default node
-    process.env._AIDE_ENV_FIX_FAILED = '1';
+    process.env._SMALTI_ENV_FIX_FAILED = '1';
     const homedir = (() => { try { return userInfo().homedir; } catch { return process.env.HOME || '/'; } })();
     let extraPaths = '/usr/local/bin:/opt/homebrew/bin';
 

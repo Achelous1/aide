@@ -12,25 +12,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aide-core"
-version = "0.1.0"
-dependencies = [
- "notify",
- "portable-pty",
- "tempfile",
-]
-
-[[package]]
-name = "aide-napi"
-version = "0.1.0"
-dependencies = [
- "aide-core",
- "napi",
- "napi-build",
- "napi-derive",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -578,6 +559,25 @@ name = "shell-words"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
+
+[[package]]
+name = "smalti-core"
+version = "0.1.0"
+dependencies = [
+ "notify",
+ "portable-pty",
+ "tempfile",
+]
+
+[[package]]
+name = "smalti-napi"
+version = "0.1.0"
+dependencies = [
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "smalti-core",
+]
 
 [[package]]
 name = "syn"

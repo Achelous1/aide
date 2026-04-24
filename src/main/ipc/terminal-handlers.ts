@@ -144,7 +144,8 @@ export function registerTerminalHandlers(ipcMain: IpcMain): void {
         'PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'LC_ALL', 'LC_CTYPE',
         'SHELL', 'TERM', 'TMPDIR', 'XDG_RUNTIME_DIR',
         'NVM_DIR',  // needed for shell tabs to initialize nvm via .zshrc
-        'AIDE_WORKSPACE',
+        'SMALTI_WORKSPACE',
+        'AIDE_WORKSPACE', // Back-compat: AIDE_* fallback until task_reb_f03 (v0.2.0)
       ];
       for (const key of allowedKeys) {
         if (process.env[key]) safeBaseEnv[key] = process.env[key] as string;

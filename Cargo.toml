@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "crates/aide-core",
-    "crates/aide-napi",
+    "crates/smalti-core",
+    "crates/smalti-napi",
 ]
 resolver = "2"
 
