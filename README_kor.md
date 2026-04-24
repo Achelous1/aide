@@ -8,7 +8,7 @@
 
 > CLI 코드 에이전트(Claude Code, Gemini CLI, Codex CLI)를 통합한 터미널 중심 IDE. **Create n Play** 시스템으로 자연어를 통해 플러그인을 즉시 생성합니다.
 
-> 🎨 **리브랜드 진행 중**: AIDE는 **smalti**(이탈리아어로 *비잔틴 유리 모자이크 조각*)로 전환됩니다. 자세한 내용은 [`docs/ideation/rebrand-smalti.md`](docs/ideation/rebrand-smalti.md) 를 참고하세요. 패키지·바이너리명 변경은 상표 클리어런스 이후 v0.1.0에 포함됩니다.
+> 🎨 **리브랜드 진행 중**: 제품명이 AIDE에서 **smalti**(이탈리아어로 *비잔틴 유리 모자이크 조각*)로 전환됩니다 — 프로토콜·환경변수·패키지명 등 코드 식별자는 레거시 `aide` 접두사를 유지하며, 상표 클리어런스 이후 v0.1.0에서 마이그레이션됩니다. 자세한 내용은 [`docs/ideation/rebrand-smalti.md`](docs/ideation/rebrand-smalti.md) 를 참고하세요.
 
 ---
 
@@ -145,8 +145,8 @@ npm install -g @openai/codex
 ### 소스에서 실행
 
 ```bash
-git clone https://github.com/Achelous1/aide.git
-cd aide
+git clone https://github.com/Achelous1/smalti.git
+cd smalti
 pnpm install   # postinstall 훅이 scripts/build-native.mjs를 통해 Rust 네이티브 모듈을
                # 자동 빌드합니다. 첫 설치 시 aide-core + aide-napi 컴파일 (~30초),
                # 이후 설치는 cargo 캐시를 사용합니다.
@@ -295,4 +295,4 @@ MCP → 에이전트: 도구 결과
 
 ## 기여
 
-이슈와 PR은 [github.com/Achelous1/aide](https://github.com/Achelous1/aide)에서 환영합니다.
+이슈와 PR은 [github.com/Achelous1/smalti](https://github.com/Achelous1/smalti)에서 환영합니다.

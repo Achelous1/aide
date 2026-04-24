@@ -15,7 +15,8 @@ function countStandaloneAide(content: string): number {
     .replace(/Applications\/AIDE\b/g, '')   // install path (D8)
     .replace(/from AIDE to/gi, '')           // rebrand notice box (English)
     .replace(/AIDE is being renamed/gi, '') // rebrand notice box (English)
-    .replace(/AIDE는 .{0,80}로 전환/g, ''); // rebrand notice box (Korean)
+    .replace(/제품명이 AIDE에서/g, '')      // rebrand notice box (Korean) — L11 in README_kor.md
+    .replace(/AIDE는 .{0,80}로 전환/g, ''); // rebrand notice box (Korean) — legacy variant
   return (clean.match(/\bAIDE\b/g) || []).length;
 }
 

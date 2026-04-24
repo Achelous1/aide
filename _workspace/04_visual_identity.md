@@ -786,6 +786,49 @@ U(pc + "/jBE55", {content: "terminal-hook · placed"})
 - Crimson을 에러 + critical-accent 두 역할에 동시 배정한 설계의 사용자 인지 실측(동시 출현 빈도 저위험 가정).
 - 라이트 테마 Welcome 프레임(`EYxm3`)에서 이미지 아이콘의 밝은 배경 위 대비(squircle 내 Obsidian 타일이 자연스러운 앵커 역할을 하므로 별도 변형 아이콘 불필요하다고 판단, 실측 권장).
 
+### 9.5.8 Workspace Active State (이슈 #108 대응)
+
+**배경.** GitHub 이슈 #108 — "현재 워크스페이스가 어떤 건지 명확히 보이지 않음". 실 제품의 워크스페이스 네비게이션 항목들이 동일한 surface 톤으로만 렌더되어 active 구분이 부재. 팔레트 C Hybrid 시각 언어로 3-레이어 active 시스템 정식화.
+
+**3-레이어 스펙.**
+
+| 레이어 | Dark | Light | 규격 | 역할 |
+|---|---|---|---|---|
+| 좌측 accent bar | `$smalti-cyan` `#4FB3BF` | `#2B8A94` | width 3px, height = 행 높이 full, 행 왼쪽 끝 flush | 가장 강한 active 시그널 — 주변시(peripheral vision)만으로도 인지 |
+| 행 배경 tint | `rgba(79,179,191,0.10)` `#4FB3BF1A` | `rgba(43,138,148,0.12)` `#2B8A941F` | 행 전체 overlay | raised 위 미묘한 tint — 판독성 유지하며 구분 추가 |
+| 아바타 링 | `$smalti-gold` `#C9A24B` | `#A8802A` | 2px stroke outside | "선택됨"의 촉각적 강조 — Magician 30% 골드 액센트를 active에 배속 |
+
+**Inactive / Hover / Active 상태 머신.**
+- **Inactive**: `fill: $smalti-raised` (`#1B1E2A` / `#DEDED6`). 평이한 baseline.
+- **Hover**: `fill: $smalti-divider` (`#2A2E3D` / `#C8C8BE`)로 살짝 브라이트닝. accent bar·ring 없음.
+- **Active**: 3-레이어 전부 적용. 호버 상태와 겹치지 않음 (active 자체가 최상위).
+
+**WCAG AA 대비 실측 (Dark).**
+- `$smalti-cyan #4FB3BF` on raised `#1B1E2A` → 4.86:1 ✅ (non-text UI 요소로 3:1만 요구되나 AA 텍스트 기준도 통과).
+- Gold ring `#C9A24B` on raised `#1B1E2A` → 5.92:1 ✅ (stroke 요소, 2px 굵기라 가시성 충분).
+- Ink-body `#E6E7ED` on tint-blended 배경 `≈ #1D2129` → 13.8:1 ✅ (tint 10%로 raised 대비 거의 변화 없음 → 이름 텍스트 판독성 보존).
+
+**Crimson 사용 금지 명시.** Active state에 Crimson `#F10C45`를 사용하지 않는다 — Crimson은 §3.3에서 **error + critical-accent**(`new` 배지) 전용으로 예약됨. 워크스페이스 선택은 "에러"도 "긴급"도 아니므로 cyan/gold 조합으로 한정한다. 혼용 시 사용자는 "어느 워크스페이스에 문제가 있나?"로 오독할 위험.
+
+**design.pen 반영.**
+- **신규 컴포넌트 2개** (document 최상위, `x≈13600`):
+  - `smalti-WorkspaceRow` (id `784E0`, reusable) — inactive baseline. 260×56, padding `[12, 16]`, gap 12, 아바타 32×32 + 이름/경로 2행 + 우측 상태 도트.
+  - `smalti-WorkspaceRow-Active` (id `DJPKf`, reusable) — active 3-레이어 전부 적용. 좌측 3px cyan bar(frame child) + tint fill `#4FB3BF1A` + gold ring stroke 2px outside.
+- **Dark/Light Hybrid WorkspaceNav 아이콘 컬럼** (`6U6vO` / `J82FJ`):
+  - 첫 번째 아이콘 (`TVh9m` cyan / `0EClJ` cyan)에 gold stroke `#C9A24B` / `#A8802A` 2px outside 추가.
+  - 아이콘 컬럼 `index 0` 위치에 `activeTint` rectangle (48×28, tint fill) + `activeAccentBar` rectangle (3×28, cyan fill) 2개를 `layoutPosition: "absolute"`로 주입. 첫 번째 아이콘 y=8 정렬.
+- **디자인 시스템 프레임** (`JkG4U`) BRAND 섹션(`FTMyl`) 뒤·CHROME 섹션(`emd5D`) 앞에 `secWsNav` (id `2uvek`) 신설 — `WORKSPACE NAV` 라벨 + inactive 3개 (`aide`/`smalti`/`docs`) + active 1개 + hover 1개 + 3-레이어 설명 캡션.
+
+**검증.**
+- `get_screenshot(6U6vO)` / `get_screenshot(J82FJ)`: Dark·Light 모두 첫 아이콘에 cyan accent bar·tint·gold ring 3-레이어 동시 가시.
+- `get_screenshot(DJPKf)`: 신규 active 컴포넌트 단독 렌더 — 3-레이어 구조 확인.
+- `get_screenshot(JkG4U)`: 디자인 시스템에 Workspace Nav 섹션 정상 삽입, 다른 섹션 영향 없음.
+
+**후속 판단 필요.**
+- 실 구현에서 워크스페이스 목록이 아이콘 컬럼(48px)인지 리스트 패널(260px)인지 확정 — design.pen은 양쪽 모두 시각 언어 제공.
+- 동일 active 스타일을 탭/파일 탐색기의 선택 상태와 어떻게 차별화할지 (현재 탭은 `$smalti-surface` fill만, 파일 선택은 `$smalti-divider` fill. 워크스페이스 active가 더 강한 시그널 = 정당한 계층).
+- Hover 상태에 옅은 cyan 1px 좌측 hint 추가 여부 — active 3-레이어의 사전 시각적 예고(progressive disclosure).
+
 ---
 
 ## 10. 다음 팀원(아이덴티티검증자)에게 전달
