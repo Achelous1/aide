@@ -44,6 +44,11 @@
   --smalti-gold: 201 162 75;
   --smalti-crimson: 241 12 69;
   --smalti-sky-blue: 111 197 219;
+  /* status semantic tokens — dark */
+  --status-success: #4FB3BF;   /* smalti-cyan — 성공/완료 */
+  --status-warning: #C9A24B;   /* smalti-gold — 경고 */
+  --status-error:   #F10C45;   /* smalti-crimson — 에러/critical */
+  --status-info:    #6FC5DB;   /* smalti-sky-blue — 정보 */
 }
 
 .light {
@@ -79,6 +84,11 @@
   --smalti-gold: 168 128 42;
   --smalti-crimson: 200 8 58;
   --smalti-sky-blue: 74 159 184;
+  /* status semantic tokens — light */
+  --status-success: #2B8A94;   /* smalti-cyan light — 성공/완료 */
+  --status-warning: #A8802A;   /* smalti-gold light — 경고 */
+  --status-error:   #C8083A;   /* smalti-crimson light — 에러/critical */
+  --status-info:    #4A9FB8;   /* smalti-sky-blue light — 정보 */
 }
 
 html, body, #root {
@@ -177,20 +187,20 @@ body {
  * Drag interaction visual feedback
  * ============================================================ */
 
-/* Insert position indicator — 2px blue vertical line between tabs */
+/* Insert position indicator — 2px cyan vertical line between tabs */
 .drag-insert-line {
   position: absolute;
   left: 0;
   top: 4px;
   bottom: 4px;
   width: 2px;
-  background-color: #3B82F6;
+  background-color: var(--accent);
   border-radius: 1px;
   pointer-events: none;
   z-index: 20;
 }
 
-/* Cross-pane drop overlay — blue tint + centered label */
+/* Cross-pane drop overlay — cyan tint + centered label */
 .drag-drop-overlay {
   position: absolute;
   inset: 0;
@@ -198,15 +208,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(59, 130, 246, 0.10);
-  border: 1px solid rgba(59, 130, 246, 0.35);
+  background-color: rgb(var(--smalti-cyan) / 0.10);
+  border: 1px solid rgb(var(--smalti-cyan) / 0.35);
   pointer-events: none;
 }
 
 .drag-drop-overlay__text {
   font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
   font-size: 12px;
-  color: #3B82F6;
+  color: var(--accent);
   opacity: 0.9;
 }
 
@@ -225,7 +235,7 @@ button:focus-visible .drag-handle-icon {
   opacity: 1;
 }
 
-/* Resize divider — 4px blue highlight on hover and active drag */
+/* Resize divider — 4px cyan highlight on hover and active drag */
 .resize-divider {
   background-color: var(--border);
   transition: background-color 150ms ease-out;
@@ -233,7 +243,7 @@ button:focus-visible .drag-handle-icon {
 
 .resize-divider:hover,
 .resize-divider--active {
-  background-color: #3B82F6;
+  background-color: var(--accent);
 }
 
 /* Expand visual width/height to 4px via ::before pseudo-element */
@@ -260,7 +270,7 @@ button:focus-visible .drag-handle-icon {
 
 .resize-divider:hover::before,
 .resize-divider--active::before {
-  background-color: #3B82F6;
+  background-color: var(--accent);
 }
 
 /* Direction icon on resize divider */
@@ -268,7 +278,7 @@ button:focus-visible .drag-handle-icon {
   position: absolute;
   z-index: 15;
   font-size: 10px;
-  color: #3B82F6;
+  color: var(--accent);
   opacity: 0;
   transition: opacity 150ms ease-out;
   pointer-events: none;

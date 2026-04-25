@@ -100,10 +100,7 @@ export function EmptyState({ paneId }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full w-full gap-6 select-none">
       {/* Hero logo */}
-      <div
-        className="font-mono font-bold text-[48px] leading-none"
-        style={{ color: 'var(--accent)' }}
-      >
+      <div className="font-mono font-bold text-[48px] leading-none text-aide-accent">
         {'> smalti_'}
       </div>
 
@@ -113,14 +110,7 @@ export function EmptyState({ paneId }: EmptyStateProps) {
       </p>
 
       {/* Agent buttons */}
-      <div
-        className="flex flex-col gap-2 rounded-xl"
-        style={{
-          width: '440px',
-          padding: '8px',
-          backgroundColor: 'var(--background)',
-        }}
-      >
+      <div className="flex flex-col gap-2 rounded-xl bg-aide-background" style={{ width: '440px', padding: '8px' }}>
         {AGENT_BUTTONS.map((btn, idx) => {
           const installed = isInstalled(btn.id);
           const isFirst = idx === 0;
@@ -129,54 +119,50 @@ export function EmptyState({ paneId }: EmptyStateProps) {
               key={btn.id}
               onClick={() => handleSelect(btn)}
               disabled={!installed}
-              className="flex items-center justify-between rounded-[10px] transition-colors"
-              style={{
-                height: '44px',
-                padding: '0 12px',
-                backgroundColor: isFirst ? 'var(--surface-elevated)' : 'var(--background)',
-                opacity: installed ? 1 : 0.4,
-                cursor: installed ? 'pointer' : 'not-allowed',
-              }}
+              className={[
+                'flex items-center justify-between rounded-[10px] transition-colors',
+                isFirst ? 'bg-aide-surface-elevated' : 'bg-aide-background',
+                installed ? 'cursor-pointer opacity-100' : 'cursor-not-allowed opacity-40',
+              ].join(' ')}
+              style={{ height: '44px', padding: '0 12px' }}
             >
               {/* Left: icon + label */}
-              <div className="flex items-center" style={{ gap: '10px' }}>
+              <div className="flex items-center gap-[10px]">
                 <span
-                  className="font-mono font-bold text-[15px]"
-                  style={{ color: isFirst ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}
+                  className={[
+                    'font-mono font-bold text-[15px]',
+                    isFirst ? 'text-aide-text-secondary' : 'text-aide-text-tertiary',
+                  ].join(' ')}
                 >
                   {btn.icon}
                 </span>
                 <span
-                  className="font-mono font-medium text-[13px]"
-                  style={{ color: isFirst ? 'var(--text-primary)' : 'var(--text-tertiary)' }}
+                  className={[
+                    'font-mono font-medium text-[13px]',
+                    isFirst ? 'text-aide-text-primary' : 'text-aide-text-tertiary',
+                  ].join(' ')}
                 >
                   {btn.label}
                 </span>
               </div>
 
               {/* Right: shortcut chips */}
-              <div className="flex items-center" style={{ gap: '6px' }}>
+              <div className="flex items-center gap-[6px]">
                 <span
-                  className="inline-flex items-center justify-center font-mono font-semibold text-[11px] rounded-full leading-none"
-                  style={{
-                    minWidth: '22px',
-                    height: '22px',
-                    padding: '0 6px',
-                    backgroundColor: isFirst ? 'var(--surface)' : 'var(--surface-elevated)',
-                    color: isFirst ? 'var(--text-secondary)' : 'var(--text-tertiary)',
-                  }}
+                  className={[
+                    'inline-flex items-center justify-center font-mono font-semibold text-[11px] rounded-full leading-none',
+                    isFirst ? 'bg-aide-surface text-aide-text-secondary' : 'bg-aide-surface-elevated text-aide-text-tertiary',
+                  ].join(' ')}
+                  style={{ minWidth: '22px', height: '22px', padding: '0 6px' }}
                 >
                   {'\u2318'}
                 </span>
                 <span
-                  className="inline-flex items-center justify-center font-mono font-semibold text-[11px] rounded-full leading-none"
-                  style={{
-                    minWidth: '22px',
-                    height: '22px',
-                    padding: '0 6px',
-                    backgroundColor: isFirst ? 'var(--surface)' : 'var(--surface-elevated)',
-                    color: isFirst ? 'var(--text-secondary)' : 'var(--text-tertiary)',
-                  }}
+                  className={[
+                    'inline-flex items-center justify-center font-mono font-semibold text-[11px] rounded-full leading-none',
+                    isFirst ? 'bg-aide-surface text-aide-text-secondary' : 'bg-aide-surface-elevated text-aide-text-tertiary',
+                  ].join(' ')}
+                  style={{ minWidth: '22px', height: '22px', padding: '0 6px' }}
                 >
                   {btn.shortcutKey}
                 </span>

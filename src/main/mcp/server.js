@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 "use strict";
-const fs = require("fs");
-const path = require("path");
-const vm = require("vm");
-const crypto = require("crypto");
+const fs = require("fs"); // eslint-disable-line @typescript-eslint/no-require-imports
+const path = require("path"); // eslint-disable-line @typescript-eslint/no-require-imports
+const vm = require("vm"); // eslint-disable-line @typescript-eslint/no-require-imports
+const crypto = require("crypto"); // eslint-disable-line @typescript-eslint/no-require-imports
 
 function safeCwd() {
   // process.cwd() throws EPERM in packaged Electron apps when launched from Finder
   // (HOME=/ or unmounted cwd). Fall back to HOME / getpwuid / /tmp.
   try { return process.cwd(); } catch { /* EPERM uv_cwd */ }
   if (process.env.HOME && process.env.HOME !== "/") return process.env.HOME;
-  try { return require("os").userInfo().homedir; } catch { /* ignore */ }
+  try { return require("os").userInfo().homedir; } catch { /* getpwuid fallback unavailable */ } // eslint-disable-line @typescript-eslint/no-require-imports
   return "/tmp";
 }
 const PLUGINS_DIR = path.join(safeCwd(), ".smalti", "plugins");
@@ -31,7 +31,7 @@ function scanPluginsDir(dir) {
     if (!entry.isDirectory()) continue;
     const specPath = path.join(dir, entry.name, "plugin.spec.json");
     if (!fs.existsSync(specPath)) continue;
-    try { specs.push(JSON.parse(fs.readFileSync(specPath, "utf-8"))); } catch {}
+    try { specs.push(JSON.parse(fs.readFileSync(specPath, "utf-8"))); } catch { /* skip malformed spec */ }
   }
   return specs;
 }
@@ -53,7 +53,7 @@ function resolvePluginDir(pluginName) {
           if (fs.existsSync(path.join(localDir, entryPoint))) {
             return { dir: localDir, base: PLUGINS_DIR, entryPoint };
           }
-        } catch {}
+        } catch { /* skip unreadable spec */ }
       }
     }
   }
@@ -64,7 +64,7 @@ function invokePluginTool(pluginName, toolName, args) {
   const resolved = resolvePluginDir(pluginName);
   if (!resolved) throw new Error("Plugin not found: " + pluginName);
   var permissions = [];
-  try { permissions = JSON.parse(fs.readFileSync(path.join(resolved.dir, "plugin.spec.json"), "utf-8")).permissions || []; } catch {}
+  try { permissions = JSON.parse(fs.readFileSync(path.join(resolved.dir, "plugin.spec.json"), "utf-8")).permissions || []; } catch { /* default to empty permissions on parse error */ }
   var hasFsRead = permissions.includes("fs:read");
   var hasFsWrite = permissions.includes("fs:write");
   var hasFsPerm = hasFsRead || hasFsWrite;
@@ -425,7 +425,7 @@ function processBuffer() {
     const line = buffer.slice(0, newline).trim();
     buffer = buffer.slice(newline + 1);
     if (!line) continue;
-    try { const msg = JSON.parse(line); if (msg.method) handleRequest(msg.method, msg.id, msg.params); } catch {}
+    try { const msg = JSON.parse(line); if (msg.method) handleRequest(msg.method, msg.id, msg.params); } catch { /* skip malformed JSON-RPC line */ }
   }
 }
 process.stdin.setEncoding("utf-8");

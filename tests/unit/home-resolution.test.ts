@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 
 /**
  * Tests that home directory resolution rejects HOME=/ (Finder launch)
@@ -81,6 +81,7 @@ describe('fix-env HOME override logic', () => {
 function getHome(): string {
   const env = process.env.HOME;
   if (env && env !== '/') return env;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   try { return require('os').userInfo().homedir; } catch { /* ignore */ }
   return '/'; // fallback for test — real code uses app.getPath('home')
 }

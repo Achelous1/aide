@@ -16,11 +16,11 @@ function Toast({ toast }: { toast: ToastMessage }) {
   const isError = toast.kind === 'error';
   const isWarning = toast.kind === 'warning';
 
-  const borderColor = isError
-    ? 'var(--status-error, #ef4444)'
+  const accentBarClass = isError
+    ? 'bg-smalti-crimson'
     : isWarning
-      ? 'var(--status-warning, #f59e0b)'
-      : 'var(--accent)';
+      ? 'bg-aide-accent-warning'
+      : 'bg-aide-accent';
 
   return (
     <div
@@ -31,8 +31,7 @@ function Toast({ toast }: { toast: ToastMessage }) {
     >
       {/* Left accent bar */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-md"
-        style={{ backgroundColor: borderColor }}
+        className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-md ${accentBarClass}`}
       />
 
       {/* Content */}
