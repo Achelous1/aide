@@ -104,7 +104,7 @@ export function EmptyState({ paneId }: EmptyStateProps) {
         className="font-mono font-bold text-[48px] leading-none"
         style={{ color: 'var(--accent)' }}
       >
-        {'> aide_'}
+        {'> smalti_'}
       </div>
 
       {/* Subtitle */}

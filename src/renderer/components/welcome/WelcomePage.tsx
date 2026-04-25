@@ -120,7 +120,7 @@ export function WelcomePage({ recentProjects }: WelcomePageProps) {
               className="font-bold text-[var(--accent)]"
               style={{ fontSize: '36px', lineHeight: 1.2 }}
             >
-              &gt; aide_
+              &gt; smalti_
             </h1>
             <p className="text-sm text-[var(--text-secondary)]">
               AI-driven terminal IDE. Open a repository to get started.

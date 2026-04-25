@@ -13,7 +13,7 @@ function getDescription(errorCode: FsReadTreeError['code'], errorPath: string, e
   const basename = parts[parts.length - 1] || errorPath;
   switch (errorCode) {
     case 'EPERM':
-      return "AIDE can't read this folder. Grant Full Disk Access in System Settings.";
+      return "smalti can't read this folder. Grant Full Disk Access in System Settings.";
     case 'ENOENT':
       return `Folder no longer exists: ${basename}`;
     case 'ENOTDIR':
