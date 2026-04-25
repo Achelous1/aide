@@ -3,6 +3,7 @@
 ## Architecture
 - [[workspace-context-menu]] — 워크스페이스 rename/경로 표시/Show in Finder, IPC 구조 및 컨텍스트 메뉴 구현
 - [[app-settings-persistence]] — aide-app-settings electron-store로 테마/윈도우 bounds 전역 영속화
+- [[smalti-palette-c-theme]] — smalti 팔레트 C 토큰 시스템, aide-* alias와 smalti-* opacity 토큰의 두 층 구조, design.pen 기준 매핑표
 
 ## Decisions
 - [[plugin-scope-local-only]] — 글로벌 플러그인 스코프 제거, .mcp.json 생성 중단 + 자동 마이그레이션
