@@ -11,14 +11,14 @@ export function StatusBar() {
 
   return (
     <div
-      className="flex items-center w-full shrink-0 px-3 gap-4 bg-aide-accent text-black text-[11px] font-mono"
+      className="flex items-center w-full shrink-0 px-3 gap-4 bg-aide-surface-elevated text-aide-text-primary text-[11px] font-mono border-t border-aide-border"
       style={{ height: '24px' }}
     >
-      {activePluginCount > 0 && (
-        <span>plugins: {activePluginCount}</span>
-      )}
+      <span className="text-aide-text-primary">[{activePluginCount}] plugins active</span>
       <span className="flex-1" />
-      {agentLabel && <span>{agentLabel}</span>}
+      {agentLabel && (
+        <span className="font-bold text-aide-accent-warning">{agentLabel}</span>
+      )}
     </div>
   );
 }

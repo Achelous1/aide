@@ -34,11 +34,11 @@ export function TabBar() {
                 : 'bg-aide-tab-inactive-bg text-aide-text-secondary hover:text-aide-text-primary'
             }`}
           >
-            {/* Active top border */}
+            {/* Active top border — gold per design.pen tabActive (Cmbk8) */}
             {isActive && (
               <span
                 className="absolute top-0 left-0 right-0 h-[2px]"
-                style={{ backgroundColor: 'var(--accent)' }}
+                style={{ backgroundColor: 'var(--accent-warning)' }}
               />
             )}
             {/* Agent color dot */}

@@ -22,7 +22,7 @@ function RecentProjectItem({ project, onClick }: RecentProjectItemProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-[var(--surface-elevated)] border border-transparent hover:border-[var(--border)]"
+      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-aide-surface-elevated border border-transparent hover:border-aide-border"
     >
       <div
         className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
@@ -31,10 +31,10 @@ function RecentProjectItem({ project, onClick }: RecentProjectItemProps) {
         {project.name.charAt(0).toUpperCase()}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-[var(--text-primary)] truncate">{project.name}</div>
-        <div className="text-xs text-[var(--text-tertiary)] truncate">{project.path}</div>
+        <div className="text-sm font-medium text-aide-text-primary truncate">{project.name}</div>
+        <div className="text-xs text-aide-text-tertiary truncate">{project.path}</div>
       </div>
-      <div className="text-xs text-[var(--text-tertiary)] flex-shrink-0">
+      <div className="text-xs text-aide-text-tertiary flex-shrink-0">
         {formatRelativeTime(project.lastOpened)}
       </div>
     </button>
@@ -102,13 +102,13 @@ export function WelcomePage({ recentProjects }: WelcomePageProps) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--background)]">
+    <div className="flex flex-col h-full bg-aide-background">
       {/* TopBar */}
       <header
-        className="h-10 relative flex items-center justify-center border-b border-[var(--border)] flex-shrink-0"
+        className="h-10 relative flex items-center justify-center border-b border-aide-border flex-shrink-0"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <span className="text-sm font-bold text-[var(--text-secondary)] pointer-events-none">&gt; smalti</span>
+        <span className="text-sm font-bold text-aide-accent pointer-events-none">&gt; smalti</span>
       </header>
 
       {/* Body */}
@@ -117,13 +117,13 @@ export function WelcomePage({ recentProjects }: WelcomePageProps) {
           {/* Hero */}
           <div className="flex flex-col gap-2">
             <h1
-              className="font-bold text-[var(--accent)]"
+              className="font-bold text-aide-text-primary"
               style={{ fontSize: '36px', lineHeight: 1.2 }}
             >
               &gt; smalti_
             </h1>
-            <p className="text-sm text-[var(--text-secondary)]">
-              AI-driven terminal IDE. Open a repository to get started.
+            <p className="text-sm text-aide-text-secondary">
+              an ai-native ide for cli agents.
             </p>
           </div>
 
@@ -137,18 +137,18 @@ export function WelcomePage({ recentProjects }: WelcomePageProps) {
                 onChange={(e) => setProjectName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleNewProject(); if (e.key === 'Escape') { setShowNameInput(false); setProjectName(''); } }}
                 placeholder="Project name..."
-                className="flex-1 px-3 py-2 rounded text-sm bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)]"
+                className="flex-1 px-3 py-2 rounded text-sm bg-aide-surface border border-aide-border text-aide-text-primary placeholder:text-aide-text-tertiary focus:outline-none focus:border-aide-accent"
               />
               <button
                 onClick={handleNewProject}
                 disabled={!projectName.trim()}
-                className="px-4 py-2 rounded text-sm font-medium bg-[var(--accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+                className="px-4 py-2 rounded text-sm font-medium bg-aide-accent text-aide-background hover:opacity-90 transition-opacity disabled:opacity-40"
               >
                 Create
               </button>
               <button
                 onClick={() => { setShowNameInput(false); setProjectName(''); }}
-                className="px-3 py-2 rounded text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] transition-colors"
+                className="px-3 py-2 rounded text-sm text-aide-text-secondary hover:bg-aide-surface-elevated transition-colors"
               >
                 Cancel
               </button>
@@ -159,13 +159,13 @@ export function WelcomePage({ recentProjects }: WelcomePageProps) {
           <div className="flex gap-3">
             <button
               onClick={handleOpenRepository}
-              className="flex-1 px-4 py-2 rounded text-sm font-medium bg-[var(--accent)] text-white hover:opacity-90 transition-opacity"
+              className="flex-1 px-4 py-2 rounded text-sm font-medium bg-aide-accent text-aide-background hover:opacity-90 transition-opacity"
             >
               Open Repository
             </button>
             <button
               onClick={() => setShowNameInput(true)}
-              className="flex-1 px-4 py-2 rounded text-sm font-medium border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--surface-elevated)] transition-colors"
+              className="flex-1 px-4 py-2 rounded text-sm font-medium border border-aide-accent text-aide-accent hover:bg-aide-surface-elevated transition-colors"
             >
               + New Project
             </button>
@@ -174,7 +174,7 @@ export function WelcomePage({ recentProjects }: WelcomePageProps) {
           {/* Recent projects */}
           {recentProjects.length > 0 && (
             <div className="flex flex-col gap-1">
-              <h2 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider px-1 mb-1">
+              <h2 className="text-xs font-medium text-aide-text-tertiary uppercase tracking-wider px-1 mb-1">
                 Recent
               </h2>
               {recentProjects.map((project) => (

@@ -73,8 +73,8 @@ export function PluginPanel() {
           }
           className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
             plugin.active
-              ? 'bg-aide-accent text-black'
-              : 'bg-aide-border text-aide-text-secondary hover:text-aide-text-primary'
+              ? 'border border-aide-accent text-aide-accent'
+              : 'border border-aide-border text-aide-text-secondary hover:text-aide-text-primary hover:border-aide-text-secondary'
           }`}
           title={plugin.active ? 'Deactivate plugin' : 'Activate plugin'}
         >
@@ -82,14 +82,14 @@ export function PluginPanel() {
         </button>
         <button
           onClick={() => window.aide.plugin.reload(plugin.id)}
-          className="px-1.5 py-0.5 rounded text-[10px] font-mono text-aide-text-tertiary hover:text-aide-text-primary hover:bg-aide-surface-hover transition-colors"
+          className="px-1.5 py-0.5 rounded text-[10px] font-mono text-aide-text-tertiary hover:text-aide-text-primary hover:bg-aide-surface-elevated transition-colors"
           title="Reload plugin"
         >
           ↻
         </button>
         <button
           onClick={() => handleOpenTab(plugin)}
-          className="px-1.5 py-0.5 rounded text-[10px] font-mono text-aide-text-tertiary hover:text-aide-text-primary hover:bg-aide-surface-hover transition-colors"
+          className="px-1.5 py-0.5 rounded text-[10px] font-mono text-aide-text-tertiary hover:text-aide-text-primary hover:bg-aide-surface-elevated transition-colors"
           title="Open plugin (will activate if off)"
         >
           ↗
