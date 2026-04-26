@@ -15,7 +15,10 @@ import { IPC_CHANNELS } from '../ipc/channels';
 import { getHome } from '../utils/home';
 
 const REPO_OWNER = 'Achelous1';
-const REPO_NAME = 'aide';
+// Repo was renamed aide → smalti in 2026-04. GitHub serves a 301 redirect
+// for the legacy /Achelous1/aide URL, so older installs that still hit it
+// will keep working — but new code should reference the canonical slug.
+const REPO_NAME = 'smalti';
 const RELEASES_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
 const POLL_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -150,7 +153,7 @@ export async function downloadUpdate(): Promise<{ ok: boolean; path?: string; er
   try {
     const downloadsDir = path.join(getHome(), 'Downloads');
     if (!fs.existsSync(downloadsDir)) fs.mkdirSync(downloadsDir, { recursive: true });
-    const filename = `AIDE-${cachedInfo.latestTag}.dmg`;
+    const filename = `smalti-${cachedInfo.latestTag}.dmg`;
     const targetPath = path.join(downloadsDir, filename);
 
     const response = await net.fetch(cachedInfo.downloadUrl);
@@ -168,6 +171,21 @@ export async function downloadUpdate(): Promise<{ ok: boolean; path?: string; er
   } finally {
     downloading = false;
   }
+}
+
+/**
+ * Find the `.app` bundle inside an extracted update directory by suffix.
+ *
+ * Name-agnostic so the brand transition (AIDE.app → smalti.app, or any future
+ * rename) cannot break the installer. Returns the full absolute path or
+ * `null` if no `.app` entry is present.
+ *
+ * Exported for unit testing.
+ */
+export function findAppBundle(extractedDir: string): string | null {
+  if (!fs.existsSync(extractedDir)) return null;
+  const entry = fs.readdirSync(extractedDir).find((name) => name.endsWith('.app'));
+  return entry ? path.join(extractedDir, entry) : null;
 }
 
 /**
@@ -217,9 +235,9 @@ export async function installUpdate(): Promise<{ ok: boolean; error?: string }> 
 
   try {
     // 1. Download .app.zip to a temp directory
-    const tmpDir = path.join(os.tmpdir(), `aide-update-${Date.now()}`);
+    const tmpDir = path.join(os.tmpdir(), `smalti-update-${Date.now()}`);
     fs.mkdirSync(tmpDir, { recursive: true });
-    const zipPath = path.join(tmpDir, 'AIDE.app.zip');
+    const zipPath = path.join(tmpDir, 'app.zip');
 
     const response = await net.fetch(cachedInfo.zipDownloadUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -234,25 +252,28 @@ export async function installUpdate(): Promise<{ ok: boolean; error?: string }> 
       });
     });
 
-    const newAppPath = path.join(tmpDir, 'AIDE.app');
-    if (!fs.existsSync(newAppPath)) {
-      throw new Error('AIDE.app not found in zip');
+    // 3. Find the .app bundle inside the extracted directory.
+    // Name-agnostic so the brand transition (AIDE.app → smalti.app, or any
+    // future rename) can't break the installer.
+    const newAppPath = findAppBundle(tmpDir);
+    if (!newAppPath) {
+      throw new Error('No .app bundle found in zip');
     }
 
-    // 3. Determine current .app bundle path from the executable path
+    // 4. Determine current .app bundle path from the executable path
     const exePath = app.getPath('exe');
     const appPath = exePath.replace(/\.app\/Contents\/.*$/, '.app');
 
-    // 4. Write the update shell script
+    // 5. Write the update shell script
     const scriptPath = path.join(tmpDir, 'update.sh');
     const script = buildUpdateScript({ appPath, newAppPath, tmpDir });
 
     fs.writeFileSync(scriptPath, script, { mode: 0o755 });
 
-    // 5. Spawn the script detached so it outlives the app process
+    // 6. Spawn the script detached so it outlives the app process
     spawn('bash', [scriptPath], { detached: true, stdio: 'ignore' }).unref();
 
-    // 6. Quit — the script will relaunch the updated app after 3 s
+    // 7. Quit — the script will relaunch the updated app after 3 s
     app.quit();
     return { ok: true };
   } catch (err) {

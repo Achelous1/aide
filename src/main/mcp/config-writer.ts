@@ -1,5 +1,5 @@
 /**
- * Writes the AIDE MCP server script and config to userData at startup.
+ * Writes the Smalti MCP server script and config to userData at startup.
  * The server runs as a standalone Node.js process — agents connect via --mcp-config.
  */
 import { app } from 'electron';
@@ -57,7 +57,7 @@ export function getMcpServerPath(): string {
 }
 
 /**
- * Shared helper: merges the AIDE MCP server entry into a JSON config file.
+ * Shared helper: merges the Smalti MCP server entry into a JSON config file.
  * Safe to call multiple times — merges rather than overwrites.
  */
 function registerJsonMcpConfig(configPath: string, nodePath: string, serverPath: string): void {
@@ -132,7 +132,7 @@ export function writeMcpConfig(workspacePath: string): string {
 
   // Claude is launched with --mcp-config <path>, so ANY other config source
   // that lists "aide" causes Claude to spawn the MCP server once per source.
-  // Strip legacy entries older versions of AIDE wrote:
+  // Strip legacy entries older versions of smalti wrote:
   //   1. ~/.claude.json (global Claude config)
   //   2. ~/.mcp.json    (HOME-level .mcp.json; Claude auto-discovers it by
   //                      walking up from cwd, and every workspace is under HOME,

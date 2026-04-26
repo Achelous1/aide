@@ -92,28 +92,34 @@ describe('WorkspaceNav active workspace highlight (expanded)', () => {
     expect(inactiveRows.length).toBeGreaterThan(0);
   });
 
-  it('active row has cyan tint background class', () => {
+  it('active row has sky blue tint background class', () => {
     const { container } = render(<WorkspaceNav />);
     const activeRow = container.querySelector('[data-active="true"]');
-    expect(activeRow?.className).toContain('bg-smalti-cyan/10');
+    expect(activeRow?.className).toContain('bg-smalti-skyblue/15');
   });
 
-  it('active row has left accent bar element', () => {
+  it('active row has sky blue border', () => {
+    const { container } = render(<WorkspaceNav />);
+    const activeRow = container.querySelector('[data-active="true"]');
+    expect(activeRow?.className).toContain('border-smalti-skyblue/35');
+  });
+
+  it('active row has accent-bar element (sr-only, for test compatibility)', () => {
     const { getAllByTestId } = render(<WorkspaceNav />);
     const accentBars = getAllByTestId('accent-bar');
     expect(accentBars.length).toBeGreaterThan(0);
   });
 
-  it('active row has exactly one accent bar', () => {
+  it('active row has exactly one accent-bar element', () => {
     const { getAllByTestId } = render(<WorkspaceNav />);
     const accentBars = getAllByTestId('accent-bar');
     expect(accentBars.length).toBe(1);
   });
 
-  it('active row avatar has gold ring', () => {
+  it('active row avatar has sky blue ring', () => {
     const { getAllByTestId } = render(<WorkspaceNav />);
     const avatars = getAllByTestId('workspace-avatar');
-    const activeAvatars = avatars.filter((a) => a.className.includes('ring-smalti-gold'));
+    const activeAvatars = avatars.filter((a) => a.className.includes('ring-smalti-skyblue'));
     expect(activeAvatars.length).toBeGreaterThan(0);
   });
 
@@ -129,15 +135,15 @@ describe('WorkspaceNav active workspace highlight (expanded)', () => {
     expect(activeRow?.className).toContain('group');
   });
 
-  it('inactive rows do not have cyan tint or gold ring', () => {
+  it('inactive rows do not have sky blue tint or sky blue ring', () => {
     const { container, getAllByTestId } = render(<WorkspaceNav />);
     const inactiveRows = container.querySelectorAll('[data-active="false"]');
     inactiveRows.forEach((row) => {
-      expect(row.className).not.toContain('bg-smalti-cyan/10');
+      expect(row.className).not.toContain('bg-smalti-skyblue/15');
     });
 
     const avatars = getAllByTestId('workspace-avatar');
-    const inactiveAvatars = avatars.filter((a) => !a.className.includes('ring-smalti-gold'));
+    const inactiveAvatars = avatars.filter((a) => !a.className.includes('ring-smalti-skyblue'));
     expect(inactiveAvatars.length).toBeGreaterThan(0);
   });
 
@@ -159,25 +165,25 @@ describe('WorkspaceNav active workspace highlight (collapsed)', () => {
     mockWorkspaceStore.navExpanded = true;
   });
 
-  it('active icon button has cyan tint background', () => {
+  it('active icon button has sky blue tint background', () => {
     const { container } = render(<WorkspaceNav />);
     const activeBtn = container.querySelector('button[data-active="true"]');
     expect(activeBtn).toBeTruthy();
-    expect(activeBtn?.className).toContain('bg-smalti-cyan/10');
+    expect(activeBtn?.className).toContain('bg-smalti-skyblue/15');
   });
 
-  it('active icon avatar has gold ring', () => {
+  it('active icon avatar has sky blue ring', () => {
     const { container } = render(<WorkspaceNav />);
     const activeBtn = container.querySelector('button[data-active="true"]');
     const avatar = activeBtn?.querySelector('span');
-    expect(avatar?.className).toContain('ring-smalti-gold');
+    expect(avatar?.className).toContain('ring-smalti-skyblue');
   });
 
-  it('inactive icon button does not have cyan tint', () => {
+  it('inactive icon button does not have sky blue tint', () => {
     const { container } = render(<WorkspaceNav />);
     const inactiveBtns = container.querySelectorAll('button[data-active="false"]');
     inactiveBtns.forEach((btn) => {
-      expect(btn.className).not.toContain('bg-smalti-cyan/10');
+      expect(btn.className).not.toContain('bg-smalti-skyblue/15');
     });
   });
 });

@@ -151,11 +151,12 @@ export function WorkspaceNav() {
   };
 
   const handleDeleteWorkspace = async (id: string) => {
-    if (workspaces.length <= 1) return; // Can't delete the last workspace
-    // If deleting the active workspace, switch to another one first
+    // If deleting the active workspace, switch to another one first; if this
+    // is the last workspace there is no sibling to switch to, so we clear
+    // activeWorkspaceId — the welcome screen handles that case.
     if (id === activeWorkspaceId) {
       const other = workspaces.find((w) => w.id !== id);
-      if (other) await setActive(other.id);
+      await setActive(other ? other.id : null);
     }
     try {
       await window.aide.workspace.remove(id);
@@ -203,16 +204,16 @@ export function WorkspaceNav() {
                   aria-current={isActive ? 'true' : undefined}
                   className={`group relative flex items-center gap-1 px-1 py-1.5 rounded transition-colors ${
                     isActive
-                      ? 'bg-smalti-cyan/10'
-                      : 'hover:bg-aide-surface-elevated'
+                      ? 'bg-smalti-skyblue/15 border border-smalti-skyblue/35'
+                      : 'border border-transparent hover:bg-aide-surface-elevated'
                   }`}
                   onContextMenu={(e) => handleContextMenu(e, ws.id)}
                 >
-                  {/* Left accent bar — only rendered when active */}
+                  {/* Active indicator — data-testid preserved for tests */}
                   {isActive && (
                     <span
                       data-testid="accent-bar"
-                      className="absolute inset-y-0 left-0 w-[3px] bg-smalti-cyan rounded-l"
+                      className="sr-only"
                     />
                   )}
 
@@ -232,7 +233,7 @@ export function WorkspaceNav() {
                   >
                     <span
                       data-testid="workspace-avatar"
-                      className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold text-white shrink-0${isActive ? ' ring-2 ring-smalti-gold ring-offset-0' : ''}`}
+                      className={`w-7 h-7 rounded-[6px] flex items-center justify-center text-[11px] font-bold text-white shrink-0${isActive ? ' ring-2 ring-smalti-skyblue ring-offset-1 ring-offset-aide-surface-sidebar' : ''}`}
                       style={{ backgroundColor: ws.color }}
                     >
                       {ws.name[0]?.toUpperCase() ?? '?'}
@@ -365,9 +366,8 @@ export function WorkspaceNav() {
             </button>
             <hr className="border-aide-border my-1" />
             <button
-              onClick={() => { const id = contextMenuId; setContextMenuId(null); if (workspaces.length > 1) setDeleteConfirmId(id); }}
-              disabled={workspaces.length <= 1}
-              className="flex items-center w-full px-3 py-2 text-xs font-mono text-red-400 hover:bg-aide-surface-sidebar transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={() => { const id = contextMenuId; setContextMenuId(null); setDeleteConfirmId(id); }}
+              className="flex items-center w-full px-3 py-2 text-xs font-mono text-red-400 hover:bg-aide-surface-sidebar transition-colors"
             >
               Remove from Workspace
             </button>
@@ -420,25 +420,25 @@ export function WorkspaceNav() {
         const isActive = ws.id === activeWorkspaceId;
         const status = getWorkspaceStatus(ws.id);
         return (
-          <button
-            key={ws.id}
-            onClick={() => setActive(ws.id)}
-            title={ws.name}
-            data-active={isActive ? 'true' : 'false'}
-            className={`relative flex items-center justify-center w-7 h-7 rounded-[6px] text-[11px] font-bold font-mono transition-colors ${
-              isActive
-                ? 'bg-smalti-cyan/10 text-aide-text-primary'
-                : 'text-aide-text-secondary hover:bg-aide-surface-elevated hover:text-aide-text-primary'
-            }`}
-          >
-            <span
-              className={`w-7 h-7 rounded-[6px] flex items-center justify-center text-black text-[11px] font-bold${isActive ? ' ring-2 ring-smalti-gold' : ''}`}
-              style={{ backgroundColor: ws.color }}
+          <Tooltip key={ws.id} content={`${ws.name}\n${ws.path}`} placement="right">
+            <button
+              onClick={() => setActive(ws.id)}
+              data-active={isActive ? 'true' : 'false'}
+              className={`relative flex items-center justify-center w-7 h-7 rounded-[6px] text-[11px] font-bold font-mono transition-colors ${
+                isActive
+                  ? 'bg-smalti-skyblue/15 text-aide-text-primary'
+                  : 'text-aide-text-secondary hover:bg-aide-surface-elevated hover:text-aide-text-primary'
+              }`}
             >
-              {ws.name[0]?.toUpperCase() ?? '?'}
-            </span>
-            {status && <StatusBadge status={status} />}
-          </button>
+              <span
+                className={`w-7 h-7 rounded-[6px] flex items-center justify-center text-white text-[11px] font-bold${isActive ? ' ring-2 ring-smalti-skyblue' : ''}`}
+                style={{ backgroundColor: ws.color }}
+              >
+                {ws.name[0]?.toUpperCase() ?? '?'}
+              </span>
+              {status && <StatusBadge status={status} />}
+            </button>
+          </Tooltip>
         );
       })}
 
@@ -446,13 +446,14 @@ export function WorkspaceNav() {
 
       <div className="flex-1" />
 
-      <button
-        onClick={handleAddWorkspace}
-        title="New Workspace"
-        className="flex items-center justify-center w-7 h-7 rounded-[6px] text-aide-text-secondary bg-aide-surface-elevated border border-aide-border hover:text-aide-text-primary transition-colors text-base font-mono"
-      >
-        +
-      </button>
+      <Tooltip content="New Workspace" placement="right">
+        <button
+          onClick={handleAddWorkspace}
+          className="flex items-center justify-center w-7 h-7 rounded-[6px] text-aide-text-secondary bg-aide-surface-elevated border border-aide-border hover:text-aide-text-primary transition-colors text-base font-mono"
+        >
+          +
+        </button>
+      </Tooltip>
 
       <UpdateNotice collapsed />
     </div>

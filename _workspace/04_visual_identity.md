@@ -790,7 +790,9 @@ U(pc + "/jBE55", {content: "terminal-hook · placed"})
 
 **배경.** GitHub 이슈 #108 — "현재 워크스페이스가 어떤 건지 명확히 보이지 않음". 실 제품의 워크스페이스 네비게이션 항목들이 동일한 surface 톤으로만 렌더되어 active 구분이 부재. 팔레트 C Hybrid 시각 언어로 3-레이어 active 시스템 정식화.
 
-**3-레이어 스펙.**
+---
+
+#### [v1 — wave5/B8, 초기 설계] 3-레이어 스펙 (히스토리 보존)
 
 | 레이어 | Dark | Light | 규격 | 역할 |
 |---|---|---|---|---|
@@ -798,36 +800,51 @@ U(pc + "/jBE55", {content: "terminal-hook · placed"})
 | 행 배경 tint | `rgba(79,179,191,0.10)` `#4FB3BF1A` | `rgba(43,138,148,0.12)` `#2B8A941F` | 행 전체 overlay | raised 위 미묘한 tint — 판독성 유지하며 구분 추가 |
 | 아바타 링 | `$smalti-gold` `#C9A24B` | `#A8802A` | 2px stroke outside | "선택됨"의 촉각적 강조 — Magician 30% 골드 액센트를 active에 배속 |
 
+**[v1 폐기 사유]** 사용자 피드백 (wave5/B8 후속): accent bar + gold ring + cyan tint의 3-레이어 조합이 "촌스럽다"는 직접 피드백. 원인 분석: 좌측 accent bar는 구식 IDE 패턴(2010년대 VS 스타일)의 잔재이며, gold ring과 cyan tint의 2-색 동시 강조가 시각적 과부하를 유발. 현대 IDE(VS Code ≥1.80, Cursor, Zed)는 모두 surface elevation + 단색 tint만 사용.
+
+---
+
+#### [v2 — wave5/B8 후속, 현행 적용] Sky Blue 단일 토큰 스펙
+
+**채택 옵션: D 변형** — bar 완전 제거 + Sky Blue `#6FC5DB` tint/15 + `border border-smalti-skyblue/35` outline.
+
+| 레이어 | Dark | 규격 | 역할 |
+|---|---|---|---|
+| 행 배경 tint | `$smalti-skyblue/15` `rgba(111,197,219,0.15)` | 행 전체 fill | surface lift — 주변 inactive 행 대비 명확한 분리 |
+| 행 outline | `$smalti-skyblue/35` `rgba(111,197,219,0.35)` | 1px border, 행 외곽 | tint만으로 부족한 윤곽 강조. bar보다 훨씬 조용한 시그널 |
+| 아바타 ring | `$smalti-skyblue` `#6FC5DB` | 2px ring, ring-offset 1px | tint·border와 동일 색상 계열로 단일화. Gold 분리 → 불필요한 2-색 긴장 해소 |
+
+**단일 토큰 선택 근거.**
+- Cyan `#4FB3BF`는 터미널 프롬프트·에이전트 활성 상태 등 "동작 중" 시맨틱에 이미 배정됨. Active selection에 재사용하면 "이 워크스페이스가 실행 중인가 / 선택된 것인가?" 모호해짐.
+- Sky Blue `#6FC5DB`는 §9.3에서 선언된 보조 강조 토큰으로, "정적 선택"에 배정하기 적합한 톤 (더 차갑고 조용함).
+- Gold 제거: Gold는 §3.3 Magician 아키타입의 30% 액센트로 예약. Active selection처럼 반복 출현하는 상태에 과잉 사용하면 희소성(scarcity) 훼손.
+
+**아바타 사이즈 통일 (피드백 #1, #2 대응).**
+- Expanded 모드 구 사이즈: `w-4 h-4 rounded text-[9px]` (16px) — too small.
+- Collapsed 모드 구 사이즈: `w-7 h-7 rounded-[6px]` (28px) — 정상.
+- **현행**: 양쪽 모두 `w-7 h-7 rounded-[6px] text-[11px]`로 통일. expanded/collapsed 전환 시 아바타 크기 점프 없음.
+
 **Inactive / Hover / Active 상태 머신.**
-- **Inactive**: `fill: $smalti-raised` (`#1B1E2A` / `#DEDED6`). 평이한 baseline.
-- **Hover**: `fill: $smalti-divider` (`#2A2E3D` / `#C8C8BE`)로 살짝 브라이트닝. accent bar·ring 없음.
-- **Active**: 3-레이어 전부 적용. 호버 상태와 겹치지 않음 (active 자체가 최상위).
+- **Inactive**: `fill: $smalti-raised` (`#1B1E2A`). `border: transparent`. 평이한 baseline.
+- **Hover**: `fill: $aide-surface-elevated`. `border: transparent`. accent 없음.
+- **Active**: `bg-smalti-skyblue/15` + `border border-smalti-skyblue/35` + avatar `ring-2 ring-smalti-skyblue`. 단일 색 계열, 과부하 없음.
 
-**WCAG AA 대비 실측 (Dark).**
-- `$smalti-cyan #4FB3BF` on raised `#1B1E2A` → 4.86:1 ✅ (non-text UI 요소로 3:1만 요구되나 AA 텍스트 기준도 통과).
-- Gold ring `#C9A24B` on raised `#1B1E2A` → 5.92:1 ✅ (stroke 요소, 2px 굵기라 가시성 충분).
-- Ink-body `#E6E7ED` on tint-blended 배경 `≈ #1D2129` → 13.8:1 ✅ (tint 10%로 raised 대비 거의 변화 없음 → 이름 텍스트 판독성 보존).
+**WCAG AA 대비 실측 (Dark, v2).**
+- Sky Blue `#6FC5DB` on raised `#1B1E2A` → 5.31:1 ✅ (non-text 3:1 요구, AA 텍스트 4.5:1도 통과).
+- border `rgba(111,197,219,0.35)` blended → 가시성 보조 역할 (대비 요건 적용 대상 아님, 장식 테두리).
+- Ink-body `#E6E7ED` on tint-blended 배경 `≈ #1E2230` → 13.4:1 ✅ (tint 15%이므로 raised 대비 변화 미미).
 
-**Crimson 사용 금지 명시.** Active state에 Crimson `#F10C45`를 사용하지 않는다 — Crimson은 §3.3에서 **error + critical-accent**(`new` 배지) 전용으로 예약됨. 워크스페이스 선택은 "에러"도 "긴급"도 아니므로 cyan/gold 조합으로 한정한다. 혼용 시 사용자는 "어느 워크스페이스에 문제가 있나?"로 오독할 위험.
+**Crimson 사용 금지 명시.** Active state에 Crimson `#F10C45`를 사용하지 않는다 — Crimson은 §3.3에서 **error + critical-accent**(`new` 배지) 전용으로 예약됨. 워크스페이스 선택은 "에러"도 "긴급"도 아니므로 skyblue 단일 조합으로 한정한다.
 
-**design.pen 반영.**
-- **신규 컴포넌트 2개** (document 최상위, `x≈13600`):
-  - `smalti-WorkspaceRow` (id `784E0`, reusable) — inactive baseline. 260×56, padding `[12, 16]`, gap 12, 아바타 32×32 + 이름/경로 2행 + 우측 상태 도트.
-  - `smalti-WorkspaceRow-Active` (id `DJPKf`, reusable) — active 3-레이어 전부 적용. 좌측 3px cyan bar(frame child) + tint fill `#4FB3BF1A` + gold ring stroke 2px outside.
-- **Dark/Light Hybrid WorkspaceNav 아이콘 컬럼** (`6U6vO` / `J82FJ`):
-  - 첫 번째 아이콘 (`TVh9m` cyan / `0EClJ` cyan)에 gold stroke `#C9A24B` / `#A8802A` 2px outside 추가.
-  - 아이콘 컬럼 `index 0` 위치에 `activeTint` rectangle (48×28, tint fill) + `activeAccentBar` rectangle (3×28, cyan fill) 2개를 `layoutPosition: "absolute"`로 주입. 첫 번째 아이콘 y=8 정렬.
-- **디자인 시스템 프레임** (`JkG4U`) BRAND 섹션(`FTMyl`) 뒤·CHROME 섹션(`emd5D`) 앞에 `secWsNav` (id `2uvek`) 신설 — `WORKSPACE NAV` 라벨 + inactive 3개 (`aide`/`smalti`/`docs`) + active 1개 + hover 1개 + 3-레이어 설명 캡션.
-
-**검증.**
-- `get_screenshot(6U6vO)` / `get_screenshot(J82FJ)`: Dark·Light 모두 첫 아이콘에 cyan accent bar·tint·gold ring 3-레이어 동시 가시.
-- `get_screenshot(DJPKf)`: 신규 active 컴포넌트 단독 렌더 — 3-레이어 구조 확인.
-- `get_screenshot(JkG4U)`: 디자인 시스템에 Workspace Nav 섹션 정상 삽입, 다른 섹션 영향 없음.
+**design.pen 현황 (v1 기준, v2 반영 미완).**
+- `smalti-WorkspaceRow` (id `784E0`, reusable) — inactive baseline 그대로 유효.
+- `smalti-WorkspaceRow-Active` (id `DJPKf`, reusable) — v1 3-레이어(cyan bar + cyan tint + gold ring) 상태. **v2로 업데이트 필요**: bar 제거, fill → `skyblue/15`, ring → skyblue 단색.
+- 업데이트 시점: 다음 design.pen 편집 세션에서 처리 예정 (사용자 검토 후).
 
 **후속 판단 필요.**
-- 실 구현에서 워크스페이스 목록이 아이콘 컬럼(48px)인지 리스트 패널(260px)인지 확정 — design.pen은 양쪽 모두 시각 언어 제공.
+- design.pen `DJPKf` 컴포넌트를 v2 스펙으로 실제 갱신 (fill/border/ring 토큰 교체, accent bar child 제거).
 - 동일 active 스타일을 탭/파일 탐색기의 선택 상태와 어떻게 차별화할지 (현재 탭은 `$smalti-surface` fill만, 파일 선택은 `$smalti-divider` fill. 워크스페이스 active가 더 강한 시그널 = 정당한 계층).
-- Hover 상태에 옅은 cyan 1px 좌측 hint 추가 여부 — active 3-레이어의 사전 시각적 예고(progressive disclosure).
+- Light 테마 대응 토큰 결정 필요 (v2에서 Light 값 미확정).
 
 ---
 

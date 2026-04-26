@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== AIDE Build Script ==="
+echo "=== Smalti Build Script ==="
 echo ""
 
 # Check pnpm
@@ -13,15 +13,15 @@ fi
 # Detect arch
 ARCH=$(uname -m)
 if [ "$ARCH" = "arm64" ]; then
-  APP_DIR="out/AIDE-darwin-arm64"
+  APP_DIR="out/Smalti-darwin-arm64"
 else
-  APP_DIR="out/AIDE-darwin-x64"
+  APP_DIR="out/Smalti-darwin-x64"
 fi
 
-APP_PATH="$APP_DIR/AIDE.app"
-DMG_NAME="AIDE"
-DMG_PATH="out/AIDE.dmg"
-DMG_TMP_PATH="out/AIDE-tmp.dmg"
+APP_PATH="$APP_DIR/Smalti.app"
+DMG_NAME="Smalti"
+DMG_PATH="out/Smalti.dmg"
+DMG_TMP_PATH="out/Smalti-tmp.dmg"
 
 # Install dependencies (postinstall hook builds the Rust .node via scripts/build-native.mjs)
 echo "[1/4] Installing dependencies..."
@@ -98,7 +98,7 @@ tell application "Finder"
     set viewOptions to the icon view options of container window
     set arrangement of viewOptions to not arranged
     set icon size of viewOptions to 100
-    set position of item "AIDE.app" of container window to {125, 160}
+    set position of item "Smalti.app" of container window to {125, 160}
     set position of item "Applications" of container window to {375, 160}
     close
     open
@@ -124,7 +124,7 @@ rm -f "$DMG_TMP_PATH"
 
 # Create .app.zip for in-place auto-update
 echo "[+] Creating app.zip for auto-update..."
-ZIP_PATH="out/AIDE.app.zip"
+ZIP_PATH="out/Smalti.app.zip"
 rm -f "$ZIP_PATH"
 ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
 

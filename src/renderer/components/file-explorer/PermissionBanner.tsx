@@ -33,72 +33,35 @@ export function PermissionBanner({ errorCode, errorPath, errorMessage, onRetry, 
   };
 
   return (
-    <div
-      style={{
-        width: '100%',
-        padding: '12px',
-        background: '#1A1C23',
-        borderBottom: '1px solid #2E3140',
-        fontFamily: 'monospace',
-        flexShrink: 0,
-      }}
-    >
+    <div className="w-full flex-shrink-0 p-3 font-mono bg-aide-surface border-b border-aide-border">
       {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ color: '#F59E0B', fontSize: '11px' }}>⚠</span>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: '#E8E9ED' }}>Permission Required</span>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-aide-accent-warning text-[11px]">⚠</span>
+          <span className="text-[11px] font-semibold text-aide-text-primary">Permission Required</span>
         </div>
         <button
           type="button"
           onClick={onDismiss}
           title="Dismiss"
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: '#5C5E6A',
-            fontSize: '12px',
-            lineHeight: 1,
-            padding: '0 2px',
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#E8E9ED'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#5C5E6A'; }}
+          className="bg-transparent border-0 cursor-pointer text-aide-text-tertiary hover:text-aide-text-primary text-[12px] leading-none px-0.5"
         >
           ✕
         </button>
       </div>
 
       {/* Description */}
-      <p
-        style={{
-          margin: '0 0 8px 0',
-          fontSize: '10px',
-          color: '#8B8D98',
-          lineHeight: 1.4,
-        }}
-      >
+      <p className="m-0 mb-2 text-[10px] text-aide-text-secondary leading-snug">
         {description}
       </p>
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: '6px' }}>
+      <div className="flex gap-1.5">
         {showOpenSettings && (
           <button
             type="button"
             onClick={handleOpenSettings}
-            style={{
-              height: '24px',
-              padding: '0 8px',
-              background: '#10B981',
-              color: '#000',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '10px',
-              fontFamily: 'monospace',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className="h-6 px-2 rounded text-[10px] font-mono font-semibold cursor-pointer bg-aide-accent text-aide-background border-0 hover:opacity-90 transition-opacity"
           >
             Open Settings
           </button>
@@ -106,17 +69,7 @@ export function PermissionBanner({ errorCode, errorPath, errorMessage, onRetry, 
         <button
           type="button"
           onClick={onRetry}
-          style={{
-            height: '24px',
-            padding: '0 8px',
-            background: '#24262E',
-            color: '#E8E9ED',
-            border: '1px solid #2E3140',
-            borderRadius: '4px',
-            fontSize: '10px',
-            fontFamily: 'monospace',
-            cursor: 'pointer',
-          }}
+          className="h-6 px-2 rounded text-[10px] font-mono cursor-pointer bg-aide-surface-elevated text-aide-text-primary border border-aide-border hover:bg-aide-border transition-colors"
         >
           Retry
         </button>

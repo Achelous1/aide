@@ -190,7 +190,7 @@ function editPlugin(params) {
   return spec;
 }
 
-const CREATE_PLUGIN_DESC = `Create a new AIDE plugin from code. Plugins are installed in the workspace ({workspace}/.aide/plugins). The code must be a CommonJS module exporting { name, version, tools, invoke(toolName, args) }.
+const CREATE_PLUGIN_DESC = `Create a new Smalti plugin from code. Plugins are installed in the workspace ({workspace}/.smalti/plugins). The code must be a CommonJS module exporting { name, version, tools, invoke(toolName, args) }.
 
 Sandbox Environment:
 - require('path') → always available
@@ -205,7 +205,7 @@ Sandbox Environment:
 - An index.html is auto-generated for iframe rendering. Pass the optional 'html' parameter to aide_create_plugin to provide a custom UI in one step.
 
 HTML UI (iframe) Event API:
-Plugin iframes receive FILES tab events via postMessage from the AIDE renderer.
+Plugin iframes receive FILES tab events via postMessage from the Smalti renderer.
 
 Constraints (sandbox="allow-scripts", no allow-same-origin):
 - file:// URLs are BLOCKED inside the iframe. Never set frame.src = 'file://' + path.
@@ -218,7 +218,7 @@ Available iframe APIs:
   window.aide.emit() — reserved for future use
 
 window.aide shim:
-AIDE automatically injects the window.aide shim into all plugin iframes — both auto-generated and custom HTML. You do NOT need to include the shim manually in custom HTML.
+Smalti automatically injects the window.aide shim into all plugin iframes — both auto-generated and custom HTML. You do NOT need to include the shim manually in custom HTML.
 
 Theme sync API:
   window.aide is automatically notified of theme changes via postMessage. Additionally you can listen:
@@ -242,9 +242,9 @@ eventBindings (.aide/settings.json): controls backend tool invocation on file ev
   Example: { "eventBindings": { "file:clicked": [{ "plugin": "my-plugin", "tool": "on-file-clicked", "args": {} }] } }
 
 Theme Support (REQUIRED):
-AIDE runs in both dark and light themes. Your plugin MUST work in both.
+Smalti runs in both dark and light themes. Your plugin MUST work in both.
 
-CSS variables are AUTO-INJECTED into every plugin iframe by AIDE — you do NOT need to define :root, .light, or @media(prefers-color-scheme) blocks yourself. Just reference the variables:
+CSS variables are AUTO-INJECTED into every plugin iframe by Smalti — you do NOT need to define :root, .light, or @media(prefers-color-scheme) blocks yourself. Just reference the variables:
 
   background: var(--background);
   color: var(--text-primary);
@@ -252,14 +252,14 @@ CSS variables are AUTO-INJECTED into every plugin iframe by AIDE — you do NOT 
   color: var(--accent);
 
 Runtime theme switching:
-AIDE sends postMessage({theme: 'dark'|'light'}) to the plugin iframe whenever the user toggles theme. The injected shim automatically updates document.documentElement.className, which triggers the .light class variables. Your CSS will re-render without any code on your side — provided you used var() references, not hardcoded colors.
+Smalti sends postMessage({theme: 'dark'|'light'}) to the plugin iframe whenever the user toggles theme. The injected shim automatically updates document.documentElement.className, which triggers the .light class variables. Your CSS will re-render without any code on your side — provided you used var() references, not hardcoded colors.
 
 Detecting current theme from JS:
   const isLight = document.documentElement.classList.contains('light');
 
 NEVER hardcode colors like #000, #fff, black, white, or any hex literal for UI surfaces. Always use the CSS variables below. Hardcoding will break one of the two themes.
 
-IMPORTANT — AIDE Design System Rules:
+IMPORTANT — Smalti Design System Rules:
 If the plugin produces UI output (HTML/CSS), it MUST use these CSS custom properties (not hardcoded colors):
 
 Dark theme (default):
@@ -322,23 +322,23 @@ function getBuiltinTools() {
     },
     {
       name: "aide_list_plugins",
-      description: "List all installed AIDE plugins with their tools.",
+      description: "List all installed Smalti plugins with their tools.",
       inputSchema: { type: "object", properties: {} }
     },
     {
       name: "aide_invoke_tool",
-      description: "Invoke a tool from an installed AIDE plugin.",
+      description: "Invoke a tool from an installed Smalti plugin.",
       inputSchema: { type: "object", properties: { plugin_name: { type: "string" }, tool_name: { type: "string" }, args: { type: "object" } }, required: ["plugin_name", "tool_name"] }
     },
     {
       name: "aide_edit_plugin",
-      description: "Edit an existing AIDE plugin in-place. Only provided fields are updated — omitted fields are left unchanged. Useful for patching code or UI without deleting and recreating the plugin.",
+      description: "Edit an existing Smalti plugin in-place. Only provided fields are updated — omitted fields are left unchanged. Useful for patching code or UI without deleting and recreating the plugin.",
       inputSchema: {
         type: "object",
         properties: {
           name: { type: "string", description: "Plugin name to edit" },
           code: { type: "string", description: "New index.js source (CommonJS module). Replaces existing code." },
-          html: { type: "string", description: "New index.html content. Replaces existing UI. The window.aide shim is automatically injected by AIDE — no manual inclusion needed." },
+          html: { type: "string", description: "New index.html content. Replaces existing UI. The window.aide shim is automatically injected by Smalti — no manual inclusion needed." },
           description: { type: "string", description: "Updated plugin description." },
           permissions: { type: "array", items: { type: "string" }, description: "Updated permissions list." },
           tools: { type: "array", description: "Updated tool definitions.", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, parameters: { type: "object" } } } },
@@ -349,7 +349,7 @@ function getBuiltinTools() {
     },
     {
       name: "aide_delete_plugin",
-      description: "Delete an installed AIDE plugin.",
+      description: "Delete an installed Smalti plugin.",
       inputSchema: {
         type: "object",
         properties: {
@@ -377,7 +377,7 @@ function getBuiltinTools() {
 function handleRequest(method, id, params) {
   try {
     if (method === "initialize") {
-      sendResult(id, { protocolVersion: params.protocolVersion || "2025-11-25", capabilities: { tools: {} }, serverInfo: { name: "aide", version: "0.1.0" } });
+      sendResult(id, { protocolVersion: params.protocolVersion || "2025-11-25", capabilities: { tools: {} }, serverInfo: { name: "smalti", version: "0.1.0" } });
     } else if (method === "tools/list") {
       sendResult(id, { tools: getBuiltinTools() });
     } else if (method === "tools/call") {
