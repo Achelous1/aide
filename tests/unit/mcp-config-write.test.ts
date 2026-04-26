@@ -91,7 +91,11 @@ describe('writeMcpConfig — post-release startup registration', () => {
 
     const content = fs.readFileSync(codexConfigPath, 'utf-8');
     expect(content).toContain('[mcp_servers.aide]');
-    expect(content).toContain(path.join(sandboxHome, '.smalti', 'smalti-mcp-server.js'));
+    // Path is written via JSON.stringify in TOML, which escapes \ → \\ on
+    // Windows. Compare against the JSON-stringified form so the assertion
+    // works on both win32 and posix.
+    const expected = JSON.stringify(path.join(sandboxHome, '.smalti', 'smalti-mcp-server.js'));
+    expect(content).toContain(expected);
   });
 
   it('strips any pre-existing aide entry from ~/.claude.json (intentional cleanup)', async () => {
