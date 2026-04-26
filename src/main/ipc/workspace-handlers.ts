@@ -47,8 +47,8 @@ function nextColor(counter: number): string {
 }
 
 /**
- * Migration: remove AIDE-generated entries from {workspace}/.mcp.json.
- * If only AIDE entries remain, delete the file entirely.
+ * Migration: remove smalti-generated entries from {workspace}/.mcp.json.
+ * If only smalti entries remain, delete the file entirely.
  */
 export function migrateProjectMcpJson(workspacePath: string): void {
   const mcpPath = nodePath.join(workspacePath, '.mcp.json');
@@ -66,7 +66,7 @@ export function migrateProjectMcpJson(workspacePath: string): void {
       const topKeys = Object.keys(config).filter((k) => k !== 'mcpServers');
       if (topKeys.length === 0) {
         fs.unlinkSync(mcpPath);
-        console.log('[smalti] Removed legacy .mcp.json (AIDE-only)');
+        console.log('[smalti] Removed legacy .mcp.json (smalti-only)');
       } else {
         delete config.mcpServers;
         fs.writeFileSync(mcpPath, JSON.stringify(config, null, 2));
@@ -119,7 +119,7 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
       workspace.lastOpened = Date.now();
       setWorkspaces(workspaces);
     }
-    // Migrate legacy .mcp.json (remove AIDE entries from project root)
+    // Migrate legacy .mcp.json (remove smalti entries from project root)
     migrateProjectMcpJson(path);
     // .aide/plugins creation is delegated (see WORKSPACE_CREATE comment).
     try { writeMcpConfig(path); } catch (err) {

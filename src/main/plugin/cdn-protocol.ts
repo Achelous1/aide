@@ -123,7 +123,7 @@ export function registerCdnProtocol(): void {
       const cached = fs.readFileSync(cachePath);
       const mime = readCachedMime(cachePath) || extMime;
       return new Response(new Uint8Array(cached), {
-        headers: { 'Content-Type': mime, 'X-AIDE-Cache': 'hit' },
+        headers: { 'Content-Type': mime, 'X-Smalti-Cache': 'hit' },
       });
     } catch { /* not cached */ }
 
@@ -132,7 +132,7 @@ export function registerCdnProtocol(): void {
       const realUrl = `https://${url.hostname}${url.pathname}${url.search}`;
       const { buffer, mime } = await downloadAndCache(realUrl, cachePath, extMime);
       return new Response(new Uint8Array(buffer), {
-        headers: { 'Content-Type': mime, 'X-AIDE-Cache': 'miss' },
+        headers: { 'Content-Type': mime, 'X-Smalti-Cache': 'miss' },
       });
     } catch (err) {
       return new Response(`CDN fetch failed: ${(err as Error).message}`, {

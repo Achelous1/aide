@@ -45,6 +45,14 @@ const config: ForgeConfig = {
     },
     name: 'Smalti',
     icon: path.resolve(__dirname, 'resources', 'icon'),
+    // Stable bundle ID — decoupled from packagerConfig.name so future brand
+    // text adjustments (capitalization, etc.) don't change CFBundleIdentifier
+    // and force users to re-grant TCC permissions (Full Disk Access, etc.).
+    appBundleId: 'com.smaltihq.smalti',
+    win32metadata: {
+      CompanyName: 'smalti',
+      ProductName: 'Smalti',
+    },
     extendInfo: {
       NSDocumentsFolderUsageDescription: 'Smalti reads workspace files from your Documents folder.',
       NSDesktopFolderUsageDescription: 'Smalti reads workspace files from your Desktop folder.',
