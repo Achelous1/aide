@@ -89,7 +89,8 @@ export function App() {
     };
   }, []);
 
-  // PaneView auto-spawns a shell when empty — no App-level auto-create needed
+  // Empty panes render the EmptyState hero (PaneView L298). No App- or
+  // restore-level auto-spawn — the user picks an agent or shell explicitly.
 
   // Global keyboard shortcuts
   useEffect(() => {

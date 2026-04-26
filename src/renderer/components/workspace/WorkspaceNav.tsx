@@ -151,11 +151,12 @@ export function WorkspaceNav() {
   };
 
   const handleDeleteWorkspace = async (id: string) => {
-    if (workspaces.length <= 1) return; // Can't delete the last workspace
-    // If deleting the active workspace, switch to another one first
+    // If deleting the active workspace, switch to another one first; if this
+    // is the last workspace there is no sibling to switch to, so we clear
+    // activeWorkspaceId — the welcome screen handles that case.
     if (id === activeWorkspaceId) {
       const other = workspaces.find((w) => w.id !== id);
-      if (other) await setActive(other.id);
+      await setActive(other ? other.id : null);
     }
     try {
       await window.aide.workspace.remove(id);
@@ -365,9 +366,8 @@ export function WorkspaceNav() {
             </button>
             <hr className="border-aide-border my-1" />
             <button
-              onClick={() => { const id = contextMenuId; setContextMenuId(null); if (workspaces.length > 1) setDeleteConfirmId(id); }}
-              disabled={workspaces.length <= 1}
-              className="flex items-center w-full px-3 py-2 text-xs font-mono text-red-400 hover:bg-aide-surface-sidebar transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={() => { const id = contextMenuId; setContextMenuId(null); setDeleteConfirmId(id); }}
+              className="flex items-center w-full px-3 py-2 text-xs font-mono text-red-400 hover:bg-aide-surface-sidebar transition-colors"
             >
               Remove from Workspace
             </button>
