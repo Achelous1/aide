@@ -432,7 +432,7 @@ export function WorkspaceNav() {
             }`}
           >
             <span
-              className={`w-7 h-7 rounded-[6px] flex items-center justify-center text-black text-[11px] font-bold${isActive ? ' ring-2 ring-smalti-skyblue' : ''}`}
+              className={`w-7 h-7 rounded-[6px] flex items-center justify-center text-white text-[11px] font-bold${isActive ? ' ring-2 ring-smalti-skyblue' : ''}`}
               style={{ backgroundColor: ws.color }}
             >
               {ws.name[0]?.toUpperCase() ?? '?'}
