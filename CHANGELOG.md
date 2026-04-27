@@ -3,6 +3,22 @@
 All notable changes to Smalti are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning per [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] — 2026-04-27
+
+Hotfix for blank plugin iframes after the v0.2.0 rebrand.
+
+### Fixed
+- **Plugin iframes rendered blank on every workspace.** v0.2.0 switched the iframe URL in `PluginView.tsx` from `aide-plugin://` to `smalti-plugin://`, but the renderer's `index.html` Content-Security-Policy `frame-src` allowlist was not updated and still permitted only `aide-plugin:`. Chromium silently blocked every iframe on CSP grounds, so users saw an empty pane regardless of whether the workspace migration (#127) had run.
+- `frame-src` now allows both `smalti-plugin:` and `aide-plugin:` (legacy alias retained for 1–2 releases, in line with the existing scheme registration).
+- `<title>AIDE</title>` updated to `<title>Smalti</title>` (stale since v0.2.0).
+
+### Tests
+- New `tests/unit/index-html-csp.test.ts` pins the `frame-src` allowlist so future scheme renames cannot drop CSP coverage silently.
+
+### Upgrade notes
+- v0.2.2 users: install v0.2.3 and reopen the workspace. No data migration required.
+- macOS still requires `xattr -c /Applications/Smalti.app` after install (unsigned build).
+
 ## [0.2.2] — 2026-04-27
 
 Hotfix for v0.2.0/v0.2.1 rebrand migration gap — workspace-level `.aide` directory and plugin path alias.
