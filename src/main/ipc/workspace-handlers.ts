@@ -5,6 +5,7 @@ import Store from 'electron-store';
 import { IPC_CHANNELS } from './channels';
 import type { WorkspaceInfo } from '../../types/ipc';
 import { writeMcpConfig } from '../mcp/config-writer';
+import { migrateAideWorkspace } from '../migrate-aide-workspace';
 import { setWorkspaceWatcher } from './fs-handlers';
 
 const store = new Store({ name: 'aide-workspaces' });
@@ -111,13 +112,22 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
     return workspace;
   });
 
-  ipcMain.handle(IPC_CHANNELS.WORKSPACE_OPEN, (_event, path: string) => {
+  ipcMain.handle(IPC_CHANNELS.WORKSPACE_OPEN, async (_event, path: string) => {
     activeWorkspacePath = path;
     const workspaces = getWorkspaces();
     const workspace = workspaces.find((w) => w.path === path);
     if (workspace) {
       workspace.lastOpened = Date.now();
       setWorkspaces(workspaces);
+    }
+    // Migrate <workspace>/.aide → .smalti so plugin loader sees the correct dir.
+    try {
+      const result = await migrateAideWorkspace(path);
+      if (result.warnings?.length) {
+        result.warnings.forEach((w) => console.warn('[smalti] workspace migration warning:', w));
+      }
+    } catch (err) {
+      console.warn('[smalti] workspace migration error:', (err as Error).message);
     }
     // Migrate legacy .mcp.json (remove smalti entries from project root)
     migrateProjectMcpJson(path);
