@@ -46,7 +46,7 @@ export interface MigrateResult {
  * moved (rename) — items that already exist in `dest` are kept (dest wins).
  * Subdirectories are recursed so inner files can be picked up.
  */
-async function mergeDirectory(src: string, dest: string, warnings: string[]): Promise<void> {
+export async function mergeDirectory(src: string, dest: string, warnings: string[]): Promise<void> {
   let entries: fs.Dirent[];
   try {
     entries = await fsp.readdir(src, { withFileTypes: true });

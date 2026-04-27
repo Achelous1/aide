@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, protocol } from 'electron';
 
 import { userInfo } from 'os';
 import path from 'path';
+import * as fs from 'fs';
 import { fixPackagedEnv } from './fix-env';
 import { registerIpcHandlers } from './ipc/handlers';
 import { registerWorkspaceHandlers } from './ipc/workspace-handlers';
@@ -14,11 +15,12 @@ import { registerAppSettingsHandlers, getAppSettings, setAppSetting } from './ip
 import { registerUpdaterHandlers } from './ipc/updater-handlers';
 import { startUpdatePolling } from './updater/check';
 import { killAllSessions } from './ipc/terminal-handlers';
-import { writeMcpConfig } from './mcp/config-writer';
+import { writeMcpConfig, getMcpConfigPath, unregisterAideFromJsonConfig } from './mcp/config-writer';
 import { registerCustomSchemes, registerPluginProtocol } from './plugin/protocol';
 import { registerCdnProtocol } from './plugin/cdn-protocol';
 import { getHome } from './utils/home';
 import { migrateAideToSmalti } from './migrate-aide-data';
+import { migrateAideUserData } from './migrate-aide-userdata';
 
 fixPackagedEnv();
 
@@ -111,6 +113,38 @@ app.on('ready', () => {
     }
   }).catch((err) => {
     console.error('[smalti] Migration failed (non-fatal):', err);
+  });
+  migrateAideUserData(app.getPath('userData')).then((results) => {
+    for (const result of results) {
+      if (result.migrated) {
+        console.log(`[smalti] userData migration: mode=${result.mode}, deletedLegacy=${result.deletedLegacy}`);
+      } else if (result.skipped && result.skipped !== 'no-legacy-dir') {
+        console.log(`[smalti] userData migration skipped: ${result.skipped}`);
+      }
+      if (result.warnings && result.warnings.length > 0) {
+        for (const w of result.warnings) {
+          console.warn(`[smalti] userData migration warning: ${w}`);
+        }
+      }
+    }
+    // Clean up dead-path mcpServers.aide entries that may have been merged
+    // from legacy userData (e.g. args[0] pointing to ~/.aide/aide-mcp-server.js).
+    try {
+      const mcpConfigPath = getMcpConfigPath();
+      if (fs.existsSync(mcpConfigPath)) {
+        const config = JSON.parse(fs.readFileSync(mcpConfigPath, 'utf-8')) as Record<string, unknown>;
+        const servers = config.mcpServers as Record<string, { args?: string[] }> | undefined;
+        const aideEntry = servers?.['aide'];
+        if (aideEntry?.args?.[0] && !fs.existsSync(aideEntry.args[0])) {
+          unregisterAideFromJsonConfig(mcpConfigPath);
+          console.log('[smalti] Cleaned dead-path mcpServers.aide from merged mcp-config.json');
+        }
+      }
+    } catch (err) {
+      console.warn('[smalti] Failed to clean dead-path MCP entry (non-fatal):', (err as Error).message);
+    }
+  }).catch((err) => {
+    console.error('[smalti] userData migration failed (non-fatal):', err);
   });
   registerIpcHandlers();
   registerAppSettingsHandlers(ipcMain);
