@@ -3,6 +3,22 @@
 All notable changes to Smalti are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning per [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] — 2026-04-27
+
+Hotfix for v0.2.0/v0.2.1 rebrand migration gap — workspace-level `.aide` directory and plugin path alias.
+
+### Fixed
+- **Per-workspace `.aide` → `.smalti` migration** — v0.1.x workspaces stored plugin data and JSON files under `<workspace>/.aide/`. v0.2.0 only renamed the user home directory (`~/.aide → ~/.smalti`); workspace-local directories were untouched. Opening a v0.1.x workspace showed zero plugins and an empty kanban board. New `migrateAideWorkspace()` runs inside the `WORKSPACE_OPEN` IPC handler (before the plugin loader fires), applying the same rename-first / merge-fallback strategy as the home-directory migration. Per-workspace marker (`<ws>/.smalti/.migrated-from-aide`) prevents repeat runs.
+- **Plugin sandbox `.aide/` path alias** — Even after the directory migration, legacy plugins that hardcode `.aide/` as their workspace data prefix (e.g. `const DEFAULT_FILE = '.aide/agent-todos.json'`) would silently recreate `<workspace>/.aide/` and write fresh empty files there, making the kanban board show a blank state. New `resolveWorkspaceRel()` helper in `sandbox.ts` rewrites any leading `.aide/` segment to `.smalti/` before resolving, so legacy plugins transparently read and write the migrated location. Alias removed in v0.3.x.
+- **Stale comment in `cdn-protocol.ts`** — JSDoc referenced `~/.aide/cdn-cache/`; corrected to `~/.smalti/cdn-cache/`.
+
+### Tests
+- 7 new cases for `migrateAideWorkspace` (no-aide-dir / rename / merge / conflict / nested / idempotent / stale-marker re-merge).
+- 7 new cases for `resolveWorkspaceRel` alias logic (`.aide/` → `.smalti/`, directory-only, `./` prefix, already-new path, mid-path non-rewrite, unrelated path, no-dot identifier).
+
+### Upgrade notes
+- v0.1.x users: migration runs automatically on the first workspace open after upgrading. No manual action.
+
 ## [0.2.1] — 2026-04-27
 
 Hotfix for v0.2.0 rebrand migration gap.

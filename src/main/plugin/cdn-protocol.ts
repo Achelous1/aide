@@ -4,7 +4,7 @@
  * Plugins use `<script src="aide-cdn://cdn.jsdelivr.net/npm/lib@1/dist/lib.js">`
  * instead of `https://...`. The handler:
  *   1. Validates hostname against CDN allowlist
- *   2. Checks ~/.aide/cdn-cache/ for a cached copy
+ *   2. Checks ~/.smalti/cdn-cache/ for a cached copy
  *   3. If cached: serves from disk (works offline)
  *   4. If not cached: downloads from the real HTTPS URL, caches, then serves
  *
