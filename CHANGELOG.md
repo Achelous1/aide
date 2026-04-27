@@ -1,7 +1,24 @@
 # Changelog
 
-All notable changes to AIDE are documented here.
+All notable changes to Smalti are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning per [SemVer](https://semver.org/spec/v2.0.0.html).
+
+## [0.2.1] — 2026-04-27
+
+Hotfix for v0.2.0 rebrand migration gap.
+
+### Fixed
+- **Legacy Electron `userData` directories were not migrated** — v0.2.0 only handled the `~/.aide → ~/.smalti` home-directory rename. The Electron `userData` directory (`~/Library/Application Support/{aide,AIDE}` on macOS, `%APPDATA%/{aide,AIDE}` on Windows, `~/.config/{aide,AIDE}` on Linux) was untouched, so users upgrading from v0.0.x or v0.1.x saw an empty workspace list, lost session history, and reset app settings on first launch of v0.2.0 (their data was sitting next to the new `smalti/` userData directory, invisible to the running app).
+- New `migrateAideUserData()` runs at `app.on('ready')` after the home-directory migration. It walks each legacy basename (`aide`, `AIDE`) in the parent of the current `userData` and applies rename-first / merge-fallback (dest wins on conflict), reusing `mergeDirectory` from `migrate-aide-data`.
+- Per-legacy markers (`.migrated-from-aide`, `.migrated-from-AIDE`) prevent double migration.
+- Defensive cleanup: any merged-in `mcpServers.aide` entry whose `args[0]` no longer exists on disk is dropped, so `registerJsonMcpConfig()` rewrites the fresh `~/.smalti/smalti-mcp-server.js` path on the next launch.
+
+### Tests
+- 8 new unit cases (no-legacy / rename / merge / AIDE-only / dual legacy / marker isolation / same-path guard) on top of the 7 existing home-migration cases. 464/467 unit tests pass overall (3 pre-existing skipped).
+
+### Upgrade notes
+- v0.2.0 users: the migration runs automatically on first launch of v0.2.1. No manual action.
+- macOS still requires `xattr -c /Applications/Smalti.app` after install (unsigned build, see v0.2.0 notes).
 
 ## [0.1.1] — 2026-04-23
 
