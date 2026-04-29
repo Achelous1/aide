@@ -109,3 +109,9 @@ target/
 # napi-generated native binaries and type declarations (rebuilt by pnpm build:native)
 src/main/native/*.node
 src/main/native/*.d.ts
+
+# Local development clutter (Phase 1 cleanup)
+git-status.json
+image.png
+skills-lock.json
+.serena/

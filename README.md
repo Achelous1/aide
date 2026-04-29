@@ -1,4 +1,4 @@
-[한국어](./README_kor.md) · **English**
+[한국어](./docs/README.ko.md) · **English**
 
 <p align="center">
   <img src="docs/brand/smalti-icon-source-1024.png" width="180" alt="smalti logo" />

@@ -15,13 +15,13 @@ function countStandaloneAide(content: string): number {
     .replace(/Applications\/AIDE\b/g, '')   // install path (D8)
     .replace(/from AIDE to/gi, '')           // rebrand notice box (English)
     .replace(/AIDE is being renamed/gi, '') // rebrand notice box (English)
-    .replace(/제품명이 AIDE에서/g, '')      // rebrand notice box (Korean) — L11 in README_kor.md
+    .replace(/제품명이 AIDE에서/g, '')      // rebrand notice box (Korean) — L11 in docs/README.ko.md
     .replace(/AIDE는 .{0,80}로 전환/g, ''); // rebrand notice box (Korean) — legacy variant
   return (clean.match(/\bAIDE\b/g) || []).length;
 }
 
 describe('README brand migration (E1)', () => {
-  it.each(['README.md', 'README_kor.md'])('%s has zero standalone AIDE', (file) => {
+  it.each(['README.md', 'docs/README.ko.md'])('%s has zero standalone AIDE', (file) => {
     const content = fs.readFileSync(path.resolve(ROOT, file), 'utf-8');
     const count = countStandaloneAide(content);
     if (count > 0) {
@@ -35,7 +35,7 @@ describe('README brand migration (E1)', () => {
     expect(count).toBe(0);
   });
 
-  it.each(['README.md', 'README_kor.md'])('%s mentions smalti brand', (file) => {
+  it.each(['README.md', 'docs/README.ko.md'])('%s mentions smalti brand', (file) => {
     const content = fs.readFileSync(path.resolve(ROOT, file), 'utf-8');
     expect(content.toLowerCase()).toContain('smalti');
   });
