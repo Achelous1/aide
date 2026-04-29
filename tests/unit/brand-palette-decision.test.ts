@@ -4,12 +4,12 @@ import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../..');
 
-function readWorkspace(rel: string): string {
-  return fs.readFileSync(path.resolve(ROOT, '_workspace', rel), 'utf-8');
+function readBrandDoc(rel: string): string {
+  return fs.readFileSync(path.resolve(ROOT, 'docs', 'brand', rel), 'utf-8');
 }
 
 describe('brand design tokens — B05 guard (Glass Cyan vs Sky Blue)', () => {
-  const doc = readWorkspace('04_visual_identity.md');
+  const doc = readBrandDoc('04_visual_identity.md');
 
   it('$smalti-cyan token is defined as a distinct palette-C token', () => {
     expect(doc).toMatch(/\$smalti-cyan/);
