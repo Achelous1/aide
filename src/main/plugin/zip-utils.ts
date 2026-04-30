@@ -133,3 +133,58 @@ export function sha256OfBuffer(buf: Buffer): ContentHash {
   const hex = crypto.createHash('sha256').update(buf).digest('hex');
   return makeContentHash(hex);
 }
+
+/**
+ * Compute file-level diff between two directory trees. Honors the same
+ * hidden/excluded-from-hash rules as computeDirectoryContentHash.
+ *
+ * Returns relative paths (forward-slash separated) of files that differ.
+ * `added`: in B, not in A.
+ * `removed`: in A, not in B.
+ * `modified`: present in both with different sha256 of content.
+ */
+export interface DirectoryDiff {
+  added: string[];
+  removed: string[];
+  modified: string[];
+}
+
+export function diffDirectories(srcA: string, srcB: string): DirectoryDiff {
+  function buildMap(dir: string): Map<string, string> {
+    const map = new Map<string, string>();
+    const files = walkFiles(dir).filter((rel) => !isExcludedFromHash(rel));
+    for (const rel of files) {
+      const content = fs.readFileSync(path.join(dir, rel));
+      const hex = crypto.createHash('sha256').update(content).digest('hex');
+      map.set(rel.split(path.sep).join('/'), hex);
+    }
+    return map;
+  }
+
+  const mapA = buildMap(srcA);
+  const mapB = buildMap(srcB);
+
+  const added: string[] = [];
+  const removed: string[] = [];
+  const modified: string[] = [];
+
+  for (const [key, hashB] of mapB) {
+    if (!mapA.has(key)) {
+      added.push(key);
+    } else if (mapA.get(key) !== hashB) {
+      modified.push(key);
+    }
+  }
+
+  for (const key of mapA.keys()) {
+    if (!mapB.has(key)) {
+      removed.push(key);
+    }
+  }
+
+  added.sort();
+  removed.sort();
+  modified.sort();
+
+  return { added, removed, modified };
+}
