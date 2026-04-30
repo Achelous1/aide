@@ -73,7 +73,13 @@ function registerJsonMcpConfig(configPath: string, nodePath: string, serverPath:
   if (!config.mcpServers || typeof config.mcpServers !== 'object') {
     config.mcpServers = {};
   }
-  (config.mcpServers as Record<string, unknown>)['aide'] = {
+  const servers = config.mcpServers as Record<string, unknown>;
+  // Migrate legacy 'aide' entry to 'smalti'
+  if ('aide' in servers) {
+    delete servers['aide'];
+    console.error(`[smalti-mcp] migrated 'aide' entry to 'smalti' in ${configPath}`);
+  }
+  servers['smalti'] = {
     command: nodePath,
     args: [serverPath],
   };
@@ -81,12 +87,12 @@ function registerJsonMcpConfig(configPath: string, nodePath: string, serverPath:
 }
 
 /**
- * Removes the mcpServers.aide entry from a JSON MCP config file.
+ * Removes both mcpServers.smalti and mcpServers.aide entries from a JSON MCP config file.
  * Preserves other mcpServers and top-level keys. If mcpServers becomes
  * empty after removal, the key is dropped. If the file does not exist
- * or contains no aide entry, this is a no-op.
+ * or contains neither entry, this is a no-op.
  */
-export function unregisterAideFromJsonConfig(configPath: string): void {
+export function unregisterSmaltiFromJsonConfig(configPath: string): void {
   if (!fs.existsSync(configPath)) return;
   let config: Record<string, unknown>;
   try {
@@ -95,8 +101,10 @@ export function unregisterAideFromJsonConfig(configPath: string): void {
     return; // corrupt — leave untouched
   }
   const servers = config.mcpServers as Record<string, unknown> | undefined;
-  if (!servers || typeof servers !== 'object' || !('aide' in servers)) return;
+  if (!servers || typeof servers !== 'object') return;
+  if (!('aide' in servers) && !('smalti' in servers)) return;
   delete servers['aide'];
+  delete servers['smalti'];
   if (Object.keys(servers).length === 0) {
     delete config.mcpServers;
   }
@@ -139,12 +147,12 @@ export function writeMcpConfig(workspacePath: string): string {
   //                      so it's always picked up alongside --mcp-config)
   // Idempotent — safe to run on every workspace change.
   try {
-    unregisterAideFromJsonConfig(path.join(home, '.claude.json'));
+    unregisterSmaltiFromJsonConfig(path.join(home, '.claude.json'));
   } catch (err) {
     console.warn('[smalti] Failed to clean legacy Claude MCP entry:', (err as Error).message);
   }
   try {
-    unregisterAideFromJsonConfig(path.join(home, '.mcp.json'));
+    unregisterSmaltiFromJsonConfig(path.join(home, '.mcp.json'));
   } catch (err) {
     console.warn('[smalti] Failed to clean legacy ~/.mcp.json entry:', (err as Error).message);
   }
@@ -161,9 +169,14 @@ export function writeMcpConfig(workspacePath: string): string {
     const codexConfigPath = path.join(home, '.codex', 'config.toml');
     fs.mkdirSync(path.dirname(codexConfigPath), { recursive: true });
     let content = fs.existsSync(codexConfigPath) ? fs.readFileSync(codexConfigPath, 'utf-8') : '';
-    content = removeTomlSection(content, '[mcp_servers.aide]');
+    // Migrate legacy [mcp_servers.aide] section and write [mcp_servers.smalti]
+    if (content.includes('[mcp_servers.aide]')) {
+      content = removeTomlSection(content, '[mcp_servers.aide]');
+      console.error(`[smalti-mcp] migrated 'aide' entry to 'smalti' in ${codexConfigPath}`);
+    }
+    content = removeTomlSection(content, '[mcp_servers.smalti]');
     const prefix = content.trimEnd();
-    const block = `[mcp_servers.aide]\ncommand = ${JSON.stringify(nodePath)}\nargs = [${JSON.stringify(serverPath)}]\n`;
+    const block = `[mcp_servers.smalti]\ncommand = ${JSON.stringify(nodePath)}\nargs = [${JSON.stringify(serverPath)}]\n`;
     fs.writeFileSync(codexConfigPath, prefix.length > 0 ? `${prefix}\n\n${block}` : block);
   } catch (err) {
     console.warn('[smalti] Failed to register Codex MCP config:', (err as Error).message);
@@ -171,7 +184,7 @@ export function writeMcpConfig(workspacePath: string): string {
 
   const config = {
     mcpServers: {
-      aide: {
+      smalti: {
         command: 'node',
         args: [getMcpServerPath()],
         env: {

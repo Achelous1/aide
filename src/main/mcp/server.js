@@ -301,10 +301,12 @@ Common examples:
   Tailwind CSS: smalti-cdn://cdn.jsdelivr.net/npm/@tailwindcss/browser@4/cdn.min.js
 NEVER use raw https:// URLs — they are blocked by the plugin sandbox. ALWAYS use smalti-cdn:// prefix.`;
 
+var _deprecationWarned = new Set();
+
 function getBuiltinTools() {
   const builtins = [
     {
-      name: "aide_create_plugin",
+      name: "smalti_create_plugin",
       description: CREATE_PLUGIN_DESC,
       inputSchema: {
         type: "object",
@@ -321,17 +323,17 @@ function getBuiltinTools() {
       }
     },
     {
-      name: "aide_list_plugins",
+      name: "smalti_list_plugins",
       description: "List all installed Smalti plugins with their tools.",
       inputSchema: { type: "object", properties: {} }
     },
     {
-      name: "aide_invoke_tool",
+      name: "smalti_invoke_tool",
       description: "Invoke a tool from an installed Smalti plugin.",
       inputSchema: { type: "object", properties: { plugin_name: { type: "string" }, tool_name: { type: "string" }, args: { type: "object" } }, required: ["plugin_name", "tool_name"] }
     },
     {
-      name: "aide_edit_plugin",
+      name: "smalti_edit_plugin",
       description: "Edit an existing Smalti plugin in-place. Only provided fields are updated — omitted fields are left unchanged. Useful for patching code or UI without deleting and recreating the plugin.",
       inputSchema: {
         type: "object",
@@ -348,7 +350,7 @@ function getBuiltinTools() {
       }
     },
     {
-      name: "aide_delete_plugin",
+      name: "smalti_delete_plugin",
       description: "Delete an installed Smalti plugin.",
       inputSchema: {
         type: "object",
@@ -382,15 +384,31 @@ function handleRequest(method, id, params) {
       sendResult(id, { tools: getBuiltinTools() });
     } else if (method === "tools/call") {
       const tn = params.name, ta = params.arguments || {};
-      if (tn === "aide_create_plugin") {
+      // Backward-compat: map old aide_* names to their smalti_* equivalents
+      var _DEPRECATED_ALIASES = {
+        "aide_create_plugin":  "smalti_create_plugin",
+        "aide_list_plugins":   "smalti_list_plugins",
+        "aide_invoke_tool":    "smalti_invoke_tool",
+        "aide_edit_plugin":    "smalti_edit_plugin",
+        "aide_delete_plugin":  "smalti_delete_plugin"
+      };
+      if (_DEPRECATED_ALIASES[tn]) {
+        var _newName = _DEPRECATED_ALIASES[tn];
+        if (!_deprecationWarned.has(tn)) {
+          _deprecationWarned.add(tn);
+          console.error("[smalti-mcp] DEPRECATED: tool name '" + tn + "' will be removed in a future version. Use '" + _newName + "' instead.");
+        }
+      }
+      var _resolved = _DEPRECATED_ALIASES[tn] || tn;
+      if (_resolved === "smalti_create_plugin") {
         sendResult(id, { content: [{ type: "text", text: JSON.stringify(createPlugin(ta), null, 2) }] });
-      } else if (tn === "aide_list_plugins") {
+      } else if (_resolved === "smalti_list_plugins") {
         sendResult(id, { content: [{ type: "text", text: JSON.stringify(listPluginSpecs(), null, 2) }] });
-      } else if (tn === "aide_invoke_tool") {
+      } else if (_resolved === "smalti_invoke_tool") {
         sendResult(id, { content: [{ type: "text", text: JSON.stringify(invokePluginTool(ta.plugin_name, ta.tool_name, ta.args || {})) }] });
-      } else if (tn === "aide_edit_plugin") {
+      } else if (_resolved === "smalti_edit_plugin") {
         sendResult(id, { content: [{ type: "text", text: JSON.stringify(editPlugin(ta), null, 2) }] });
-      } else if (tn === "aide_delete_plugin") {
+      } else if (_resolved === "smalti_delete_plugin") {
         const dir = path.join(PLUGINS_DIR, ta.plugin_name);
         if (!path.resolve(dir).startsWith(path.resolve(PLUGINS_DIR) + path.sep)) throw new Error("Invalid plugin name");
         if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true });

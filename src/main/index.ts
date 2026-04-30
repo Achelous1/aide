@@ -15,7 +15,7 @@ import { registerAppSettingsHandlers, getAppSettings, setAppSetting } from './ip
 import { registerUpdaterHandlers } from './ipc/updater-handlers';
 import { startUpdatePolling } from './updater/check';
 import { killAllSessions } from './ipc/terminal-handlers';
-import { writeMcpConfig, getMcpConfigPath, unregisterAideFromJsonConfig } from './mcp/config-writer';
+import { writeMcpConfig, getMcpConfigPath, unregisterSmaltiFromJsonConfig } from './mcp/config-writer';
 import { registerCustomSchemes, registerPluginProtocol } from './plugin/protocol';
 import { registerCdnProtocol } from './plugin/cdn-protocol';
 import { getHome } from './utils/home';
@@ -134,10 +134,10 @@ app.on('ready', () => {
       if (fs.existsSync(mcpConfigPath)) {
         const config = JSON.parse(fs.readFileSync(mcpConfigPath, 'utf-8')) as Record<string, unknown>;
         const servers = config.mcpServers as Record<string, { args?: string[] }> | undefined;
-        const aideEntry = servers?.['aide'];
+        const aideEntry = servers?.['smalti'] ?? servers?.['aide'];
         if (aideEntry?.args?.[0] && !fs.existsSync(aideEntry.args[0])) {
-          unregisterAideFromJsonConfig(mcpConfigPath);
-          console.log('[smalti] Cleaned dead-path mcpServers.aide from merged mcp-config.json');
+          unregisterSmaltiFromJsonConfig(mcpConfigPath);
+          console.log('[smalti] Cleaned dead-path mcpServers.smalti from merged mcp-config.json');
         }
       }
     } catch (err) {
