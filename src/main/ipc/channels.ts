@@ -40,6 +40,7 @@ export const IPC_CHANNELS = {
   PLUGIN_REGISTRY_PULL: 'plugin:registry:pull',
   PLUGIN_REGISTRY_PUSH: 'plugin:registry:push',
   PLUGIN_REGISTRY_REMOVE: 'plugin:registry:remove',
+  PLUGIN_REGISTRY_MODIFIED_FILES: 'plugin:registry:modified-files',
 
   // Settings
   SETTINGS_READ: 'settings:read',

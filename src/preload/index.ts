@@ -132,6 +132,8 @@ const aideAPI: AideAPI = {
       push: (pluginName: string, opts?: { bumpPatch?: boolean }) =>
         ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_REGISTRY_PUSH, pluginName, opts),
       remove: (registryId: string) => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_REGISTRY_REMOVE, registryId),
+      modifiedFiles: (pluginName: string): Promise<string[]> =>
+        ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_REGISTRY_MODIFIED_FILES, pluginName) as Promise<string[]>,
     },
   },
 

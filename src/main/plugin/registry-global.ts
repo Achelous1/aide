@@ -5,7 +5,9 @@ import {
   packDirectoryToZipBuffer,
   unpackZipBufferToDirectory,
   computeDirectoryContentHash,
+  diffDirectories,
 } from './zip-utils';
+import os from 'os';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -314,5 +316,53 @@ export function removePlugin(id: string): void {
   if (id in idx.plugins) {
     delete idx.plugins[id];
     writeIndex(idx);
+  }
+}
+
+/**
+ * For a workspace plugin that has a `source` block, compute file-level
+ * modifications relative to its installed registry version. Useful for
+ * surfacing "what will be lost" before applying an update.
+ *
+ * Returns a flat list of "<status> <relPath>" entries — e.g.
+ * ["modified src/index.js", "added src/utils/new.js"]. Removed files
+ * are also flagged.
+ *
+ * Returns [] when:
+ * - the registry doesn't have the installedVersion zip (data loss / sandbox tests)
+ *
+ * Throws on filesystem errors. Caller should treat as best-effort and
+ * fall back to "files unknown" UI.
+ */
+export function getModifiedFiles(
+  workspacePluginDir: string,
+  source: { registryId: string; installedVersion: string },
+): string[] {
+  const zipFilePath = path.join(
+    versionDir(source.registryId, source.installedVersion),
+    'plugin.zip',
+  );
+
+  if (!fs.existsSync(zipFilePath)) {
+    return [];
+  }
+
+  const tmpDir = path.join(os.tmpdir(), `smalti-diff-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  fs.mkdirSync(tmpDir, { recursive: true });
+  try {
+    const buf = fs.readFileSync(zipFilePath);
+    unpackZipBufferToDirectory(buf, tmpDir);
+
+    const diff = diffDirectories(tmpDir, workspacePluginDir);
+
+    const results: string[] = [
+      ...diff.modified.map((p) => `modified ${p}`),
+      ...diff.added.map((p) => `added ${p}`),
+      ...diff.removed.map((p) => `removed ${p}`),
+    ];
+
+    return results;
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }

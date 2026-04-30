@@ -465,4 +465,21 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
       return { ok: false, error: (err as Error).message };
     }
   });
+
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_REGISTRY_MODIFIED_FILES, async (_e, pluginName: string) => {
+    try {
+      const effectiveCwd = getEffectiveCwd(cwd);
+      const localDir = getLocalPluginsDir(effectiveCwd);
+      const pluginDir = path.join(localDir, pluginName);
+      const spec = readPluginSpec(pluginDir);
+      if (!spec || !spec.source) return [];
+      return registryGlobal.getModifiedFiles(pluginDir, {
+        registryId: spec.source.registryId,
+        installedVersion: spec.source.installedVersion,
+      });
+    } catch (err) {
+      console.error('[plugin:registry:modified-files] error:', err);
+      return [];
+    }
+  });
 }
