@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { unregisterAideFromJsonConfig } from '../../src/main/mcp/config-writer';
+import { unregisterSmaltiFromJsonConfig } from '../../src/main/mcp/config-writer';
 
-describe('unregisterAideFromJsonConfig', () => {
+describe('unregisterSmaltiFromJsonConfig', () => {
   let tmpDir: string;
   let configPath: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aide-unreg-test-'));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'smalti-unreg-test-'));
     configPath = path.join(tmpDir, '.claude.json');
   });
 
@@ -18,7 +18,7 @@ describe('unregisterAideFromJsonConfig', () => {
   });
 
   it('does nothing when the config file does not exist', () => {
-    expect(() => unregisterAideFromJsonConfig(configPath)).not.toThrow();
+    expect(() => unregisterSmaltiFromJsonConfig(configPath)).not.toThrow();
     expect(fs.existsSync(configPath)).toBe(false);
   });
 
@@ -30,7 +30,7 @@ describe('unregisterAideFromJsonConfig', () => {
     };
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-    unregisterAideFromJsonConfig(configPath);
+    unregisterSmaltiFromJsonConfig(configPath);
 
     const result = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     expect(result.mcpServers).toBeUndefined();
@@ -45,7 +45,7 @@ describe('unregisterAideFromJsonConfig', () => {
     };
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-    unregisterAideFromJsonConfig(configPath);
+    unregisterSmaltiFromJsonConfig(configPath);
 
     const result = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     expect(result.mcpServers.aide).toBeUndefined();
@@ -60,7 +60,7 @@ describe('unregisterAideFromJsonConfig', () => {
     };
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-    unregisterAideFromJsonConfig(configPath);
+    unregisterSmaltiFromJsonConfig(configPath);
 
     const result = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     expect(result.mcpServers).toBeUndefined();
@@ -75,7 +75,7 @@ describe('unregisterAideFromJsonConfig', () => {
     const raw = JSON.stringify(config, null, 2);
     fs.writeFileSync(configPath, raw);
 
-    unregisterAideFromJsonConfig(configPath);
+    unregisterSmaltiFromJsonConfig(configPath);
 
     expect(fs.readFileSync(configPath, 'utf-8')).toBe(raw);
   });
@@ -85,7 +85,7 @@ describe('unregisterAideFromJsonConfig', () => {
     const raw = JSON.stringify(config, null, 2);
     fs.writeFileSync(configPath, raw);
 
-    unregisterAideFromJsonConfig(configPath);
+    unregisterSmaltiFromJsonConfig(configPath);
 
     expect(fs.readFileSync(configPath, 'utf-8')).toBe(raw);
   });
@@ -94,7 +94,7 @@ describe('unregisterAideFromJsonConfig', () => {
     const raw = '{invalid json!!!';
     fs.writeFileSync(configPath, raw);
 
-    expect(() => unregisterAideFromJsonConfig(configPath)).not.toThrow();
+    expect(() => unregisterSmaltiFromJsonConfig(configPath)).not.toThrow();
     expect(fs.readFileSync(configPath, 'utf-8')).toBe(raw);
   });
 
@@ -107,11 +107,25 @@ describe('unregisterAideFromJsonConfig', () => {
     };
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-    unregisterAideFromJsonConfig(configPath);
-    unregisterAideFromJsonConfig(configPath);
+    unregisterSmaltiFromJsonConfig(configPath);
+    unregisterSmaltiFromJsonConfig(configPath);
 
     const result = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     expect(result.mcpServers.aide).toBeUndefined();
     expect(result.mcpServers.other).toBeDefined();
+  });
+
+  it('removes the smalti entry too (defensive cleanup)', () => {
+    const config = {
+      mcpServers: {
+        smalti: { command: 'node', args: ['/path/to/smalti-mcp-server.js'] },
+      },
+    };
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+    unregisterSmaltiFromJsonConfig(configPath);
+
+    const result = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    expect(result.mcpServers).toBeUndefined();
   });
 });

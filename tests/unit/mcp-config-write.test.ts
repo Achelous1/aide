@@ -67,7 +67,7 @@ describe('writeMcpConfig — post-release startup registration', () => {
     expect(content).toContain('node');
   });
 
-  it('registers mcpServers.aide in ~/.gemini/settings.json with smalti server path', async () => {
+  it('registers mcpServers.smalti in ~/.gemini/settings.json with smalti server path', async () => {
     const { writeMcpConfig } = await loadConfigWriter();
     writeMcpConfig(path.join(sandboxHome, 'workspace'));
 
@@ -76,13 +76,13 @@ describe('writeMcpConfig — post-release startup registration', () => {
 
     const cfg = JSON.parse(fs.readFileSync(geminiConfigPath, 'utf-8'));
     expect(cfg.mcpServers).toBeDefined();
-    expect(cfg.mcpServers.aide).toBeDefined();
-    expect(cfg.mcpServers.aide.args[0]).toBe(
+    expect(cfg.mcpServers.smalti).toBeDefined();
+    expect(cfg.mcpServers.smalti.args[0]).toBe(
       path.join(sandboxHome, '.smalti', 'smalti-mcp-server.js'),
     );
   });
 
-  it('registers [mcp_servers.aide] in ~/.codex/config.toml with smalti server path', async () => {
+  it('registers [mcp_servers.smalti] in ~/.codex/config.toml with smalti server path', async () => {
     const { writeMcpConfig } = await loadConfigWriter();
     writeMcpConfig(path.join(sandboxHome, 'workspace'));
 
@@ -90,7 +90,7 @@ describe('writeMcpConfig — post-release startup registration', () => {
     expect(fs.existsSync(codexConfigPath)).toBe(true);
 
     const content = fs.readFileSync(codexConfigPath, 'utf-8');
-    expect(content).toContain('[mcp_servers.aide]');
+    expect(content).toContain('[mcp_servers.smalti]');
     // Path is written via JSON.stringify in TOML, which escapes \ → \\ on
     // Windows. Compare against the JSON-stringified form so the assertion
     // works on both win32 and posix.
@@ -171,6 +171,67 @@ describe('writeMcpConfig — post-release startup registration', () => {
     expect(codexAfter2).toBe(codexAfter1);
   });
 
+  it('migrates legacy aide entry to smalti in ~/.gemini/settings.json', async () => {
+    const geminiConfigPath = path.join(sandboxHome, '.gemini', 'settings.json');
+    fs.mkdirSync(path.dirname(geminiConfigPath), { recursive: true });
+    fs.writeFileSync(
+      geminiConfigPath,
+      JSON.stringify(
+        {
+          mcpServers: {
+            aide: { command: 'node', args: ['/old/aide-mcp-server.js'] },
+            other: { command: 'node', args: ['/other/server.js'] },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const { writeMcpConfig } = await loadConfigWriter();
+    writeMcpConfig(path.join(sandboxHome, 'workspace'));
+
+    const cfg = JSON.parse(fs.readFileSync(geminiConfigPath, 'utf-8'));
+    // Legacy aide entry must be gone
+    expect(cfg.mcpServers.aide).toBeUndefined();
+    // smalti entry must be present with new path
+    expect(cfg.mcpServers.smalti).toBeDefined();
+    expect(cfg.mcpServers.smalti.args[0]).toBe(
+      path.join(sandboxHome, '.smalti', 'smalti-mcp-server.js'),
+    );
+    // Unrelated servers preserved
+    expect(cfg.mcpServers.other).toBeDefined();
+    expect(cfg.mcpServers.other.args[0]).toBe('/other/server.js');
+  });
+
+  it('migrates legacy [mcp_servers.aide] section to smalti in ~/.codex/config.toml', async () => {
+    const codexConfigPath = path.join(sandboxHome, '.codex', 'config.toml');
+    fs.mkdirSync(path.dirname(codexConfigPath), { recursive: true });
+    fs.writeFileSync(
+      codexConfigPath,
+      [
+        '[mcp_servers.aide]',
+        'command = "node"',
+        'args = ["/old/aide-mcp-server.js"]',
+        '',
+        '[mcp_servers.other]',
+        'command = "python"',
+        'args = ["other.py"]',
+      ].join('\n'),
+    );
+
+    const { writeMcpConfig } = await loadConfigWriter();
+    writeMcpConfig(path.join(sandboxHome, 'workspace'));
+
+    const content = fs.readFileSync(codexConfigPath, 'utf-8');
+    // Legacy aide section must be gone
+    expect(content).not.toContain('[mcp_servers.aide]');
+    // smalti section must be present
+    expect(content).toContain('[mcp_servers.smalti]');
+    // Unrelated section preserved
+    expect(content).toContain('[mcp_servers.other]');
+  });
+
   it('preserves unrelated servers in ~/.gemini/settings.json (merge, not overwrite)', async () => {
     const geminiConfigPath = path.join(sandboxHome, '.gemini', 'settings.json');
     fs.mkdirSync(path.dirname(geminiConfigPath), { recursive: true });
@@ -192,7 +253,7 @@ describe('writeMcpConfig — post-release startup registration', () => {
     const cfg = JSON.parse(fs.readFileSync(geminiConfigPath, 'utf-8'));
     expect(cfg.mcpServers.sentry).toBeDefined();
     expect(cfg.mcpServers.sentry.command).toBe('sentry-cli');
-    expect(cfg.mcpServers.aide).toBeDefined();
+    expect(cfg.mcpServers.smalti).toBeDefined();
     expect(cfg.someOtherKey).toBe('preserve-me');
   });
 });
