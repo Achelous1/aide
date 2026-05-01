@@ -44,6 +44,14 @@ interface PluginState {
    */
   publish: (pluginName: string, bumpPatch?: boolean) => Promise<PublishConflict | null>;
   importFromRegistry: (registryId: string, targetName?: string) => Promise<void>;
+  /**
+   * Lazy fetch the file-level diff between a workspace plugin and its
+   * installed registry version. Used by UpdateConfirmDialog to surface
+   * "what will be lost" — only called the moment the dialog is about to
+   * render, never on PluginPanel mount. Resolves to [] on any error so
+   * the UI degrades gracefully without breaking.
+   */
+  getModifiedFiles: (pluginName: string) => Promise<string[]>;
 }
 
 export const usePluginStore = create<PluginState>((set, get) => ({
@@ -266,5 +274,14 @@ export const usePluginStore = create<PluginState>((set, get) => ({
       throw new Error(`Import failed: ${result.reason}`);
     }
     await get().loadPlugins();
+  },
+
+  getModifiedFiles: async (pluginName: string) => {
+    try {
+      const files = await window.aide.plugin.registry.modifiedFiles(pluginName);
+      return Array.isArray(files) ? files : [];
+    } catch {
+      return [];
+    }
   },
 }));

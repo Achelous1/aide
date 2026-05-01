@@ -91,6 +91,7 @@ export function PluginPanel() {
     forkAsNew,
     publish,
     importFromRegistry,
+    getModifiedFiles,
   } = usePluginStore();
 
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -100,6 +101,24 @@ export function PluginPanel() {
   const [updateTarget, setUpdateTarget] = useState<PluginInfo | null>(null);
   const [publishConflict, setPublishConflict] =
     useState<{ plugin: PluginInfo; conflict: PublishConflict } | null>(null);
+  const [updateModifiedFiles, setUpdateModifiedFiles] = useState<string[]>([]);
+
+  // Lazy fetch the file-level diff whenever the Update dialog opens. Race-safe
+  // via the `alive` flag so a quick close + re-open doesn't show stale rows.
+  useEffect(() => {
+    if (!updateTarget) {
+      setUpdateModifiedFiles([]);
+      return;
+    }
+    let alive = true;
+    setUpdateModifiedFiles([]);
+    getModifiedFiles(updateTarget.name).then((files) => {
+      if (alive) setUpdateModifiedFiles(files);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [updateTarget, getModifiedFiles]);
 
   useEffect(() => {
     loadPlugins();
@@ -394,7 +413,7 @@ export function PluginPanel() {
           onClose={() => setUpdateTarget(null)}
           pluginName={updateTarget.name}
           latestVersion={registryDiffs[updateTarget.name]?.latestVersion ?? '?'}
-          modifiedFiles={[]}
+          modifiedFiles={updateModifiedFiles}
           onConfirm={async () => {
             await applyUpdate(updateTarget.name);
           }}
