@@ -8,6 +8,10 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
+const isLocalBuild = !!process.env.SMALTI_LOCAL_BUILD;
+const productName = isLocalBuild ? 'Smalti-Local-Build' : 'Smalti';
+const appBundleId = isLocalBuild ? 'com.smaltihq.smalti.local' : 'com.smaltihq.smalti';
+
 const nativeNodeFiles = ['src/main/native'];
 
 function copyNativeModules(buildPath: string) {
@@ -43,15 +47,15 @@ const config: ForgeConfig = {
     asar: {
       unpack: '**/native/*.node',
     },
-    name: 'Smalti',
+    name: productName,
     icon: path.resolve(__dirname, 'resources', 'icon'),
-    // Stable bundle ID — decoupled from packagerConfig.name so future brand
-    // text adjustments (capitalization, etc.) don't change CFBundleIdentifier
-    // and force users to re-grant TCC permissions (Full Disk Access, etc.).
-    appBundleId: 'com.smaltihq.smalti',
+    // Bundle ID is stable for release builds. Local builds use a separate
+    // bundle ID so they are recognised as a distinct app by macOS, keeping
+    // Application Support directories and TCC permissions isolated.
+    appBundleId,
     win32metadata: {
       CompanyName: 'smalti',
-      ProductName: 'Smalti',
+      ProductName: productName,
     },
     extendInfo: {
       NSDocumentsFolderUsageDescription: 'Smalti reads workspace files from your Documents folder.',
@@ -70,7 +74,7 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({ name: 'Smalti' }),
+    new MakerSquirrel({ name: productName }),
     new MakerZIP({}, ['darwin']),
   ],
   plugins: [
