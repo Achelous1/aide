@@ -85,9 +85,6 @@ export function PluginPanel() {
     loadPlugins,
     activate,
     deletePlugin,
-    generate,
-    generating,
-    generateError,
     registryDiffs,
     refreshRegistryDiffs,
     applyUpdate,
@@ -103,8 +100,6 @@ export function PluginPanel() {
   const [updateTarget, setUpdateTarget] = useState<PluginInfo | null>(null);
   const [publishConflict, setPublishConflict] =
     useState<{ plugin: PluginInfo; conflict: PublishConflict } | null>(null);
-  const [genName, setGenName] = useState('');
-  const [genDesc, setGenDesc] = useState('');
 
   useEffect(() => {
     loadPlugins();
@@ -237,15 +232,6 @@ export function PluginPanel() {
     }
   };
 
-  const handleGenerate = async () => {
-    if (!genName.trim() || generating) return;
-    const result = await generate(genName.trim(), genDesc.trim());
-    if (result) {
-      setGenName('');
-      setGenDesc('');
-    }
-  };
-
   const renderPlugin = (plugin: PluginInfo) => {
     const status = statusFor(plugin);
     const diff = registryDiffs[plugin.name];
@@ -308,7 +294,7 @@ export function PluginPanel() {
       </div>
 
       {/* Add from registry button */}
-      <div className="px-3 py-2 shrink-0">
+      <div className="px-3 py-2 shrink-0 border-b border-aide-border">
         <button
           onClick={() => setBrowserOpen(true)}
           data-testid="add-from-registry"
@@ -316,36 +302,6 @@ export function PluginPanel() {
         >
           + Add from registry
         </button>
-      </div>
-
-      {/* Generate plugin form */}
-      <div className="px-3 pb-2 shrink-0 flex flex-col gap-2 border-b border-aide-border">
-        <input
-          type="text"
-          value={genName}
-          onChange={(e) => setGenName(e.target.value)}
-          placeholder="plugin name"
-          aria-label="Plugin name"
-          className="w-full bg-aide-background border border-aide-border rounded px-2 py-1.5 text-xs font-mono text-aide-text-primary focus:outline-none focus:border-aide-accent"
-        />
-        <input
-          type="text"
-          value={genDesc}
-          onChange={(e) => setGenDesc(e.target.value)}
-          placeholder="describe what it does"
-          aria-label="Plugin description"
-          className="w-full bg-aide-background border border-aide-border rounded px-2 py-1.5 text-xs font-mono text-aide-text-primary focus:outline-none focus:border-aide-accent"
-        />
-        <button
-          onClick={handleGenerate}
-          disabled={!genName.trim() || generating}
-          className="w-full px-3 py-1.5 text-xs font-mono rounded border border-aide-accent text-aide-accent hover:bg-aide-accent/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {generating ? 'Generating…' : '+ Generate plugin'}
-        </button>
-        {generateError && (
-          <span className="text-[10px] font-mono text-smalti-crimson">{generateError}</span>
-        )}
       </div>
 
       {/* Plugin list */}
@@ -363,7 +319,7 @@ export function PluginPanel() {
         {!loading && !error && plugins.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 gap-1 text-aide-text-tertiary text-xs font-mono">
             <span>No plugins installed</span>
-            <span className="text-[10px]">Use + Add from registry, or generate one</span>
+            <span className="text-[10px]">Use + Add from registry to install one</span>
           </div>
         )}
 
