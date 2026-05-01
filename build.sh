@@ -1,7 +1,25 @@
 #!/bin/bash
 set -e
 
-echo "=== Smalti Build Script ==="
+# Local-build mode: --local flag or SMALTI_LOCAL_BUILD env var
+LOCAL_BUILD=0
+for arg in "$@"; do
+  if [ "$arg" = "--local" ]; then
+    LOCAL_BUILD=1
+  fi
+done
+if [ -n "$SMALTI_LOCAL_BUILD" ] && [ "$SMALTI_LOCAL_BUILD" != "0" ]; then
+  LOCAL_BUILD=1
+fi
+
+if [ "$LOCAL_BUILD" = "1" ]; then
+  echo "=== Smalti LOCAL Build (Smalti-Local-Build, isolated bundle ID) ==="
+  PRODUCT_NAME="Smalti-Local-Build"
+  export SMALTI_LOCAL_BUILD=1
+else
+  echo "=== Smalti Build Script ==="
+  PRODUCT_NAME="Smalti"
+fi
 echo ""
 
 # Check pnpm
@@ -13,15 +31,15 @@ fi
 # Detect arch
 ARCH=$(uname -m)
 if [ "$ARCH" = "arm64" ]; then
-  APP_DIR="out/Smalti-darwin-arm64"
+  APP_DIR="out/${PRODUCT_NAME}-darwin-arm64"
 else
-  APP_DIR="out/Smalti-darwin-x64"
+  APP_DIR="out/${PRODUCT_NAME}-darwin-x64"
 fi
 
-APP_PATH="$APP_DIR/Smalti.app"
-DMG_NAME="Smalti"
-DMG_PATH="out/Smalti.dmg"
-DMG_TMP_PATH="out/Smalti-tmp.dmg"
+APP_PATH="$APP_DIR/${PRODUCT_NAME}.app"
+DMG_NAME="$PRODUCT_NAME"
+DMG_PATH="out/${PRODUCT_NAME}.dmg"
+DMG_TMP_PATH="out/${PRODUCT_NAME}-tmp.dmg"
 
 # Install dependencies (postinstall hook builds the Rust .node via scripts/build-native.mjs)
 echo "[1/4] Installing dependencies..."
@@ -98,7 +116,7 @@ tell application "Finder"
     set viewOptions to the icon view options of container window
     set arrangement of viewOptions to not arranged
     set icon size of viewOptions to 100
-    set position of item "Smalti.app" of container window to {125, 160}
+    set position of item "${PRODUCT_NAME}.app" of container window to {125, 160}
     set position of item "Applications" of container window to {375, 160}
     close
     open
@@ -124,7 +142,7 @@ rm -f "$DMG_TMP_PATH"
 
 # Create .app.zip for in-place auto-update
 echo "[+] Creating app.zip for auto-update..."
-ZIP_PATH="out/Smalti.app.zip"
+ZIP_PATH="out/${PRODUCT_NAME}.app.zip"
 rm -f "$ZIP_PATH"
 ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
 
