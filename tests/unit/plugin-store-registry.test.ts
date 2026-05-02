@@ -129,7 +129,7 @@ describe('plugin-store registry actions', () => {
     expect(store.getState().registryDiffs).toEqual({});
   });
 
-  it('applyUpdate calls registry.pull with latest version and target name', async () => {
+  it('applyUpdate calls registry.pull with latest version and target name and overwrite:true', async () => {
     api.list.mockResolvedValue([mkPlugin('a')]);
     api.registryDiff.mockResolvedValue(mkDiff('reg-a', 'update-available', '0.3.0'));
 
@@ -137,7 +137,7 @@ describe('plugin-store registry actions', () => {
     await store.getState().refreshRegistryDiffs();
     await store.getState().applyUpdate('a');
 
-    expect(api.registryPull).toHaveBeenCalledWith('reg-a', '0.3.0', 'a');
+    expect(api.registryPull).toHaveBeenCalledWith('reg-a', '0.3.0', 'a', { overwrite: true });
   });
 
   it('applyUpdate throws when registry pull returns not ok', async () => {
@@ -160,10 +160,10 @@ describe('plugin-store registry actions', () => {
       restoreOriginal: true,
     });
 
-    // First call: clone original into new name (using installed/version as base)
+    // First call: clone original into new name (using installed/version as base) — no overwrite (fresh name)
     expect(api.registryPull).toHaveBeenNthCalledWith(1, 'reg-a', '0.1.0', 'a-fork');
-    // Second call: restore original to upstream (latest)
-    expect(api.registryPull).toHaveBeenNthCalledWith(2, 'reg-a', '0.2.0', 'a');
+    // Second call: restore original to upstream (latest) — overwrite:true required
+    expect(api.registryPull).toHaveBeenNthCalledWith(2, 'reg-a', '0.2.0', 'a', { overwrite: true });
   });
 
   it('forkAsNew skips restore call when restoreOriginal=false', async () => {

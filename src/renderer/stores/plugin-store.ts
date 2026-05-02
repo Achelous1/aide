@@ -211,7 +211,8 @@ export const usePluginStore = create<PluginState>((set, get) => ({
     const result = await window.aide.plugin.registry.pull(
       diff.registryId,
       diff.latestVersion ?? undefined,
-      pluginName
+      pluginName,
+      { overwrite: true }
     );
     if (!result.ok) {
       throw new Error(`Update failed: ${result.reason}`);
@@ -236,7 +237,8 @@ export const usePluginStore = create<PluginState>((set, get) => ({
       await window.aide.plugin.registry.pull(
         diff.registryId,
         diff.latestVersion ?? undefined,
-        originalName
+        originalName,
+        { overwrite: true }
       );
     }
     await get().loadPlugins();

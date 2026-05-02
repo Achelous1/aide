@@ -268,7 +268,7 @@ export interface AideAPI {
     registry: {
       list(): Promise<RegistrySummary[]>;
       diff(pluginName: string): Promise<RegistryDiff | null>;
-      pull(registryId: string, version?: string, targetName?: string): Promise<{ ok: true; pluginPath: string; contentHash: string } | { ok: false; reason?: string; error?: string }>;
+      pull(registryId: string, version?: string, targetName?: string, opts?: { overwrite?: boolean }): Promise<{ ok: true; pluginPath: string; contentHash: string } | { ok: false; reason?: string; error?: string }>;
       push(pluginName: string, opts?: { bumpPatch?: boolean }): Promise<{ ok: true; version: string; contentHash: string } | { ok: false; error?: string }>;
       remove(registryId: string): Promise<{ ok: true } | { ok: false; error?: string }>;
       modifiedFiles(pluginName: string): Promise<string[]>;

@@ -127,8 +127,8 @@ const aideAPI: AideAPI = {
     registry: {
       list: () => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_REGISTRY_LIST),
       diff: (pluginName: string) => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_REGISTRY_DIFF, pluginName),
-      pull: (registryId: string, version?: string, targetName?: string) =>
-        ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_REGISTRY_PULL, registryId, version, targetName),
+      pull: (registryId: string, version?: string, targetName?: string, opts?: { overwrite?: boolean }) =>
+        ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_REGISTRY_PULL, registryId, version, targetName, opts),
       push: (pluginName: string, opts?: { bumpPatch?: boolean }) =>
         ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_REGISTRY_PUSH, pluginName, opts),
       remove: (registryId: string) => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_REGISTRY_REMOVE, registryId),

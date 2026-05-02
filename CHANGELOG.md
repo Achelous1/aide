@@ -3,6 +3,36 @@
 All notable changes to Smalti are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning per [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-05-01
+
+Plugin global registry — workspace plugins can now be exported, imported, and synced across workspaces with explicit Update / Fork / Publish flows. Plus an MCP namespace rebrand and a local-build identity flag.
+
+### Added
+- **Plugin global registry** (`~/.smalti/registry/`) — generated plugins auto-push to a shared on-disk registry; other workspaces can browse and import them. Sync-first model: workspace state classified as `synced` / `update-available` / `locally-modified` / `unknown`. Workspace-specific changes that need to be preserved go through "Fork as new plugin" (D6) — divergence under the same `pluginId` is impossible by construction. PRs #131 (design + plan), #133 (zip-utils + registry-global backend, TDD), #134 (IPC channels + PLUGIN_GENERATE auto-push), #135 (UI: PluginPanel v2, RegistryBrowser, Fork/Update/Publish dialogs).
+- **`UpdateConfirmDialog` shows the file list that will be overwritten** — lazy IPC `plugin:registry:modified-files` unpacks the installed-version zip to compute file-level diff only when the destructive update dialog opens. PRs #136 (backend), #140 (UI wiring).
+- **`sh build.sh --local` flag** — produces `Smalti-Local-Build.app` / `.dmg` with a separate macOS bundle ID (`com.smaltihq.smalti.local`) so a local test build coexists with the released app instead of overwriting Application Support and TCC permissions. PR #138.
+- **design.pen** — Phase 0 mockups for the registry feature persisted to disk. PR #137.
+
+### Changed
+- **MCP rebrand `aide` → `smalti`** — builtin tools renamed (`aide_create_plugin` → `smalti_create_plugin`, etc., 5 tools total). External `mcpServers` config key renamed (Gemini `settings.json`, Codex `config.toml`, internal `mcp-config.json`); existing `aide` entries in the user's config files are auto-migrated to `smalti` on next launch. PR #132.
+- **PluginPanel v2** — replaces the previous panel: status badges (synced/update-available/locally-modified) drive an action menu (Update / Fork as new plugin / Publish / Remove). Removes the inline "Generate plugin" form (the IPC channel and `plugin-store.generate` action remain — MCP and CLI entry points are unaffected). PRs #135, #139.
+
+### Deprecated
+- `aide_*` MCP tool aliases — still routed to the new `smalti_*` handlers with a one-time deprecation warning per process; will be removed in a future release.
+- `mcpServers.aide` key in external configs — auto-migrated to `mcpServers.smalti` on register.
+
+### Fixed
+- **Update / Fork-restore-original flows now work** — `plugin:registry:pull` IPC accepts an `{ overwrite?: boolean }` option so `applyUpdate` and `forkAsNew(restoreOriginal: true)` can replace an existing plugin directory in place. Earlier release-candidate code rejected every such call as `name-conflict`, making the core update flow completely broken. Surfaced by Devil's Advocate review pre-release.
+- **Registry list error no longer corrupts UI** — `plugin:registry:list` returns `[]` on filesystem error instead of `{ ok: false, error }`, preventing `RegistryBrowser` from crashing on `.map()`.
+
+### Tests
+- Suite grew from ~480 to **620 tests** with TDD coverage for zip-utils (round-trip + content hash determinism + path traversal), registry-global (push/pull/diff/state machine + immutable versions + atomic writes), IPC handlers (auto-push tolerance + diff states), all 5 UI components (badges, browser, 3 dialogs), the modifiedFiles wiring, and the local-build forge config branching.
+
+### Upgrade notes
+- v0.2.x users: install v0.3.0 and reopen the workspace. No data migration required.
+- External clients (Claude Code, Gemini CLI, Codex CLI) calling the old `aide_*` MCP tool names will still work this release but log a deprecation warning. Update integrations to `smalti_*` to remove the warning.
+- macOS still requires `xattr -c /Applications/Smalti.app` after install (unsigned build).
+
 ## [0.2.3] — 2026-04-27
 
 Hotfix for blank plugin iframes after the v0.2.0 rebrand.

@@ -364,7 +364,8 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
     try {
       return registryGlobal.listPlugins();
     } catch (err) {
-      return { ok: false, error: (err as Error).message };
+      console.error('[plugin-handlers] registry list error:', (err as Error).message);
+      return [];
     }
   });
 
@@ -384,7 +385,7 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
     }
   });
 
-  ipcMain.handle(IPC_CHANNELS.PLUGIN_REGISTRY_PULL, async (_e, registryId: string, version?: string, targetName?: string) => {
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_REGISTRY_PULL, async (_e, registryId: string, version?: string, targetName?: string, opts?: { overwrite?: boolean }) => {
     try {
       const effectiveCwd = getEffectiveCwd(cwd);
       const localDir = getLocalPluginsDir(effectiveCwd);
@@ -396,9 +397,13 @@ export function registerPluginHandlers(ipcMain: IpcMain, cwd: string): void {
       const dirName = targetName ?? meta.name;
       const destDir = path.join(localDir, dirName);
 
-      // Name conflict check
+      // Name conflict check — skip if caller explicitly wants to overwrite
       if (fs.existsSync(destDir)) {
-        return { ok: false, reason: 'name-conflict' };
+        if (opts?.overwrite) {
+          fs.rmSync(destDir, { recursive: true, force: true });
+        } else {
+          return { ok: false, reason: 'name-conflict' };
+        }
       }
 
       fs.mkdirSync(destDir, { recursive: true });
