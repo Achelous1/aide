@@ -1,7 +1,7 @@
 {
   "name": "smalti",
   "productName": "Smalti",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Smalti — a terminal-centric AI-driven IDE with natural-language plugin generation",
   "homepage": "https://github.com/Achelous1/smalti",
   "repository": {
