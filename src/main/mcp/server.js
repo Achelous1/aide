@@ -258,6 +258,11 @@ Invoking backend tools from iframe:
       document.getElementById('preview').src = URL.createObjectURL(blob);
     });
 
+Workspace data path convention:
+- Plugin data files MUST be stored under <workspace>/.smalti/ (NOT .aide/).
+- Default path pattern: '.smalti/<plugin-name>.json' or '.smalti/<plugin-name>.<key>.json'.
+- Legacy plugins that hardcode '.aide/' still work (sandbox auto-rewrites to .smalti/), but new plugins should use .smalti/ directly to keep API responses (e.g. echoed filePath fields) consistent with disk reality.
+
 eventBindings (.smalti/settings.json): controls backend tool invocation on file events only — separate from iframe postMessage.
   Example: { "eventBindings": { "file:clicked": [{ "plugin": "my-plugin", "tool": "on-file-clicked", "args": {} }] } }
 
