@@ -140,4 +140,51 @@ describe('migrateAideToSmalti', () => {
     expect(result.skipped).toBe('no-aide-dir');
     expect(result.deletedLegacy).toBeUndefined();
   });
+
+  // ── AC-4: partial-failure recovery ──────────────────────────────────────────
+  // ~/.aide has a, b, c. Only a exists in ~/.smalti already (conflict).
+  // Migration must move b and c, keep a as the dest version.
+
+  it('partial-failure recovery: moves b,c when only a conflicts with dest', async () => {
+    await fsp.mkdir(aideDir);
+    await fsp.mkdir(smaltiDir);
+    await fsp.writeFile(path.join(aideDir, 'a.json'), 'aide-a');
+    await fsp.writeFile(path.join(aideDir, 'b.json'), 'b-content');
+    await fsp.writeFile(path.join(aideDir, 'c.json'), 'c-content');
+    // dest already has 'a' — it wins
+    await fsp.writeFile(path.join(smaltiDir, 'a.json'), 'smalti-a');
+
+    const result = await migrateAideToSmalti();
+
+    expect(result.migrated).toBe(true);
+    expect(result.mode).toBe('merged');
+    expect(result.deletedLegacy).toBe(true);
+
+    // dest version preserved for conflicting file
+    expect(await fsp.readFile(path.join(smaltiDir, 'a.json'), 'utf-8')).toBe('smalti-a');
+    // non-conflicting files moved over
+    expect(await fsp.readFile(path.join(smaltiDir, 'b.json'), 'utf-8')).toBe('b-content');
+    expect(await fsp.readFile(path.join(smaltiDir, 'c.json'), 'utf-8')).toBe('c-content');
+    // source removed
+    expect(fs.existsSync(aideDir)).toBe(false);
+  });
+
+  // ── AC-3: marker present but ~/.aide reappeared → defensive re-merge ────────
+
+  it('re-merges when marker exists but ~/.aide has reappeared, marker preserved', async () => {
+    // Simulate: prior migration wrote marker, then ~/.aide recreated externally
+    await fsp.mkdir(smaltiDir, { recursive: true });
+    await fsp.writeFile(marker, '2026-01-01T00:00:00Z');
+    await fsp.mkdir(aideDir);
+    await fsp.writeFile(path.join(aideDir, 'reappeared.json'), 'new-data');
+
+    const result = await migrateAideToSmalti();
+
+    expect(result.migrated).toBe(true);
+    expect(result.mode).toBe('merged');
+    expect(fs.existsSync(path.join(smaltiDir, 'reappeared.json'))).toBe(true);
+    expect(fs.existsSync(aideDir)).toBe(false);
+    // Existing marker timestamp untouched (merge branch does not overwrite)
+    expect(await fsp.readFile(marker, 'utf-8')).toBe('2026-01-01T00:00:00Z');
+  });
 });

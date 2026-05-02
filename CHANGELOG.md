@@ -3,6 +3,22 @@
 All notable changes to Smalti are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning per [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-05-02
+
+Hotfix release closing the v0.2.x → v0.3.0 migration loop. Plugins generated under v0.1.x that hardcode `.aide/` workspace paths now resolve correctly through the MCP server, and the migration design is captured in a written PRD with full regression coverage.
+
+### Fixed
+- **MCP server sandbox alias for legacy `.aide/` plugin paths** — `src/main/mcp/server.js` now applies the same `.aide/` → `.smalti/` rewrite that v0.2.2 introduced in `src/main/plugin/sandbox.ts`. Without it, every plugin call routed through MCP (Claude/Gemini/Codex agents) saw `.aide/` resolve to a missing directory; the agent-todo-board kanban with all existing tasks appeared empty for users upgrading from v0.1.x. Two sandbox copies exist because `server.js` is loaded as a standalone JS via `?raw` import and cannot consume TS modules — the alias is now inlined in both with a property-based equivalence test that guards against drift. PR #143.
+- **`migrateProjectMcpJson` strips both `aide` and `smalti` keys** from workspace `.mcp.json`. `smalti` is delivered per-invocation via `--mcp-config`; a workspace-level entry caused duplicate MCP server spawns. PR #143.
+
+### Added
+- **Migration PRD** (`docs/spec/migration-prd.md`) — 19 migration surface areas, 8 acceptance criteria, idempotency / partial-failure / marker / rename-first policies, back-compat retention vs. drop policy, out-of-scope items. PR #143.
+- **Migration regression test suite** — +23 tests (637 → 660). Covers MCP sandbox alias per fs method, post-alias workspace boundary, sandbox.ts equivalence, Claude/Gemini/Codex global config migration with TOML array preservation, and home-migration partial-failure / marker-resurrected-source recovery. PR #143.
+- **Plugin generator workspace path convention** — `CREATE_PLUGIN_DESC` now instructs new plugins to write under `<workspace>/.smalti/` instead of `.aide/`. Legacy `.aide/` paths still work via sandbox alias, but new plugins use `.smalti/` directly so API responses (e.g. echoed `filePath`) match disk reality. PR #143.
+
+### Documentation
+- **CLAUDE.md "Known Pitfalls"** — added `MCP server.js: sandbox alias must stay in sync with sandbox.ts` entry documenting the duplicated implementation and the equivalence test. PR #143.
+
 ## [0.3.0] — 2026-05-01
 
 Plugin global registry — workspace plugins can now be exported, imported, and synced across workspaces with explicit Update / Fork / Publish flows. Plus an MCP namespace rebrand and a local-build identity flag.

@@ -210,6 +210,9 @@ Claude accepts `--mcp-config <path>` per invocation. Gemini and Codex do not —
 
 All three are written by `writeMcpConfig()` in `src/main/mcp/config-writer.ts`. See `registerJsonMcpConfig()` for the shared JSON merge helper.
 
+### MCP server.js: sandbox alias는 sandbox.ts와 동기화 필수
+`src/main/mcp/server.js`는 `?raw` import되는 standalone JS로, `src/main/plugin/sandbox.ts`의 `resolveWorkspaceRel()`을 import할 수 없다. server.js 내부에 동등 로직을 inline으로 유지하며 `tests/unit/server-sandbox-alias.test.ts`가 양쪽의 동등성을 검증한다. `sandbox.ts`의 alias 로직을 변경할 때는 반드시 server.js의 inline 로직도 함께 업데이트할 것.
+
 ## Platform Notes
 
 - macOS: bash/zsh default shell, .dmg/.zip packaging
