@@ -49,7 +49,10 @@ function nextColor(counter: number): string {
 
 /**
  * Migration: remove smalti-generated entries from {workspace}/.mcp.json.
- * If only smalti entries remain, delete the file entirely.
+ * Removes both 'aide' (legacy) and 'smalti' keys from mcpServers.
+ * smalti is passed via --mcp-config per-invocation, so workspace-level
+ * registration causes duplicate spawns.
+ * If no other servers remain, delete the file entirely.
  */
 export function migrateProjectMcpJson(workspacePath: string): void {
   const mcpPath = nodePath.join(workspacePath, '.mcp.json');
@@ -58,24 +61,28 @@ export function migrateProjectMcpJson(workspacePath: string): void {
     const raw = fs.readFileSync(mcpPath, 'utf-8');
     const config = JSON.parse(raw);
     if (!config.mcpServers || typeof config.mcpServers !== 'object') return;
-    if (!('aide' in config.mcpServers)) return;
+    if (!('aide' in config.mcpServers) && !('smalti' in config.mcpServers)) return;
 
+    // Remove legacy 'aide' entry
     delete config.mcpServers.aide;
+    // Remove 'smalti' entry — smalti is passed via --mcp-config per invocation,
+    // so workspace-level registration would cause duplicate spawns.
+    delete config.mcpServers.smalti;
 
     if (Object.keys(config.mcpServers).length === 0) {
       // No other servers — check if there are top-level keys besides mcpServers
       const topKeys = Object.keys(config).filter((k) => k !== 'mcpServers');
       if (topKeys.length === 0) {
         fs.unlinkSync(mcpPath);
-        console.log('[smalti] Removed legacy .mcp.json (smalti-only)');
+        console.log('[smalti] Removed legacy .mcp.json (aide+smalti entries only)');
       } else {
         delete config.mcpServers;
         fs.writeFileSync(mcpPath, JSON.stringify(config, null, 2));
-        console.log('[smalti] Removed aide entry and empty mcpServers from .mcp.json');
+        console.log('[smalti] Removed aide/smalti entries and empty mcpServers from .mcp.json');
       }
     } else {
       fs.writeFileSync(mcpPath, JSON.stringify(config, null, 2));
-      console.log('[smalti] Removed aide entry from .mcp.json (other servers preserved)');
+      console.log('[smalti] Removed aide/smalti entries from .mcp.json (other servers preserved)');
     }
   } catch {
     // Corrupt or unreadable — leave it alone
