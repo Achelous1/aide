@@ -60,6 +60,26 @@ function resolvePluginDir(pluginName) {
   return null;
 }
 
+/**
+ * Resolve a workspace-relative path, rewriting a leading `.aide/` segment to
+ * `.smalti/` so legacy plugins (v0.1.x) that hardcode `.aide/` as their data
+ * directory transparently see the migrated location.
+ *
+ * Only the first path segment is rewritten — `.aide/` buried inside a deeper
+ * path (e.g. `a/.aide/x`) is left untouched because that cannot be a workspace
+ * root data directory.
+ *
+ * Mirrors src/main/plugin/sandbox.ts resolveWorkspaceRel exactly.
+ * TODO(T3): unify with src/main/plugin/sandbox.ts resolveWorkspaceRel
+ */
+function resolveWorkspaceRel(ws, fp) {
+  // v0.1.x compat: pre-rebrand plugins hardcode `.aide/` as a workspace data
+  // dir. Rewrite first segment to `.smalti/` so legacy plugins see migrated
+  // data without needing regeneration.
+  var normalized = fp.replace(/^(\.\/?)?\.aide(\/|$)/, "$1.smalti$2");
+  return path.resolve(ws, normalized);
+}
+
 function invokePluginTool(pluginName, toolName, args) {
   const resolved = resolvePluginDir(pluginName);
   if (!resolved) throw new Error("Plugin not found: " + pluginName);
@@ -75,15 +95,15 @@ function invokePluginTool(pluginName, toolName, args) {
   function assertRead() { if (!hasFsRead) throw new Error("Permission denied: fs:read not granted"); }
   function assertWrite() { if (!hasFsWrite) throw new Error("Permission denied: fs:write not granted"); }
   var scopedFs = {
-    read: function(fp) { assertRead(); var a = path.resolve(ws, fp); assertInWs(a); return fs.readFileSync(a, "utf-8"); },
-    write: function(fp, c) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.writeFileSync(a, c); },
-    existsSync: function(fp) { var a = path.resolve(ws, fp); assertInWs(a); return fs.existsSync(a); },
-    readFileSync: function(fp, enc) { assertRead(); var a = path.resolve(ws, fp); assertInWs(a); return enc ? fs.readFileSync(a, enc) : fs.readFileSync(a); },
-    writeFileSync: function(fp, c) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.writeFileSync(a, c); },
-    mkdirSync: function(fp, opts) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.mkdirSync(a, opts); },
-    readdirSync: function(fp, opts) { assertRead(); var a = path.resolve(ws, fp); assertInWs(a); return fs.readdirSync(a, opts); },
-    statSync: function(fp) { var a = path.resolve(ws, fp); assertInWs(a); return fs.statSync(a); },
-    unlinkSync: function(fp) { assertWrite(); var a = path.resolve(ws, fp); assertInWs(a); fs.unlinkSync(a); }
+    read: function(fp) { assertRead(); var a = resolveWorkspaceRel(ws, fp); assertInWs(a); return fs.readFileSync(a, "utf-8"); },
+    write: function(fp, c) { assertWrite(); var a = resolveWorkspaceRel(ws, fp); assertInWs(a); fs.writeFileSync(a, c); },
+    existsSync: function(fp) { var a = resolveWorkspaceRel(ws, fp); assertInWs(a); return fs.existsSync(a); },
+    readFileSync: function(fp, enc) { assertRead(); var a = resolveWorkspaceRel(ws, fp); assertInWs(a); return enc ? fs.readFileSync(a, enc) : fs.readFileSync(a); },
+    writeFileSync: function(fp, c) { assertWrite(); var a = resolveWorkspaceRel(ws, fp); assertInWs(a); fs.writeFileSync(a, c); },
+    mkdirSync: function(fp, opts) { assertWrite(); var a = resolveWorkspaceRel(ws, fp); assertInWs(a); fs.mkdirSync(a, opts); },
+    readdirSync: function(fp, opts) { assertRead(); var a = resolveWorkspaceRel(ws, fp); assertInWs(a); return fs.readdirSync(a, opts); },
+    statSync: function(fp) { var a = resolveWorkspaceRel(ws, fp); assertInWs(a); return fs.statSync(a); },
+    unlinkSync: function(fp) { assertWrite(); var a = resolveWorkspaceRel(ws, fp); assertInWs(a); fs.unlinkSync(a); }
   };
   var sandboxRequire = function(id) {
     if (id === "path") return path;
@@ -202,7 +222,7 @@ Sandbox Environment:
 - aide.files.reveal(path) / aide.files.select(path) / aide.files.refresh() → control the FILES tab (no-op in MCP context, functional in Electron UI)
 - aide.plugins.emit(event, data) → broadcast event to other plugins (no-op in MCP context)
 - No network access, no child_process, no other Node.js modules
-- An index.html is auto-generated for iframe rendering. Pass the optional 'html' parameter to aide_create_plugin to provide a custom UI in one step.
+- An index.html is auto-generated for iframe rendering. Pass the optional 'html' parameter to smalti_create_plugin to provide a custom UI in one step.
 
 HTML UI (iframe) Event API:
 Plugin iframes receive FILES tab events via postMessage from the Smalti renderer.
@@ -238,7 +258,12 @@ Invoking backend tools from iframe:
       document.getElementById('preview').src = URL.createObjectURL(blob);
     });
 
-eventBindings (.aide/settings.json): controls backend tool invocation on file events only — separate from iframe postMessage.
+Workspace data path convention:
+- Plugin data files MUST be stored under <workspace>/.smalti/ (NOT .aide/).
+- Default path pattern: '.smalti/<plugin-name>.json' or '.smalti/<plugin-name>.<key>.json'.
+- Legacy plugins that hardcode '.aide/' still work (sandbox auto-rewrites to .smalti/), but new plugins should use .smalti/ directly to keep API responses (e.g. echoed filePath fields) consistent with disk reality.
+
+eventBindings (.smalti/settings.json): controls backend tool invocation on file events only — separate from iframe postMessage.
   Example: { "eventBindings": { "file:clicked": [{ "plugin": "my-plugin", "tool": "on-file-clicked", "args": {} }] } }
 
 Theme Support (REQUIRED):
@@ -316,7 +341,7 @@ function getBuiltinTools() {
           code: { type: "string", description: "Complete plugin source code (CommonJS module)" },
           permissions: { type: "array", items: { type: "string" }, description: "Required permissions: fs:read, fs:write, network, process" },
           tools: { type: "array", description: "Tool definitions the plugin exposes", items: { type: "object", properties: { name: { type: "string" }, description: { type: "string" }, parameters: { type: "object" } } } },
-          html: { type: "string", description: "Optional custom index.html for the plugin iframe UI. If omitted, a default UI is auto-generated. The window.aide shim (on, invoke, emit, theme) is automatically injected by AIDE into all iframes — you do not need to include it manually." },
+          html: { type: "string", description: "Optional custom index.html for the plugin iframe UI. If omitted, a default UI is auto-generated. The window.aide shim (on, invoke, emit, theme) is automatically injected by Smalti into all iframes — you do not need to include it manually." },
           fileAssociations: { type: "array", items: { type: "string" }, description: "File extensions or glob patterns this plugin handles (e.g. [\".html\", \".css\", \"*.json\"]). Used to associate the plugin with file types in the file tree." }
         },
         required: ["name", "description", "code"]

@@ -20,6 +20,14 @@
  * Marker (~/.smalti/.migrated-from-aide) records that migration has run, so
  * future launches don't redo the merge.
  *
+ * Marker re-run policy:
+ *   - If the marker exists AND ~/.aide is absent: skip entirely (idempotent).
+ *   - If the marker exists BUT ~/.aide has reappeared (e.g. user restored a
+ *     backup or another tool recreated it): the merge path runs defensively
+ *     so any new files in ~/.aide are moved to ~/.smalti. The marker is NOT
+ *     rewritten in this case (it already exists). This ensures partial-failure
+ *     recovery works across process restarts without double-writing the marker.
+ *
  * Failures are surfaced via the returned MigrateResult AND a console.warn so
  * post-mortem debugging is possible (the previous copy-only version swallowed
  * delete errors silently and left ~/.aide on disk).
