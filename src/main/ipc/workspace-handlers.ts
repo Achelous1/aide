@@ -163,7 +163,7 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle(IPC_CHANNELS.WORKSPACE_OPEN_DIALOG, async () => {
     const win = BrowserWindow.getFocusedWindow();
-    const result = await dialog.showOpenDialog(win!, { properties: ['openDirectory'] });
+    const result = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] });
     if (result.canceled || result.filePaths.length === 0) return null;
     return result.filePaths[0];
   });
@@ -185,7 +185,7 @@ export function registerWorkspaceHandlers(ipcMain: IpcMain): void {
     const win = BrowserWindow.getFocusedWindow();
     const result = await dialog.showOpenDialog(win!, {
       title: 'Select parent directory for new project',
-      properties: ['openDirectory'],
+      properties: ['openDirectory', 'createDirectory'],
     });
     if (result.canceled || result.filePaths.length === 0) return null;
     const projectPath = nodePath.join(result.filePaths[0], projectName);
