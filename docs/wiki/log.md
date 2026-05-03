@@ -13,6 +13,7 @@
 2026-04-17 [ingest] Created [[app-settings-persistence]] — 테마 + 윈도우 해상도 저장/복원, aide-app-settings electron-store 추가 (PR #54)
 2026-04-22 [ingest] Created [[rust-core-migration]] — promoted from ideation after PRs #90/#91/#92/#93/#94 merged (Phase 0 spike + Phase 1 readTree/fsops/watcher swap)
 2026-04-24 [update] Cross-ref cleanup: [[rebrand-partide]] and [[rebrand-wnide]] marked as historical (SUPERSEDED), [[rebrand-smalti]] elevated as current candidate. Bidirectional `related` frontmatter links restored. `rust-core-migration` crate naming discussion updated to reference smalti.
+2026-05-02 [ingest] Created [[mcp-server-sandbox-duplication]] — v0.2.2 alias가 sandbox.ts에만 적용되고 server.js에는 빠져 칸반 데이터 안 보인 P0 버그, v0.3.1에서 alias inline 복제 + 동등성 속성 테스트로 회귀 가드 (PR #143, release v0.3.1)
 2026-04-24 [update] E4: docs/wiki brand sweep — formerly AIDE brand references migrated to smalti, code identifiers preserved.
 2026-04-25 [update] D6 follow-up: renderer-side user-visible strings (Welcome/EmptyState hero `> aide_` → `> smalti_`, TitleBar label, PermissionBanner EPERM message) migrated to smalti. Guard test [[../../tests/unit/brand-renderer-strings.test.ts]] added.
 2026-04-25 [update] Live theme application: re-aliased legacy `--background`/`--surface`/`--accent` CSS variables in `global.css` to smalti palette C values for both dark and light. All existing `aide-*` Tailwind classes now render with the new palette without component churn.

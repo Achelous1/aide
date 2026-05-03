@@ -207,7 +207,7 @@ interface ToolRegistry {
 
 #### 2.5 Plugin Workspace Isolation
 
-플러그인은 **워크스페이스 단위로만** 관리된다. 글로벌 플러그인 개념은 없으며, 모든 플러그인은 `{workspace}/.aide/plugins/`에 저장된다. smalti는 프로젝트 루트에 어떠한 파일도 생성하지 않는다 (예: `.mcp.json` 미생성 — MCP 서버는 spawn 시점의 cwd에서 플러그인 경로를 유도).
+플러그인은 **워크스페이스 단위로만** 관리된다. 글로벌 플러그인 개념은 없으며, 모든 플러그인은 `{workspace}/.smalti/plugins/`에 저장된다 (v0.2.x 이전의 `.aide/plugins/` 경로는 `migrate-aide-workspace.ts`가 자동 마이그레이션). smalti는 프로젝트 루트에 어떠한 파일도 생성하지 않는다 (예: `.mcp.json` 미생성 — MCP 서버는 spawn 시점의 cwd에서 플러그인 경로를 유도).
 
 **워크스페이스 전환 시 플러그인 갱신 흐름**:
 
@@ -244,7 +244,7 @@ Main: refreshPlugins(ws-b)
 
 **설계 원칙**:
 - 발신자(emitter)는 반환값을 받지 않는다 — 응답이 필요하면 수신 플러그인이 발신 플러그인으로 별도 emit
-- 바인딩은 `.aide/settings.json`에 선언적으로 정의
+- 바인딩은 `.smalti/settings.json`에 선언적으로 정의 (v0.1.x plugin이 hardcode한 `.aide/settings.json`은 sandbox alias로 자동 rewrite — [[mcp-server-sandbox-duplication]] 참조)
 - 권한(`pluginPermissions`)도 같은 파일에서 관리
 - 워크스페이스 스코프 내 로컬 + 글로벌 플러그인 간 통신 가능
 
@@ -605,6 +605,8 @@ aide/
 - 파일시스템 접근은 `plugin.spec.json`의 permissions에 따라 제한
 - 네트워크/프로세스 접근은 명시적 허용 필요
 - 실행 시간 및 메모리 제한 적용
+- **Sandbox는 두 곳에 구현되어 있다** — Electron 앱 내부 plugin invoke 경로의 `src/main/plugin/sandbox.ts` (renderer → main → vm)와 외부 MCP agent 호출 경로의 `src/main/mcp/server.js` (stdio JSON-RPC → 자체 vm). server.js는 `?raw` import되는 standalone JS이므로 sandbox.ts의 TypeScript 모듈을 import할 수 없어 sandbox 로직이 inline으로 복제된다. 두 구현 사이의 의미 차이는 `tests/unit/server-sandbox-alias.test.ts`의 동등성 속성 테스트가 회귀를 차단한다. 자세한 배경은 [[mcp-server-sandbox-duplication]] 참조.
+- v0.1.x plugin이 hardcode한 workspace-relative `.aide/` 경로는 양쪽 sandbox 모두 `resolveWorkspaceRel()`로 `.smalti/`로 자동 alias rewrite한다 (PR #143, v0.3.1). Plugin source code 자체의 `.aide/` 문자열은 사용자 워크스페이스 산물이므로 자동 수정하지 않으며 — runtime alias로 처리한다.
 
 ### Rust Native Module
 - fs-handlers의 path traversal 가드: `isExcluded()` 및 절대 경로 정규화로 워크스페이스 루트 외부 접근 차단
